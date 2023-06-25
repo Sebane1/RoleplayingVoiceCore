@@ -1,0 +1,3 @@
+[submodule "ElevenLabs-DotNet"]
+	path = ElevenLabs-DotNet
+	url = https://github.com/RageAgainstThePixel/ElevenLabs-DotNet.git
