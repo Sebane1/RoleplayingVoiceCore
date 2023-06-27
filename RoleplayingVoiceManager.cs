@@ -78,7 +78,7 @@ namespace RoleplayingVoiceCore {
             foreach (char character in @"@#$%^&*()_+{}:;\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
-            return ExtractQuotations(newText);
+            return ExtractQuotations(newText).Replace("\"", null);
         }
 
         private string ExtractQuotations(string text) {
@@ -87,7 +87,7 @@ namespace RoleplayingVoiceCore {
             if (strings.Length > 1) {
                 for (int i = 0; i < strings.Length; i++) {
                     if ((i + 1) % 2 == 0) {
-                        newText += strings[i] + "\r\n\r\n";
+                        newText += strings[i] + (strings.Length % 2 == 0 ? "\r\n\r\n" : "");
                     }
                 }
                 return newText;
