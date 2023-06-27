@@ -14,6 +14,8 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
+        public event EventHandler OnSendFailed;
+        public event EventHandler OnConnectionFailed;
 
         public NetworkedClient(string ipAddress) {
             sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
@@ -34,29 +36,49 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
 
         public async Task<bool> SendFile(string sendID, string path) {
-        sendMod:
-            try {
-                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
-                writer.Write(sendID);
-                writer.Write(0);
-                using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read)) {
-                    writer.Write(fileStream.Length);
-                    CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
-                    writer.Flush();
-                }
-            } catch {
-                sendingClient.Client.Shutdown(SocketShutdown.Both);
-                sendingClient.Client.Disconnect(true);
-                sendingClient.Close();
+            if (connected) {
                 try {
-                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
-                    goto sendMod;
+                    using FileStream fileStream = new(path, FileMode.Open, FileAccess.Read);
+                    BinaryWriter writer = new(sendingClient.GetStream());
+
+                    writer.Write(sendID);
+                    writer.Write(0);
+                    writer.Write(fileStream.Length);
+
+                    CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+
+                    writer.Flush();
+                    fileStream.Dispose();
+                    return true;
                 } catch {
-                    connected = false;
+                    Close();
+                    connectionAttempts++;
+
+                    if (connectionAttempts >= 10) {
+                        return await SendFile(sendID, path);
+                    } else {
+                        OnSendFailed?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            } else {
+                Start();
+
+                connectionAttempts++;
+                if (connectionAttempts >= 10) {
+                    return await SendFile(sendID, path);
+                } else {
+                    OnConnectionFailed?.Invoke(this, EventArgs.Empty);
                 }
             }
             return true;
+        }
+
+
+        private void Close() {
+            sendingClient.Client.Shutdown(SocketShutdown.Both);
+            sendingClient.Client.Disconnect(true);
+            sendingClient.Close();
+            connected = false;
         }
 
         public async Task<string> GetFile(string sendID, string tempPath) {

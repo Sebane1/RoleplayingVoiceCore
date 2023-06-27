@@ -23,7 +23,7 @@ namespace RoleplayingVoiceCore {
         public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
 
-        public async Task<string> DoVoice(string sender, string text, string voiceType) {
+        public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
             Voice characterVoice = null;
             foreach (var voice in voices) {
@@ -35,7 +35,7 @@ namespace RoleplayingVoiceCore {
             var defaultVoiceSettings = await _api.VoicesEndpoint.GetDefaultVoiceSettingsAsync();
             if (characterVoice != null) {
                 WaveOutEvent output = new WaveOutEvent();
-                if (!text.StartsWith("(") && !text.EndsWith(")")) {
+                if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && !text.Contains(@""""))) {
                     string trimmedText = TrimText(text);
                     if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
                         CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
