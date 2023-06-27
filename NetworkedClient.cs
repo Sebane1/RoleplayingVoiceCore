@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 
@@ -6,7 +7,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
     public class NetworkedClient : IDisposable {
         private bool disposedValue;
         private bool connected;
-        private TcpClient listeningClient;
         private TcpClient sendingClient;
         int connectionAttempts = 0;
         private string id;
@@ -17,18 +17,15 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public NetworkedClient(string ipAddress) {
             sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
-            listeningClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5500));
+            sendingClient.LingerState = new LingerOption(false, 5);
             _ipAddress = ipAddress;
         }
         public void Start() {
             try {
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
-                    listeningClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5500));
                 } catch {
-                    Thread.Sleep(10000);
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
-                    listeningClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5500));
                 }
                 connected = true;
             } catch {
@@ -64,7 +61,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public async Task<string> GetFile(string sendID, string tempPath) {
         sendMod:
-            string path = "";
+            string path = Path.Combine(tempPath, sendID + ".mp3");
             try {
                 BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
                 BinaryReader reader = new BinaryReader(sendingClient.GetStream());
@@ -73,7 +70,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 byte value = reader.ReadByte();
                 if (value != 0) {
                     long length = reader.ReadInt64();
-                    path = Path.Combine(tempPath, sendID + ".mp3");
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
                     }
@@ -93,33 +89,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
             return path;
         }
 
-        public void ListenForFiles(string tempPath) {
-            using (TcpClient client = listeningClient) {
-                using (BinaryReader reader = new BinaryReader(client.GetStream())) {
-                    using (BinaryWriter writer = new BinaryWriter(client.GetStream())) {
-                        id = reader.ReadString();
-                        while (true) {
-                            try {
-                                while (reader.ReadByte() == 0) {
-                                    writer.Write(0);
-                                }
-                                long length = reader.ReadInt64();
-                                string path = Path.Combine(tempPath, id + ".mp3");
-                                using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
-                                    CopyStream(reader.BaseStream, fileStream, (int)length);
-                                }
-                            } catch {
-                                client.Client.Shutdown(SocketShutdown.Both);
-                                client.Client.Disconnect(true);
-                                client.Close();
-                                connected = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
         public static void CopyStream(Stream input, Stream output, int bytes) {
             byte[] buffer = new byte[32768];
             int read;
