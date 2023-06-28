@@ -53,7 +53,7 @@ namespace RoleplayingVoiceCore {
                         CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                     }
                     if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                        clipPath = await _api.TextToSpeechEndpoint.TextToSpeechAsync(trimmedText, characterVoice,
+                        clipPath = await _api.TextToSpeechEndpoint.TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
                             defaultVoiceSettings, null,
                             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
                         CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
@@ -61,7 +61,7 @@ namespace RoleplayingVoiceCore {
                         clipPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
                     } else {
                         CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                        clipPath = await _api.TextToSpeechEndpoint.TextToSpeechAsync(trimmedText, characterVoice,
+                        clipPath = await _api.TextToSpeechEndpoint.TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
                             defaultVoiceSettings, null,
                             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
                         CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
