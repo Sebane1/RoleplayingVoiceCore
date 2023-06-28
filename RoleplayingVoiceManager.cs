@@ -126,13 +126,15 @@ namespace RoleplayingVoiceCore {
             }
         }
         public async Task<string> GetVoice(string sender, string text) {
-            string path = await _networkedClient.GetFile(CreateMD5(sender + text),
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
-            if (!string.IsNullOrEmpty(path)) {
-                WaveOutEvent output = new WaveOutEvent();
-                using (var player = new AudioFileReader(path)) {
-                    output.Init(player);
-                    output.Play();
+            if (_networkedClient != null) {
+                string path = await _networkedClient.GetFile(CreateMD5(sender + text),
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
+                if (!string.IsNullOrEmpty(path)) {
+                    WaveOutEvent output = new WaveOutEvent();
+                    using (var player = new AudioFileReader(path)) {
+                        output.Init(player);
+                        output.Play();
+                    }
                 }
             }
             return "";
