@@ -13,6 +13,7 @@ namespace RoleplayingVoiceCore {
 
         private string clipPath = "";
         public event EventHandler VoicesUpdated;
+        public event EventHandler<ValidationResult> OnApiValidationComplete;
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices characterVoices = null) {
             _apiKey = apiKey;
             _api = new ElevenLabsClient(apiKey);
@@ -25,6 +26,32 @@ namespace RoleplayingVoiceCore {
         public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
+
+        public async Task<bool> ApiValidation(string key)
+        {
+            bool isApiKeyValid = false;
+            if (!string.IsNullOrEmpty(key))
+            {
+                var api = new ElevenLabsClient(key);
+                var subscriptionInfo = await api.UserEndpoint.GetSubscriptionInfoAsync();
+                if (subscriptionInfo.Status == null)
+                {
+                    isApiKeyValid = false;
+                }
+                else
+                {
+                    isApiKeyValid = true;
+                }
+            }
+            ValidationResult validationResult = new ValidationResult();
+            validationResult.ValidationSuceeded = isApiKeyValid;
+            OnApiValidationComplete?.Invoke(this, validationResult);
+            if (isApiKeyValid)
+            {
+                return true;
+            }
+            return false;
+        }
 
         public async Task<string[]> GetVoiceList() {
             List<string> voicesNames = new List<string>();
@@ -140,4 +167,9 @@ namespace RoleplayingVoiceCore {
             return "";
         }
     }
+}
+
+public class ValidationResult : EventArgs
+{
+    public bool ValidationSuceeded { get; set; }
 }
