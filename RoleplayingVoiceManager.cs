@@ -6,6 +6,7 @@ using RoleplayingVoiceCore.AudioRecycler;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
+        private string _apiKey;
         private ElevenLabsClient _api;
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
@@ -13,6 +14,7 @@ namespace RoleplayingVoiceCore {
         private string clipPath = "";
         public event EventHandler VoicesUpdated;
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices characterVoices = null) {
+            _apiKey = apiKey;
             _api = new ElevenLabsClient(apiKey);
             _networkedClient = client;
             if (characterVoices != null) {
@@ -22,7 +24,17 @@ namespace RoleplayingVoiceCore {
 
         public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
+        public string ApiKey { get => _apiKey; set => _apiKey = value; }
 
+        public async Task<string[]> GetVoiceList() {
+            List<string> voicesNames = new List<string>();
+            var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+            voicesNames.Add("None");
+            foreach (var voice in voices) {
+                voicesNames.Add(voice.Name);
+            }
+            return voicesNames.ToArray();
+        }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
             Voice characterVoice = null;
