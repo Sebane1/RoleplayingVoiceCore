@@ -18,12 +18,20 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public event EventHandler OnConnectionFailed;
 
         public NetworkedClient(string ipAddress) {
-            sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
-            sendingClient.LingerState = new LingerOption(false, 5);
+            try {
+                sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
+                sendingClient.LingerState = new LingerOption(false, 5);
+            } catch {
+
+            }
             _ipAddress = ipAddress;
         }
         public void Start() {
             try {
+                if (sendingClient == null) {
+                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
+                    sendingClient.LingerState = new LingerOption(false, 5);
+                }
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
                 } catch {
@@ -61,13 +69,17 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     }
                 }
             } else {
-                Start();
+                try {
+                    Start();
 
-                connectionAttempts++;
-                if (connectionAttempts >= 10) {
-                    return await SendFile(sendID, path);
-                } else {
-                    OnConnectionFailed?.Invoke(this, EventArgs.Empty);
+                    connectionAttempts++;
+                    if (connectionAttempts >= 10) {
+                        return await SendFile(sendID, path);
+                    } else {
+                        OnConnectionFailed?.Invoke(this, EventArgs.Empty);
+                    }
+                } catch {
+
                 }
             }
             return true;
