@@ -44,7 +44,7 @@ namespace RoleplayingVoiceCore {
                     break;
                 }
             }
-            var defaultVoiceSettings = await _api.VoicesEndpoint.GetDefaultVoiceSettingsAsync();
+            var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
             if (characterVoice != null) {
                 WaveOutEvent output = new WaveOutEvent();
                 if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && !text.Contains(@""""))) {
