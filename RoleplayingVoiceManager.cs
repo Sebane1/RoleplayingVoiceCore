@@ -3,23 +3,24 @@ using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Wave;
 using RoleplayingVoiceCore.AudioRecycler;
+using System.Net.Http;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
         private string _apiKey;
-        private ElevenLabsClient _api;
+        private ElevenLabsClient? _api;
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
+        private HttpClient httpClient { get; }
 
         private string clipPath = "";
-        public event EventHandler VoicesUpdated;
-        public event EventHandler<ValidationResult> OnApiValidationComplete;
-        public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices characterVoices = null) {
+        public event EventHandler? VoicesUpdated;
+        public event EventHandler<ValidationResult>? OnApiValidationComplete;
+        public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices? characterVoices = null) {
             _apiKey = apiKey;
             try {
                 _api = new ElevenLabsClient(apiKey);
             } catch {
-
             }
             _networkedClient = client;
             if (characterVoices != null) {
@@ -34,9 +35,10 @@ namespace RoleplayingVoiceCore {
         public async Task<bool> ApiValidation(string key)
         {
             bool isApiKeyValid = false;
-            if (!string.IsNullOrEmpty(key))
+            if (!string.IsNullOrEmpty(key) && key.All(c => char.IsAsciiLetterOrDigit(c)))
             {
                 var api = new ElevenLabsClient(key);
+                var keyValid = new ElevenLabsAuthentication(key);
                 var subscriptionInfo = await api.UserEndpoint.GetSubscriptionInfoAsync();
                 if (subscriptionInfo.Status == null)
                 {
@@ -59,10 +61,25 @@ namespace RoleplayingVoiceCore {
 
         public async Task<string[]> GetVoiceList() {
             List<string> voicesNames = new List<string>();
-            var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+            IReadOnlyList<Voice>? voices = null;
+            if (_api != null)
+            {
+                try
+                {
+                    voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                }
+                catch
+                {
+
+                }
+            }
             voicesNames.Add("None");
-            foreach (var voice in voices) {
-                voicesNames.Add(voice.Name);
+            if (voices != null)
+            {
+                foreach (var voice in voices)
+                {
+                    voicesNames.Add(voice.Name);
+                }
             }
             return voicesNames.ToArray();
         }
