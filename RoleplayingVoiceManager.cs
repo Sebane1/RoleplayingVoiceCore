@@ -3,7 +3,6 @@ using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Wave;
 using RoleplayingVoiceCore.AudioRecycler;
-using System.Net.Http;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
@@ -11,16 +10,26 @@ namespace RoleplayingVoiceCore {
         private ElevenLabsClient? _api;
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
-        private HttpClient httpClient { get; }
 
         private string clipPath = "";
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
+        private bool apiValid;
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices? characterVoices = null) {
             _apiKey = apiKey;
-            try {
+            try
+            {
                 _api = new ElevenLabsClient(apiKey);
-            } catch {
+                _api.UserEndpoint.GetUserInfoAsync();
+                apiValid = true;
+            }
+            catch (Exception e)
+            {
+                var errorMain = e.Message.ToString();
+                if (errorMain.Contains("invalid_api_key"))
+                {
+                    apiValid = false;
+                }
             }
             _networkedClient = client;
             if (characterVoices != null) {
@@ -34,25 +43,27 @@ namespace RoleplayingVoiceCore {
 
         public async Task<bool> ApiValidation(string key)
         {
-            bool isApiKeyValid = false;
             if (!string.IsNullOrEmpty(key) && key.All(c => char.IsAsciiLetterOrDigit(c)))
             {
-                var api = new ElevenLabsClient(key);
-                var keyValid = new ElevenLabsAuthentication(key);
-                var subscriptionInfo = await api.UserEndpoint.GetSubscriptionInfoAsync();
-                if (subscriptionInfo.Status == null)
+                try
                 {
-                    isApiKeyValid = false;
+                    var api = new ElevenLabsClient(key);
+                    await api.UserEndpoint.GetUserInfoAsync();
+                    apiValid = true;
                 }
-                else
+                catch (Exception e)
                 {
-                    isApiKeyValid = true;
+                    var errorMain = e.Message.ToString();
+                    if (errorMain.Contains("invalid_api_key"))
+                    {
+                        apiValid = false;
+                    }
                 }
             }
             ValidationResult validationResult = new ValidationResult();
-            validationResult.ValidationSuceeded = isApiKeyValid;
+            validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
-            if (isApiKeyValid)
+            if (apiValid)
             {
                 return true;
             }
@@ -68,9 +79,13 @@ namespace RoleplayingVoiceCore {
                 {
                     voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                 }
-                catch
+                catch (Exception e)
                 {
-
+                    var errorVoiceList = e.Message.ToString();
+                    if (errorVoiceList.Contains("invalid_api_key"))
+                    {
+                        apiValid = false;
+                    }
                 }
             }
             voicesNames.Add("None");
@@ -84,12 +99,29 @@ namespace RoleplayingVoiceCore {
             return voicesNames.ToArray();
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
-            var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+            IReadOnlyList<Voice>? voices = null;
+            try
+            {
+                voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+            }
+            catch (Exception e)
+            {
+                var errorVoiceGen = e.Message.ToString();
+                if (errorVoiceGen.Contains("invalid_api_key"))
+                {
+                    apiValid = false;
+                }
+            }
             Voice characterVoice = null;
-            foreach (var voice in voices) {
-                if (voice.Name.ToLower().Contains(voiceType.ToLower())) {
-                    characterVoice = voice;
-                    break;
+            if (voices != null)
+            {
+                foreach (var voice in voices)
+                {
+                    if (voice.Name.ToLower().Contains(voiceType.ToLower()))
+                    {
+                        characterVoice = voice;
+                        break;
+                    }
                 }
             }
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
