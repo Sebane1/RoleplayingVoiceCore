@@ -100,19 +100,22 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             IReadOnlyList<Voice>? voices = null;
-            try
+            if (_api != null)
             {
-                voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-            }
-            catch (Exception e)
-            {
-                var errorVoiceGen = e.Message.ToString();
-                if (errorVoiceGen.Contains("invalid_api_key"))
+                try
                 {
-                    apiValid = false;
+                    voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                }
+                catch (Exception e)
+                {
+                    var errorVoiceGen = e.Message.ToString();
+                    if (errorVoiceGen.Contains("invalid_api_key"))
+                    {
+                        apiValid = false;
+                    }
                 }
             }
-            Voice characterVoice = null;
+            Voice? characterVoice = null;
             if (voices != null)
             {
                 foreach (var voice in voices)
