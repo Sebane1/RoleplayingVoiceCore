@@ -15,7 +15,11 @@ namespace RoleplayingVoiceCore {
         public event EventHandler VoicesUpdated;
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices characterVoices = null) {
             _apiKey = apiKey;
-            _api = new ElevenLabsClient(apiKey);
+            try {
+                _api = new ElevenLabsClient(apiKey);
+            } catch {
+
+            }
             _networkedClient = client;
             if (characterVoices != null) {
                 _characterVoices = characterVoices;
@@ -47,35 +51,39 @@ namespace RoleplayingVoiceCore {
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
             if (characterVoice != null) {
                 WaveOutEvent output = new WaveOutEvent();
-                if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && !text.Contains(@""""))) {
-                    string trimmedText = TrimText(text);
-                    if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
-                        CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
-                    }
-                    if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                        clipPath = await _api.TextToSpeechEndpoint
-                            .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                            defaultVoiceSettings, null,
-                            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
-                        CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
-                    } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
-                        clipPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                    } else {
-                        CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                        clipPath = await _api.TextToSpeechEndpoint
-                            .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                            defaultVoiceSettings, null,
-                            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
-                        CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
-                    }
-                    VoicesUpdated.Invoke(this, EventArgs.Empty);
-                    if (File.Exists(clipPath)) {
-                        using (var player = new AudioFileReader(clipPath)) {
-                            output.Init(player);
-                            output.Play();
+                try {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && !text.Contains(@""""))) {
+                        string trimmedText = TrimText(text);
+                        if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                            CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                         }
-                        _networkedClient.SendFile(CreateMD5(sender + text), clipPath);
+                        if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                            clipPath = await _api.TextToSpeechEndpoint
+                                .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
+                                defaultVoiceSettings, null,
+                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
+                            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
+                        } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                            clipPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                        } else {
+                            CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                            clipPath = await _api.TextToSpeechEndpoint
+                                .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
+                                defaultVoiceSettings, null,
+                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
+                            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
+                        }
+                        VoicesUpdated.Invoke(this, EventArgs.Empty);
+                        if (File.Exists(clipPath)) {
+                            using (var player = new AudioFileReader(clipPath)) {
+                                output.Init(player);
+                                output.Play();
+                            }
+                            _networkedClient.SendFile(CreateMD5(sender + text), clipPath);
+                        }
                     }
+                } catch {
+
                 }
             }
             return clipPath;
