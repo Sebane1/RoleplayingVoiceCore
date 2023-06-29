@@ -109,9 +109,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     }
                 }
             } catch {
-                sendingClient.Client.Shutdown(SocketShutdown.Both);
-                sendingClient.Client.Disconnect(true);
-                sendingClient.Close();
+                if (sendingClient != null) {
+                    sendingClient.Client.Shutdown(SocketShutdown.Both);
+                    sendingClient.Client.Disconnect(true);
+                    sendingClient.Close();
+                }
                 try {
                     sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
