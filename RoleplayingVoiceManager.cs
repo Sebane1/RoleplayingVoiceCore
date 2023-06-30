@@ -256,8 +256,3 @@ namespace RoleplayingVoiceCore {
         public int ValidationState { get; set; }
     }
 }
-
-public class ValidationResult : EventArgs
-{
-    public bool ValidationSuceeded { get; set; }
-}
