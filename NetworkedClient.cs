@@ -12,7 +12,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
-        public int Port { get { return 5105 * (connectionAttempts * 100); } }
+        public int Port { get { return 5105 + (connectionAttempts * 100); } }
 
         public event EventHandler OnSendFailed;
         public event EventHandler OnConnectionFailed;
@@ -22,7 +22,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 sendingClient.LingerState = new LingerOption(false, 5);
             } catch {
-
+                connectionAttempts++;
+                try {
+                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                    sendingClient.LingerState = new LingerOption(false, 5);
+                } catch { }
             }
             _ipAddress = ipAddress;
         }
@@ -35,6 +39,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
+                    connectionAttempts++;
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 }
                 connected = true;
