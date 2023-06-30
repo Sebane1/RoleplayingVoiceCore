@@ -1,4 +1,5 @@
 ﻿using ElevenLabs;
+using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Wave;
@@ -10,6 +11,7 @@ namespace RoleplayingVoiceCore {
         private ElevenLabsClient? _api;
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
+        SubscriptionInfo _info = new SubscriptionInfo();
 
         private string clipPath = "";
         public event EventHandler? VoicesUpdated;
@@ -45,6 +47,7 @@ namespace RoleplayingVoiceCore {
         public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
+        public SubscriptionInfo Info { get => _info; set => _info = value; }
 
         public async Task<bool> ApiValidation(string key)
         {
@@ -106,6 +109,32 @@ namespace RoleplayingVoiceCore {
             }
             return voicesNames.ToArray();
         }
+
+        public async void RefreshElevenlabsSubscriptionInfo()
+        {
+            ValidationResult state = new ValidationResult();
+            _info = null;
+            SubscriptionInfo? value = null;
+            if (_api != null)
+            {
+                try
+                {
+                    value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
+                }
+                catch (Exception e)
+                {
+                    var errorSubInfo = e.Message.ToString();
+                    if (errorSubInfo.Contains("invalid_api_key"))
+                    {
+                        apiValid = false;
+                        state.ValidationState = 3;
+                        OnApiValidationComplete?.Invoke(this, state);
+                    }
+                }
+            }
+            _info = value;
+        }
+
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
@@ -172,7 +201,8 @@ namespace RoleplayingVoiceCore {
                             _networkedClient.SendFile(CreateMD5(sender + text), clipPath);
                         }
                     }
-                } catch {
+                } 
+                catch {
 
                 }
             }
