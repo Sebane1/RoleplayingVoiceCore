@@ -1,4 +1,5 @@
 ﻿using ElevenLabs;
+using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Wave;
@@ -10,6 +11,7 @@ namespace RoleplayingVoiceCore {
         private ElevenLabsClient _api;
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
+        SubscriptionInfo _info = new SubscriptionInfo();
 
         private string clipPath = "";
         public event EventHandler VoicesUpdated;
@@ -29,6 +31,7 @@ namespace RoleplayingVoiceCore {
         public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
+        public SubscriptionInfo Info { get => _info; set => _info = value; }
 
         public async Task<string[]> GetVoiceList() {
             List<string> voicesNames = new List<string>();
@@ -38,6 +41,11 @@ namespace RoleplayingVoiceCore {
                 voicesNames.Add(voice.Name);
             }
             return voicesNames.ToArray();
+        }
+
+        public async void RefreshElevenlabsSubscriptionInfo() {
+            var value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
+            _info = value;
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
