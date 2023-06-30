@@ -134,7 +134,6 @@ namespace RoleplayingVoiceCore {
             }
             _info = value;
         }
-
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
