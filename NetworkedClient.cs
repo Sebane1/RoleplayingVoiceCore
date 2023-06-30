@@ -67,8 +67,8 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     return true;
                 } catch {
                     Close();
+                    Start();
                     connectionAttempts++;
-
                     if (connectionAttempts <= 10) {
                         return await SendFile(sendID, path);
                     } else {
