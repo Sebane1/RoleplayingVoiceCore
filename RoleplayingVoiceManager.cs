@@ -48,6 +48,7 @@ namespace RoleplayingVoiceCore {
             _info = value;
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
+            string hash = CreateMD5(sender + text);
             var voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
             Voice characterVoice = null;
             foreach (var voice in voices) {
@@ -87,7 +88,7 @@ namespace RoleplayingVoiceCore {
                                 output.Init(player);
                                 output.Play();
                             }
-                            _networkedClient.SendFile(CreateMD5(sender + text), clipPath);
+                            _networkedClient.SendFile(hash, clipPath);
                         }
                     }
                 } catch {
