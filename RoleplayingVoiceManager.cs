@@ -100,16 +100,21 @@ namespace RoleplayingVoiceCore {
             foreach (char character in @"@#$%^&*()_+{}:;\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
-            return ExtractQuotations(newText).Replace("\"", null);
+            return ExtractQuotations(newText).Replace("\"", null).Replace("“", null).Replace(",", " - ");
         }
 
         private string ExtractQuotations(string text) {
             string newText = "";
-            string[] strings = text.Split('"');
+            string[] strings = null;
+            if (text.Contains(@"""")) {
+                strings = text.Split('"');
+            } else {
+                strings = text.Split('“');
+            }
             if (strings.Length > 1) {
                 for (int i = 0; i < strings.Length; i++) {
                     if ((i + 1) % 2 == 0) {
-                        newText += strings[i] + (strings.Length % 2 == 0 ? "\r\n\r\n" : "");
+                        newText += strings[i] + (strings.Length % 2 == 0 ? " -- " : "");
                     }
                 }
                 return newText;
@@ -131,7 +136,8 @@ namespace RoleplayingVoiceCore {
             if (_networkedClient != null) {
                 string path = "";
                 string hash = CreateMD5(sender + text);
-                string localPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache", hash + ".mp3");
+                string localPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache", hash + ".mp3");
                 if (!File.Exists(localPath)) {
                     path = await _networkedClient.GetFile(hash,
                         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
