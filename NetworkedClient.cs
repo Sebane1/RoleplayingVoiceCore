@@ -30,7 +30,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             }
             _ipAddress = ipAddress;
         }
-        public void Start() {
+        public async void Start() {
             try {
                 if (sendingClient == null) {
                     sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
@@ -47,7 +47,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 connected = false;
             }
         }
-
+        public void UpdateIPAddress(string ipAddress) {
+            _ipAddress = ipAddress;
+        }
         public async Task<bool> SendFile(string sendID, string path) {
             if (connected) {
                 try {
