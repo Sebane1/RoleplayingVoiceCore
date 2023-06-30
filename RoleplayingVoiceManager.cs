@@ -16,25 +16,30 @@ namespace RoleplayingVoiceCore {
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
         private bool apiValid;
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices? characterVoices = null) {
-            _apiKey = apiKey;
-            try
+            // Spin a new thread for this
+            Task.Run(() => 
             {
-                _api = new ElevenLabsClient(apiKey);
-                _api.UserEndpoint.GetUserInfoAsync();
-                apiValid = true;
-            }
-            catch (Exception e)
-            {
-                var errorMain = e.Message.ToString();
-                if (errorMain.Contains("invalid_api_key"))
+                _apiKey = apiKey;
+                try
                 {
-                    apiValid = false;
+                    _api = new ElevenLabsClient(apiKey);
+                    var test = _api.UserEndpoint.GetUserInfoAsync().Result;
+                    apiValid = true;
                 }
-            }
-            _networkedClient = client;
-            if (characterVoices != null) {
-                _characterVoices = characterVoices;
-            }
+                catch (Exception e)
+                {
+                    var errorMain = e.Message.ToString();
+                    if (errorMain.Contains("invalid_api_key"))
+                    {
+                        apiValid = false;
+                    }
+                }
+                _networkedClient = client;
+                if (characterVoices != null)
+                {
+                    _characterVoices = characterVoices;
+                }
+            });
         }
 
         public string ClipPath { get => clipPath; set => clipPath = value; }
@@ -71,6 +76,7 @@ namespace RoleplayingVoiceCore {
         }
 
         public async Task<string[]> GetVoiceList() {
+            ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             IReadOnlyList<Voice>? voices = null;
             if (_api != null)
@@ -85,6 +91,8 @@ namespace RoleplayingVoiceCore {
                     if (errorVoiceList.Contains("invalid_api_key"))
                     {
                         apiValid = false;
+                        state.ValidationState = 3;
+                        OnApiValidationComplete?.Invoke(this, state);
                     }
                 }
             }
@@ -99,6 +107,7 @@ namespace RoleplayingVoiceCore {
             return voicesNames.ToArray();
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
+            ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
             if (_api != null)
             {
@@ -112,6 +121,8 @@ namespace RoleplayingVoiceCore {
                     if (errorVoiceGen.Contains("invalid_api_key"))
                     {
                         apiValid = false;
+                        state.ValidationState = 3;
+                        OnApiValidationComplete?.Invoke(this, state);
                     }
                 }
             }
@@ -230,9 +241,12 @@ namespace RoleplayingVoiceCore {
             return "";
         }
     }
-}
-
-public class ValidationResult : EventArgs
-{
-    public bool ValidationSuceeded { get; set; }
+    public class ValidationResult : EventArgs
+    {
+        public bool ValidationSuceeded { get; set; }
+        // ValidationState 3 is meant for api calls failed when they shouldn't have
+        // Meaning somehow an invalid key slipped by the validation, or it got invalidated by outside sources
+        // Right now the plugin isn't set up to actually make use of it, and this needs to be thought through
+        public int ValidationState { get; set; }
+    }
 }
