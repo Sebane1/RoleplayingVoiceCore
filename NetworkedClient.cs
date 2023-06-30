@@ -1,6 +1,4 @@
-﻿using System.IO;
-using System.IO.Compression;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 
 namespace FFXIVLooseTextureCompiler.Networking {
@@ -14,12 +12,14 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
+        public int Port { get { return 5105 * (connectionAttempts * 100); } }
+
         public event EventHandler OnSendFailed;
         public event EventHandler OnConnectionFailed;
 
         public NetworkedClient(string ipAddress) {
             try {
-                sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
+                sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 sendingClient.LingerState = new LingerOption(false, 5);
             } catch {
 
@@ -29,13 +29,13 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public void Start() {
             try {
                 if (sendingClient == null) {
-                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
+                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                     sendingClient.LingerState = new LingerOption(false, 5);
                 }
                 try {
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
+                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
+                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 }
                 connected = true;
             } catch {
@@ -62,21 +62,22 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     Close();
                     connectionAttempts++;
 
-                    if (connectionAttempts >= 10) {
+                    if (connectionAttempts <= 10) {
                         return await SendFile(sendID, path);
                     } else {
                         OnSendFailed?.Invoke(this, EventArgs.Empty);
+                        connectionAttempts = 0;
                     }
                 }
             } else {
                 try {
                     Start();
-
                     connectionAttempts++;
-                    if (connectionAttempts >= 10) {
+                    if (connectionAttempts <= 10) {
                         return await SendFile(sendID, path);
                     } else {
                         OnConnectionFailed?.Invoke(this, EventArgs.Empty);
+                        connectionAttempts = 0;
                     }
                 } catch {
 
@@ -94,7 +95,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
 
         public async Task<string> GetFile(string sendID, string tempPath) {
-        sendMod:
             string path = Path.Combine(tempPath, sendID + ".mp3");
             try {
                 BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
@@ -109,21 +109,14 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     }
                 }
             } catch {
-                if (sendingClient != null) {
-                    if (sendingClient.Client != null) {
-                        try {
-                            sendingClient.Client.Shutdown(SocketShutdown.Both);
-                            sendingClient.Client.Disconnect(true);
-                            sendingClient.Close();
-                        } catch {
-
-                        }
-                    }
-                }
                 try {
-                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, 5400));
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), 5400));
-                    goto sendMod;
+                    Start();
+                    connectionAttempts++;
+                    if (connectionAttempts < 10) {
+                        return await GetFile(sendID, path);
+                    } else {
+                        connectionAttempts = 0;
+                    }
                 } catch {
                     connected = false;
                 }
