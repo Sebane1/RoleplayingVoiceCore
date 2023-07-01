@@ -144,7 +144,7 @@ namespace RoleplayingVoiceCore {
                         string stitchedPath = Path.Combine(rpVoiceCache, hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
-                            string[] audioClips = (text.Contains(@"""") || text.Contains(@"“")) ? ExtractQuotationsToList(text) : AggressiveWordSplicing(text);
+                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“")) ? ExtractQuotationsToList(trimmedText) : AggressiveWordSplicing(trimmedText);
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
                                 audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
@@ -210,7 +210,7 @@ namespace RoleplayingVoiceCore {
             foreach (char character in @"@#$%^&*()_+{}:;\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
-            return ExtractQuotations(newText).Replace("\"", null).Replace("“", null).Replace(",", " - ");
+            return newText;
         }
         public MemoryStream Concatenate(params string[] mp3filenames) {
             MemoryStream output = new MemoryStream();
