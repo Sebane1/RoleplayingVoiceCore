@@ -17,28 +17,25 @@ namespace RoleplayingVoiceCore {
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
         private bool apiValid;
+        private string rpVoiceCache;
+
         public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices? characterVoices = null) {
+            rpVoiceCache = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache";
             // Spin a new thread for this
-            Task.Run(() => 
-            {
+            Task.Run(() => {
                 _apiKey = apiKey;
-                try
-                {
+                try {
                     _api = new ElevenLabsClient(apiKey);
                     var test = _api.UserEndpoint.GetUserInfoAsync().Result;
                     apiValid = true;
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     var errorMain = e.Message.ToString();
-                    if (errorMain.Contains("invalid_api_key"))
-                    {
+                    if (errorMain.Contains("invalid_api_key")) {
                         apiValid = false;
                     }
                 }
                 _networkedClient = client;
-                if (characterVoices != null)
-                {
+                if (characterVoices != null) {
                     _characterVoices = characterVoices;
                 }
             });
@@ -48,22 +45,17 @@ namespace RoleplayingVoiceCore {
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
         public SubscriptionInfo Info { get => _info; set => _info = value; }
+        public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
 
-        public async Task<bool> ApiValidation(string key)
-        {
-            if (!string.IsNullOrEmpty(key) && key.All(c => char.IsAsciiLetterOrDigit(c)))
-            {
-                try
-                {
+        public async Task<bool> ApiValidation(string key) {
+            if (!string.IsNullOrEmpty(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
+                try {
                     var api = new ElevenLabsClient(key);
                     await api.UserEndpoint.GetUserInfoAsync();
                     apiValid = true;
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     var errorMain = e.Message.ToString();
-                    if (errorMain.Contains("invalid_api_key"))
-                    {
+                    if (errorMain.Contains("invalid_api_key")) {
                         apiValid = false;
                     }
                 }
@@ -71,8 +63,7 @@ namespace RoleplayingVoiceCore {
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
-            if (apiValid)
-            {
+            if (apiValid) {
                 return true;
             }
             return false;
@@ -82,17 +73,12 @@ namespace RoleplayingVoiceCore {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             IReadOnlyList<Voice>? voices = null;
-            if (_api != null)
-            {
-                try
-                {
+            if (_api != null) {
+                try {
                     voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     var errorVoiceList = e.Message.ToString();
-                    if (errorVoiceList.Contains("invalid_api_key"))
-                    {
+                    if (errorVoiceList.Contains("invalid_api_key")) {
                         apiValid = false;
                         state.ValidationState = 3;
                         OnApiValidationComplete?.Invoke(this, state);
@@ -100,32 +86,24 @@ namespace RoleplayingVoiceCore {
                 }
             }
             voicesNames.Add("None");
-            if (voices != null)
-            {
-                foreach (var voice in voices)
-                {
+            if (voices != null) {
+                foreach (var voice in voices) {
                     voicesNames.Add(voice.Name);
                 }
             }
             return voicesNames.ToArray();
         }
 
-        public async void RefreshElevenlabsSubscriptionInfo()
-        {
+        public async void RefreshElevenlabsSubscriptionInfo() {
             ValidationResult state = new ValidationResult();
             _info = null;
             SubscriptionInfo? value = null;
-            if (_api != null)
-            {
-                try
-                {
+            if (_api != null) {
+                try {
                     value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     var errorSubInfo = e.Message.ToString();
-                    if (errorSubInfo.Contains("invalid_api_key"))
-                    {
+                    if (errorSubInfo.Contains("invalid_api_key")) {
                         apiValid = false;
                         state.ValidationState = 3;
                         OnApiValidationComplete?.Invoke(this, state);
@@ -138,17 +116,12 @@ namespace RoleplayingVoiceCore {
             string hash = CreateMD5(sender + text);
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
-            if (_api != null)
-            {
-                try
-                {
+            if (_api != null) {
+                try {
                     voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     var errorVoiceGen = e.Message.ToString();
-                    if (errorVoiceGen.Contains("invalid_api_key"))
-                    {
+                    if (errorVoiceGen.Contains("invalid_api_key")) {
                         apiValid = false;
                         state.ValidationState = 3;
                         OnApiValidationComplete?.Invoke(this, state);
@@ -156,58 +129,75 @@ namespace RoleplayingVoiceCore {
                 }
             }
             Voice? characterVoice = null;
-            if (voices != null)
-            {
-                foreach (var voice in voices)
-                {
-                    if (voice.Name.ToLower().Contains(voiceType.ToLower()))
-                    {
+            if (voices != null) {
+                foreach (var voice in voices) {
+                    if (voice.Name.ToLower().Contains(voiceType.ToLower())) {
                         characterVoice = voice;
                         break;
                     }
                 }
             }
-            var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
             if (characterVoice != null) {
-                WaveOutEvent output = new WaveOutEvent();
                 try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && !text.Contains(@""""))) {
-                        string trimmedText = TrimText(text);
-                        if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
-                            CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
-                        }
-                        if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                            clipPath = await _api.TextToSpeechEndpoint
-                                .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                                defaultVoiceSettings, null,
-                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
-                            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
-                        } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
-                            clipPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                        } else {
-                            CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                            clipPath = await _api.TextToSpeechEndpoint
-                                .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                                defaultVoiceSettings, null,
-                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
-                            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), clipPath);
-                        }
-                        VoicesUpdated.Invoke(this, EventArgs.Empty);
-                        if (File.Exists(clipPath)) {
-                            using (var player = new AudioFileReader(clipPath)) {
-                                output.Init(player);
-                                output.Play();
+                    WaveOutEvent output = new WaveOutEvent();
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+                        string stitchedPath = Path.Combine(rpVoiceCache, hash + ".mp3");
+                        if (!File.Exists(stitchedPath)) {
+                            string trimmedText = TrimText(text);
+                            string[] audioClips = (text.Contains(@"""") || text.Contains(@"“")) ? ExtractQuotationsToList(text) : AggressiveWordSplicing(text);
+                            List<string> audioPaths = new List<string>();
+                            foreach (string audioClip in audioClips) {
+                                audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
                             }
-                            _networkedClient.SendFile(hash, clipPath);
+                            VoicesUpdated.Invoke(this, EventArgs.Empty);
+                            MemoryStream playbackStream = Concatenate(audioPaths.ToArray());
+                            try {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                                    playbackStream.Position = 0;
+                                    playbackStream.CopyTo(stitchedStream);
+                                    stitchedStream.Flush();
+                                    stitchedStream.Close();
+                                }
+                            } catch {
+
+                            }
                         }
+                        using (var player = new AudioFileReader(stitchedPath)) {
+                            output.Init(player);
+                            output.Play();
+                        }
+                        _networkedClient.SendFile(hash, stitchedPath);
                     }
-                } 
-                catch {
+                } catch {
 
                 }
             }
             return clipPath;
         }
+
+        private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
+            string audioPath = "";
+            var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
+            if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+            }
+            if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                audioPath = await _api.TextToSpeechEndpoint
+                    .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
+                    defaultVoiceSettings, null, rpVoiceCache);
+                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+            } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+            } else {
+                CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                audioPath = await _api.TextToSpeechEndpoint
+                    .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
+                    defaultVoiceSettings, null, rpVoiceCache);
+                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+            }
+            return audioPath;
+        }
+
         private string TrimText(string text) {
             string newText = text.Replace("XD", "ahahaha")
             .Replace("lmao", "ahahaha")
@@ -222,7 +212,13 @@ namespace RoleplayingVoiceCore {
             }
             return ExtractQuotations(newText).Replace("\"", null).Replace("“", null).Replace(",", " - ");
         }
-
+        public MemoryStream Concatenate(params string[] mp3filenames) {
+            MemoryStream output = new MemoryStream();
+            foreach (string filename in mp3filenames) {
+                File.OpenRead(filename).CopyTo(output);
+            }
+            return output;
+        }
         private string ExtractQuotations(string text) {
             string newText = "";
             string[] strings = null;
@@ -241,6 +237,45 @@ namespace RoleplayingVoiceCore {
             } else {
                 return text;
             }
+        }
+
+        private string[] ExtractQuotationsToList(string text) {
+            string newText = "";
+            string[] strings = null;
+            List<string> quotes = new List<string>();
+            if (text.Contains(@"""")) {
+                strings = text.Split('"');
+            } else {
+                strings = text.Split('“');
+            }
+            if (strings.Length > 1) {
+                for (int i = 0; i < strings.Length; i++) {
+                    if ((i + 1) % 2 == 0) {
+                        quotes.Add(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "));
+                    }
+                }
+            } else {
+                quotes.Add(text);
+            }
+            return quotes.ToArray();
+        }
+
+        private string[] AggressiveWordSplicing(string text) {
+            string[] strings = null;
+            List<string> quotes = new List<string>();
+            strings = text.Split(' ');
+            string temp = "";
+            for (int i = 0; i < strings.Length; i++) {
+                temp += strings[i] + " ";
+                if (strings[i].Contains(",") || strings[i].Contains(".") || strings[i].Contains("!") || strings[i].Contains("?")) {
+                    quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Replace(".", "").Trim());
+                    temp = "";
+                }
+            }
+            if (!string.IsNullOrEmpty(temp)) {
+                quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Replace(".", "").Trim());
+            }
+            return quotes.ToArray();
         }
 
         public static string CreateMD5(string input) {
@@ -265,20 +300,20 @@ namespace RoleplayingVoiceCore {
                     path = localPath;
                 }
                 if (!string.IsNullOrEmpty(path)) {
-                    WaveOutEvent output = new WaveOutEvent();
-                    using (var player = new AudioFileReader(path)) {
-                        output.Volume = Math.Clamp(volume, 0, 1);
-                        output.Init(player);
-                        output.Play();
+                    if (File.Exists(path)) {
+                        WaveOutEvent output = new WaveOutEvent();
+                        using (var player = new AudioFileReader(path)) {
+                            output.Volume = Math.Clamp(volume, 0, 1);
+                            output.Init(player);
+                            output.Play();
+                        }
                     }
                 }
-
             }
             return "";
         }
     }
-    public class ValidationResult : EventArgs
-    {
+    public class ValidationResult : EventArgs {
         public bool ValidationSuceeded { get; set; }
         // ValidationState 3 is meant for api calls failed when they shouldn't have
         // Meaning somehow an invalid key slipped by the validation, or it got invalidated by outside sources

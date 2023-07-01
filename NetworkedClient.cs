@@ -92,13 +92,58 @@ namespace FFXIVLooseTextureCompiler.Networking {
             }
             return true;
         }
+        public async Task<bool> SendFile(string sendID, Stream dataStream) {
+            if (connected) {
+                try {
+                    BinaryWriter writer = new(sendingClient.GetStream());
+
+                    writer.Write(sendID);
+                    writer.Write(0);
+                    writer.Write(dataStream.Length);
+
+                    CopyStream(dataStream, writer.BaseStream, (int)dataStream.Length);
+
+                    writer.Flush();
+                    dataStream.Dispose();
+                    return true;
+                } catch {
+                    Close();
+                    Start();
+                    connectionAttempts++;
+                    if (connectionAttempts <= 10) {
+                        return await SendFile(sendID, dataStream);
+                    } else {
+                        OnSendFailed?.Invoke(this, EventArgs.Empty);
+                        connectionAttempts = 0;
+                    }
+                }
+            } else {
+                try {
+                    Start();
+                    connectionAttempts++;
+                    if (connectionAttempts <= 10) {
+                        return await SendFile(sendID, dataStream);
+                    } else {
+                        OnConnectionFailed?.Invoke(this, EventArgs.Empty);
+                        connectionAttempts = 0;
+                    }
+                } catch {
+
+                }
+            }
+            return true;
+        }
 
 
         private void Close() {
-            sendingClient.Client.Shutdown(SocketShutdown.Both);
-            sendingClient.Client.Disconnect(true);
-            sendingClient.Close();
-            connected = false;
+            try {
+                sendingClient.Client.Shutdown(SocketShutdown.Both);
+                sendingClient.Client.Disconnect(true);
+                sendingClient.Close();
+                connected = false;
+            } catch {
+
+            }
         }
 
         public async Task<string> GetFile(string sendID, string tempPath) {
@@ -144,9 +189,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             if (!disposedValue) {
                 if (disposing) {
                     try {
-                        sendingClient.Client.Shutdown(SocketShutdown.Both);
-                        sendingClient.Close();
-                        sendingClient.Dispose();
+                        Close();
                     } catch {
 
                     }
