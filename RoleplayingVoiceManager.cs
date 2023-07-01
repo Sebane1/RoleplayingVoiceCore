@@ -1,4 +1,5 @@
 ﻿using ElevenLabs;
+using ElevenLabs.History;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
@@ -16,6 +17,8 @@ namespace RoleplayingVoiceCore {
         private string clipPath = "";
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
+
+        private IReadOnlyList<HistoryItem> _history;
         private bool apiValid;
         private string rpVoiceCache;
 
@@ -144,7 +147,8 @@ namespace RoleplayingVoiceCore {
                         string stitchedPath = Path.Combine(rpVoiceCache, hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
-                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“")) ? ExtractQuotationsToList(trimmedText) : AggressiveWordSplicing(trimmedText);
+                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
+                                ? ExtractQuotationsToList(trimmedText) : AggressiveWordSplicing(trimmedText);
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
                                 audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
@@ -182,19 +186,37 @@ namespace RoleplayingVoiceCore {
                 CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
             }
             if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                audioPath = await _api.TextToSpeechEndpoint
-                    .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                    defaultVoiceSettings, null, rpVoiceCache);
-                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
             } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
                 audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
             } else {
                 CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                audioPath = await _api.TextToSpeechEndpoint
-                    .TextToSpeechAsync(@"""" + trimmedText.Replace(@"""", null) + @"""", characterVoice,
-                    defaultVoiceSettings, null, rpVoiceCache);
-                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
             }
+            return audioPath;
+        }
+
+        private async Task<string> GetVoiceFromElevenLabs(string trimmedText, string voiceType,
+            VoiceSettings defaultVoiceSettings, Voice characterVoice) {
+            string finalText = @"""" + trimmedText.Replace(@"""", null) + @"""";
+            string audioPath = "";
+            bool foundInHistory = false;
+            var history = await _api.HistoryEndpoint.GetHistoryAsync();
+            foreach (var item in history) {
+                if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
+                    if (item.Text.ToLower() == finalText.ToLower()) {
+                        audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
+                        foundInHistory = true;
+                        break;
+                    }
+                }
+            }
+            if (!foundInHistory) {
+                audioPath = await _api.TextToSpeechEndpoint
+                    .TextToSpeechAsync(finalText, characterVoice,
+                    defaultVoiceSettings, null, rpVoiceCache);
+            }
+            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
             return audioPath;
         }
 
