@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Numerics;
 
 namespace FFXIVLooseTextureCompiler.Networking {
     public class NetworkedClient : IDisposable {
@@ -40,7 +41,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public void UpdateIPAddress(string ipAddress) {
             _ipAddress = ipAddress;
         }
-        public async Task<bool> SendFile(string sendID, string path) {
+        public async Task<bool> SendFile(string sendID, string path, Vector3 position) {
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -49,6 +50,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
                 writer.Write(sendID);
                 writer.Write(0);
+                writer.Write(position.X);
+                writer.Write(position.Y);
+                writer.Write(position.Z);
                 writer.Write(fileStream.Length);
 
                 CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
@@ -60,7 +64,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 connectionAttempts++;
                 if (connectionAttempts <= 10) {
-                    return await SendFile(sendID, path);
+                    return await SendFile(sendID, path, position);
                 } else {
                     OnSendFailed?.Invoke(this, EventArgs.Empty);
                     connectionAttempts = 0;
@@ -83,8 +87,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
             connected = false;
         }
 
-        public async Task<string> GetFile(string sendID, string tempPath) {
+        public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath) {
             string path = Path.Combine(tempPath, sendID + ".mp3");
+            Vector3 position = new Vector3();
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -92,8 +97,10 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 BinaryReader reader = new BinaryReader(sendingClient.GetStream());
                 writer.Write(sendID);
                 writer.Write(1);
+
                 byte value = reader.ReadByte();
                 if (value != 0) {
+                    new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     long length = reader.ReadInt64();
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
@@ -112,7 +119,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     connected = false;
                 }
             }
-            return path;
+            return new KeyValuePair<Vector3, string>(position, path);
         }
 
         public static void CopyStream(Stream input, Stream output, int bytes) {
