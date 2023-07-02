@@ -115,7 +115,7 @@ namespace RoleplayingVoiceCore {
             }
             _info = value;
         }
-        public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote) {
+        public async Task<string> DoVoice(string sender, string text, string voiceType, bool isEmote, float volume, bool aggressiveSplicing) {
             string hash = CreateMD5(sender + text);
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
@@ -148,7 +148,7 @@ namespace RoleplayingVoiceCore {
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
-                                ? ExtractQuotationsToList(trimmedText) : AggressiveWordSplicing(trimmedText);
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : AggressiveWordSplicing(trimmedText);
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
                                 audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
@@ -167,6 +167,7 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                         using (var player = new AudioFileReader(stitchedPath)) {
+                            output.Volume = volume;
                             output.Init(player);
                             output.Play();
                         }
@@ -261,7 +262,7 @@ namespace RoleplayingVoiceCore {
             }
         }
 
-        private string[] ExtractQuotationsToList(string text) {
+        private string[] ExtractQuotationsToList(string text, bool aggressiveSplicing) {
             string newText = "";
             string[] strings = null;
             List<string> quotes = new List<string>();
@@ -273,7 +274,11 @@ namespace RoleplayingVoiceCore {
             if (strings.Length > 1) {
                 for (int i = 0; i < strings.Length; i++) {
                     if ((i + 1) % 2 == 0) {
-                        quotes.Add(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "));
+                        if (aggressiveSplicing) {
+                            quotes.AddRange(AggressiveWordSplicing(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - ")));
+                        } else {
+                            quotes.Add(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "));
+                        }
                     }
                 }
             } else {

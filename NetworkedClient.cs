@@ -140,10 +140,10 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 sendingClient.Client.Shutdown(SocketShutdown.Both);
                 sendingClient.Client.Disconnect(true);
                 sendingClient.Close();
-                connected = false;
             } catch {
 
             }
+            connected = false;
         }
 
         public async Task<string> GetFile(string sendID, string tempPath) {
