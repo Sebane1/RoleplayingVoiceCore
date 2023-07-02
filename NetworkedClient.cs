@@ -5,7 +5,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
     public class NetworkedClient : IDisposable {
         private bool disposedValue;
         private bool connected;
-        private TcpClient sendingClient;
         int connectionAttempts = 0;
         private string id;
         private string _ipAddress;
@@ -18,28 +17,19 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public event EventHandler OnConnectionFailed;
 
         public NetworkedClient(string ipAddress) {
-            try {
-                sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                sendingClient.LingerState = new LingerOption(false, 5);
-            } catch {
-                connectionAttempts++;
-                try {
-                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                    sendingClient.LingerState = new LingerOption(false, 5);
-                } catch { }
-            }
             _ipAddress = ipAddress;
         }
-        public async void Start() {
+        public async void Start(TcpClient sendingClient) {
             try {
-                if (sendingClient == null) {
-                    sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                    sendingClient.LingerState = new LingerOption(false, 5);
-                }
+                sendingClient.LingerState = new LingerOption(false, 5);
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
-                    connectionAttempts++;
+                    if (connectionAttempts < 10) {
+                        connectionAttempts++;
+                    } else {
+                        connectionAttempts = 0;
+                    }
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 }
                 connected = true;
@@ -51,95 +41,42 @@ namespace FFXIVLooseTextureCompiler.Networking {
             _ipAddress = ipAddress;
         }
         public async Task<bool> SendFile(string sendID, string path) {
-            if (connected) {
-                try {
-                    using FileStream fileStream = new(path, FileMode.Open, FileAccess.Read);
-                    BinaryWriter writer = new(sendingClient.GetStream());
-
-                    writer.Write(sendID);
-                    writer.Write(0);
-                    writer.Write(fileStream.Length);
-
-                    CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
-
-                    writer.Flush();
-                    fileStream.Dispose();
-                    return true;
-                } catch {
-                    Close();
-                    Start();
-                    connectionAttempts++;
-                    if (connectionAttempts <= 10) {
-                        return await SendFile(sendID, path);
-                    } else {
-                        OnSendFailed?.Invoke(this, EventArgs.Empty);
-                        connectionAttempts = 0;
-                    }
-                }
-            } else {
-                try {
-                    Start();
-                    connectionAttempts++;
-                    if (connectionAttempts <= 10) {
-                        return await SendFile(sendID, path);
-                    } else {
-                        OnConnectionFailed?.Invoke(this, EventArgs.Empty);
-                        connectionAttempts = 0;
-                    }
-                } catch {
-
-                }
-            }
-            return true;
-        }
-        public async Task<bool> SendFile(string sendID, Stream dataStream) {
-            if (connected) {
-                try {
-                    BinaryWriter writer = new(sendingClient.GetStream());
-
-                    writer.Write(sendID);
-                    writer.Write(0);
-                    writer.Write(dataStream.Length);
-
-                    CopyStream(dataStream, writer.BaseStream, (int)dataStream.Length);
-
-                    writer.Flush();
-                    dataStream.Dispose();
-                    return true;
-                } catch {
-                    Close();
-                    Start();
-                    connectionAttempts++;
-                    if (connectionAttempts <= 10) {
-                        return await SendFile(sendID, dataStream);
-                    } else {
-                        OnSendFailed?.Invoke(this, EventArgs.Empty);
-                        connectionAttempts = 0;
-                    }
-                }
-            } else {
-                try {
-                    Start();
-                    connectionAttempts++;
-                    if (connectionAttempts <= 10) {
-                        return await SendFile(sendID, dataStream);
-                    } else {
-                        OnConnectionFailed?.Invoke(this, EventArgs.Empty);
-                        connectionAttempts = 0;
-                    }
-                } catch {
-
-                }
-            }
-            return true;
-        }
-
-
-        private void Close() {
             try {
-                sendingClient.Client.Shutdown(SocketShutdown.Both);
-                sendingClient.Client.Disconnect(true);
-                sendingClient.Close();
+                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                Start(sendingClient);
+                using FileStream fileStream = new(path, FileMode.Open, FileAccess.Read);
+                BinaryWriter writer = new(sendingClient.GetStream());
+
+                writer.Write(sendID);
+                writer.Write(0);
+                writer.Write(fileStream.Length);
+
+                CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+
+                writer.Flush();
+                fileStream.Dispose();
+                Close(sendingClient);
+                return true;
+            } catch {
+                connectionAttempts++;
+                if (connectionAttempts <= 10) {
+                    return await SendFile(sendID, path);
+                } else {
+                    OnSendFailed?.Invoke(this, EventArgs.Empty);
+                    connectionAttempts = 0;
+                }
+            }
+            return true;
+        }
+
+        private void Close(TcpClient sendingClient) {
+            try {
+                if (sendingClient != null) {
+                    sendingClient.Client?.Shutdown(SocketShutdown.Both);
+                    sendingClient.Client?.Disconnect(true);
+                    sendingClient?.Close();
+                    sendingClient?.Dispose();
+                }
             } catch {
 
             }
@@ -149,6 +86,8 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public async Task<string> GetFile(string sendID, string tempPath) {
             string path = Path.Combine(tempPath, sendID + ".mp3");
             try {
+                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                Start(sendingClient);
                 BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
                 BinaryReader reader = new BinaryReader(sendingClient.GetStream());
                 writer.Write(sendID);
@@ -160,9 +99,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
                     }
                 }
+                Close(sendingClient);
             } catch {
                 try {
-                    Start();
                     connectionAttempts++;
                     if (connectionAttempts < 10) {
                         return await GetFile(sendID, path);
@@ -187,14 +126,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
         protected virtual void Dispose(bool disposing) {
             if (!disposedValue) {
-                if (disposing) {
-                    try {
-                        Close();
-                    } catch {
-
-                    }
-                }
-
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
                 // TODO: set large fields to null
                 disposedValue = true;
