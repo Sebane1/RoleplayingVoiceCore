@@ -7,6 +7,8 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using RoleplayingVoiceCore.AudioRecycler;
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
@@ -119,7 +121,7 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing) {
-            string hash = CreateMD5(sender + text);
+            string hash = Shai1Hash(sender + text);
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
             if (_api != null) {
@@ -318,12 +320,16 @@ namespace RoleplayingVoiceCore {
                 return Convert.ToHexString(hashBytes); // .NET 5 +
             }
         }
+        static string Shai1Hash(string input) {
+            using var sha1 = SHA1.Create();
+            return Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(input)));
+        }
         public async Task<string> GetVoice(string sender, string text, float volume, Vector3 centerPosition) {
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
                 string path = "";
                 Vector3 position = new Vector3();
-                string hash = CreateMD5(sender + text);
+                string hash = Shai1Hash(sender + text);
                 string localPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache", hash + ".mp3");
                 if (!File.Exists(localPath)) {
