@@ -335,7 +335,8 @@ namespace RoleplayingVoiceCore {
                         WaveOutEvent output = new WaveOutEvent();
                         using (var player = new AudioFileReader(path)) {
                             float distance = Vector3.Distance(centerPosition, data.Key);
-                            output.Volume = Math.Clamp(volume * ((10 - distance) / 10), 0, 1);
+                            float newVolume = volume * ((10 - distance) / 10);
+                            output.Volume = Math.Clamp(newVolume, 0, 1);
                             output.Init(player);
                             output.Play();
                         }

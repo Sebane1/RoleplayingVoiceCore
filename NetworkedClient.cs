@@ -111,7 +111,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 try {
                     connectionAttempts++;
                     if (connectionAttempts < 10) {
-                        return await GetFile(sendID, path);
+                        return await GetFile(sendID, tempPath);
                     } else {
                         connectionAttempts = 0;
                     }
