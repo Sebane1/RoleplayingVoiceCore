@@ -89,7 +89,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath) {
             string path = Path.Combine(tempPath, sendID + ".mp3");
-            Vector3 position = new Vector3();
+            Vector3 position = new Vector3(-1, -1, -1);
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -120,6 +120,35 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             }
             return new KeyValuePair<Vector3, string>(position, path);
+        }
+
+        public async Task<Vector3> GetPosition(string sendID) {
+            Vector3 position = new Vector3(-1, -1, -1);
+            try {
+                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                Start(sendingClient);
+                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
+                BinaryReader reader = new BinaryReader(sendingClient.GetStream());
+                writer.Write(sendID);
+                writer.Write(2);
+                byte value = reader.ReadByte();
+                if (value != 0) {
+                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                }
+                Close(sendingClient);
+            } catch {
+                try {
+                    connectionAttempts++;
+                    if (connectionAttempts < 10) {
+                        return await GetPosition(sendID);
+                    } else {
+                        connectionAttempts = 0;
+                    }
+                } catch {
+                    connected = false;
+                }
+            }
+            return position;
         }
 
         public static void CopyStream(Stream input, Stream output, int bytes) {

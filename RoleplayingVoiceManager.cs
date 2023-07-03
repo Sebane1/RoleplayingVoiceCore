@@ -4,6 +4,7 @@ using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using RoleplayingVoiceCore.AudioRecycler;
 using System.Numerics;
 
@@ -116,8 +117,8 @@ namespace RoleplayingVoiceCore {
             }
             _info = value;
         }
-        public async Task<string> DoVoice(string sender, string text, string voiceType, 
-            bool isEmote, float volume, Vector3 position,  bool aggressiveSplicing) {
+        public async Task<string> DoVoice(string sender, string text, string voiceType,
+            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing) {
             string hash = CreateMD5(sender + text);
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;
@@ -169,8 +170,9 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                         using (var player = new AudioFileReader(stitchedPath)) {
-                            output.Volume = volume;
-                            output.Init(player);
+                            var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                            volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
+                            output.Init(volumeSampleProvider);
                             output.Play();
                         }
                         _networkedClient.SendFile(hash, stitchedPath, position);
@@ -320,6 +322,7 @@ namespace RoleplayingVoiceCore {
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
                 string path = "";
+                Vector3 position = new Vector3();
                 string hash = CreateMD5(sender + text);
                 string localPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache", hash + ".mp3");
@@ -327,17 +330,20 @@ namespace RoleplayingVoiceCore {
                     data = await _networkedClient.GetFile(hash,
                         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
                     path = data.Value;
+                    position = data.Key;
                 } else {
                     path = localPath;
+                    position = await _networkedClient.GetPosition(hash);
                 }
                 if (!string.IsNullOrEmpty(path)) {
                     if (File.Exists(path)) {
                         WaveOutEvent output = new WaveOutEvent();
                         using (var player = new AudioFileReader(path)) {
-                            float distance = Vector3.Distance(centerPosition, data.Key);
+                            float distance = Vector3.Distance(centerPosition, position);
                             float newVolume = volume * ((10 - distance) / 10);
-                            output.Volume = Math.Clamp(newVolume, 0, 1);
-                            output.Init(player);
+                            var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                            volumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
+                            output.Init(volumeSampleProvider);
                             output.Play();
                         }
                     }
