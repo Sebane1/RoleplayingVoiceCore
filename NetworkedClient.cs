@@ -100,7 +100,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
                 byte value = reader.ReadByte();
                 if (value != 0) {
-                    new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     long length = reader.ReadInt64();
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
