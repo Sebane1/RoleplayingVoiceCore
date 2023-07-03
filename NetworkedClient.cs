@@ -132,10 +132,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 writer.Write(sendID);
                 writer.Write(2);
                 byte value = reader.ReadByte();
-                if (value != 0) {
+                if (value == 1) {
                     position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                 }
                 Close(sendingClient);
+                return position;
             } catch {
                 try {
                     connectionAttempts++;

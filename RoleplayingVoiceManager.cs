@@ -171,13 +171,13 @@ namespace RoleplayingVoiceCore {
 
                             }
                         }
-                        _networkedClient.SendFile(hash, stitchedPath, position);
                         using (var player = new AudioFileReader(stitchedPath)) {
                             var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                             volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
                             output.Init(volumeSampleProvider);
                             output.Play();
                         }
+                        _networkedClient.SendFile(hash, stitchedPath, position);
                     }
                 } catch {
 
@@ -339,14 +339,14 @@ namespace RoleplayingVoiceCore {
                     position = data.Key;
                 } else {
                     path = localPath;
-                    position = await _networkedClient.GetPosition(hash);
+                  position = await _networkedClient.GetPosition(hash);
                 }
                 if (!string.IsNullOrEmpty(path)) {
                     if (File.Exists(path)) {
                         WaveOutEvent output = new WaveOutEvent();
                         using (var player = new AudioFileReader(path)) {
                             float distance = Vector3.Distance(centerPosition, position);
-                            float newVolume = volume * ((10 - distance) / 10);
+                            float newVolume = volume * ((20 - distance) / 20);
                             var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                             volumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
                             output.Init(volumeSampleProvider);
