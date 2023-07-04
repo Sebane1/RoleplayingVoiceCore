@@ -324,7 +324,7 @@ namespace RoleplayingVoiceCore {
             using var sha1 = SHA1.Create();
             return Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(input)));
         }
-        public async Task<string> GetVoice(string sender, string text, float volume, Vector3 centerPosition) {
+        public async Task<string> GetVoice(string sender, string text, float volume, Vector3 centerPosition, bool isShoutYell) {
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
                 string path = "";
@@ -339,13 +339,13 @@ namespace RoleplayingVoiceCore {
                     position = data.Key;
                 } else {
                     path = localPath;
-                  position = await _networkedClient.GetPosition(hash);
+                    position = await _networkedClient.GetPosition(hash);
                 }
                 if (!string.IsNullOrEmpty(path)) {
                     if (File.Exists(path)) {
                         WaveOutEvent output = new WaveOutEvent();
                         using (var player = new AudioFileReader(path)) {
-                            float distance = Vector3.Distance(centerPosition, position);
+                            float distance = !isShoutYell ? Vector3.Distance(centerPosition, position) : 0;
                             float newVolume = volume * ((20 - distance) / 20);
                             var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                             volumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
