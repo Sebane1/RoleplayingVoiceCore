@@ -205,7 +205,9 @@ namespace RoleplayingVoiceCore {
 
         private async Task<string> GetVoiceFromElevenLabs(string trimmedText, string voiceType,
             VoiceSettings defaultVoiceSettings, Voice characterVoice) {
-            string finalText = @"""" + trimmedText.Replace(@"""", null) + @"""";
+            string unquotedText = trimmedText.Replace(@"""", null);
+            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+            string finalText = @"""" + numberAdjusted + @"""";
             string audioPath = "";
             bool foundInHistory = false;
             var history = await _api.HistoryEndpoint.GetHistoryAsync();
@@ -301,12 +303,12 @@ namespace RoleplayingVoiceCore {
             for (int i = 0; i < strings.Length; i++) {
                 temp += strings[i] + " ";
                 if (strings[i].Contains(",") || strings[i].Contains(".") || strings[i].Contains("!") || strings[i].Contains("?")) {
-                    quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Replace(".", "").Trim());
+                    quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
                     temp = "";
                 }
             }
             if (!string.IsNullOrEmpty(temp)) {
-                quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Replace(".", "").Trim());
+                quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
             }
             return quotes.ToArray();
         }
