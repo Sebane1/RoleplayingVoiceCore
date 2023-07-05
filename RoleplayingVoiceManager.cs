@@ -26,8 +26,8 @@ namespace RoleplayingVoiceCore {
         private bool apiValid;
         private string rpVoiceCache;
 
-        public RoleplayingVoiceManager(string apiKey, NetworkedClient client, CharacterVoices? characterVoices = null) {
-            rpVoiceCache = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache";
+        public RoleplayingVoiceManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
+            rpVoiceCache = cache;
             // Spin a new thread for this
             Task.Run(() => {
                 _apiKey = apiKey;
@@ -332,11 +332,9 @@ namespace RoleplayingVoiceCore {
                 string path = "";
                 Vector3 position = new Vector3();
                 string hash = Shai1Hash(sender + text);
-                string localPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache", hash + ".mp3");
+                string localPath = Path.Combine(rpVoiceCache, hash + ".mp3");
                 if (!File.Exists(localPath)) {
-                    data = await _networkedClient.GetFile(hash,
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\RPVoiceCache");
+                    data = await _networkedClient.GetFile(hash,rpVoiceCache);
                     path = data.Value;
                     position = data.Key;
                 } else {
