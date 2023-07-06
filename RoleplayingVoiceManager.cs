@@ -215,7 +215,8 @@ namespace RoleplayingVoiceCore {
             var history = await _api.HistoryEndpoint.GetHistoryAsync();
             foreach (var item in history) {
                 if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
-                    if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim() == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
+                    if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim()
+                        == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
                         audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
                         foundInHistory = true;
                         break;
@@ -244,7 +245,7 @@ namespace RoleplayingVoiceCore {
             .Replace(":3", ".")
             .Replace(":P", ".")
             .Replace("<3", "love");
-            foreach (char character in @"@#$%^&*()_+{}:;\/<>|`~".ToCharArray()) {
+            foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
             return newText;
@@ -310,7 +311,9 @@ namespace RoleplayingVoiceCore {
             string temp = "";
             for (int i = 0; i < strings.Length; i++) {
                 temp += strings[i] + " ";
-                if (strings[i].Contains(",") || strings[i].Contains(".") || strings[i].Contains("!") || strings[i].Contains("?")) {
+                if (strings[i].Contains(",") || (strings[i].Contains(".") && !strings[i].Contains("...")) 
+                    || strings[i].Contains("!") || strings[i].Contains("?") || strings[i].Contains(";") 
+                    || strings[i].Contains(":") || strings[i].Contains("·")) {
                     quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
                     temp = "";
                 }
