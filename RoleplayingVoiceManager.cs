@@ -147,7 +147,6 @@ namespace RoleplayingVoiceCore {
             }
             if (characterVoice != null) {
                 try {
-                    WaveOutEvent output = new WaveOutEvent();
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
                         string stitchedPath = Path.Combine(rpVoiceCache, hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
@@ -167,19 +166,20 @@ namespace RoleplayingVoiceCore {
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e){
+                            } catch (Exception e) {
 
                                 var error = e.Message;
 
                             }
                         }
+                        WaveOutEvent output = new WaveOutEvent();
+                        Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
                         using (var player = new AudioFileReader(stitchedPath)) {
                             var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                             volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
                             output.Init(volumeSampleProvider);
                             output.Play();
                         }
-                        _networkedClient.SendFile(hash, stitchedPath, position);
                     }
                 } catch {
 
@@ -248,7 +248,9 @@ namespace RoleplayingVoiceCore {
         public MemoryStream Concatenate(params string[] mp3filenames) {
             MemoryStream output = new MemoryStream();
             foreach (string filename in mp3filenames) {
-                File.OpenRead(filename).CopyTo(output);
+                using (Stream stream = File.OpenRead(filename)) {
+                    stream.CopyTo(output);
+                }
             }
             return output;
         }
@@ -336,7 +338,7 @@ namespace RoleplayingVoiceCore {
                 string hash = Shai1Hash(sender + text);
                 string localPath = Path.Combine(rpVoiceCache, hash + ".mp3");
                 if (!File.Exists(localPath)) {
-                    data = await _networkedClient.GetFile(hash,rpVoiceCache);
+                    data = await _networkedClient.GetFile(hash, rpVoiceCache);
                     path = data.Value;
                     position = data.Key;
                 } else {
