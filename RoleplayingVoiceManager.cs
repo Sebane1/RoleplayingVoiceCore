@@ -215,7 +215,7 @@ namespace RoleplayingVoiceCore {
             var history = await _api.HistoryEndpoint.GetHistoryAsync();
             foreach (var item in history) {
                 if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
-                    if (item.Text.ToLower().Replace(@"""", null) == finalText.ToLower().Replace(@"""", null)) {
+                    if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim() == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
                         audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
                         foundInHistory = true;
                         break;
