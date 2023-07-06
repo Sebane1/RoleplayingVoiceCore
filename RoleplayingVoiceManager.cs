@@ -167,7 +167,9 @@ namespace RoleplayingVoiceCore {
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch {
+                            } catch (Exception e){
+
+                                var error = e.Message;
 
                             }
                         }
