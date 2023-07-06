@@ -45,22 +45,23 @@ namespace FFXIVLooseTextureCompiler.Networking {
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
-                using FileStream fileStream = new(path, FileMode.Open, FileAccess.Read);
-                BinaryWriter writer = new(sendingClient.GetStream());
+                using (FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    using (BinaryWriter writer = new(sendingClient.GetStream())) {
+                        writer.Write(sendID);
+                        writer.Write(0);
+                        writer.Write(position.X);
+                        writer.Write(position.Y);
+                        writer.Write(position.Z);
+                        writer.Write(fileStream.Length);
 
-                writer.Write(sendID);
-                writer.Write(0);
-                writer.Write(position.X);
-                writer.Write(position.Y);
-                writer.Write(position.Z);
-                writer.Write(fileStream.Length);
+                        CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
 
-                CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
-
-                writer.Flush();
-                fileStream.Dispose();
-                Close(sendingClient);
-                return true;
+                        writer.Flush();
+                        fileStream.Dispose();
+                        Close(sendingClient);
+                        return true;
+                    }
+                }
             } catch {
                 connectionAttempts++;
                 if (connectionAttempts <= 10) {
