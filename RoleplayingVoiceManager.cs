@@ -237,9 +237,13 @@ namespace RoleplayingVoiceCore {
             .Replace("lol", "ahahaha")
             .Replace("lmfao", "ahahaha")
             .Replace("kek", "ahahaha")
+            .Replace("rotflmao", "ahahaha")
+            .Replace("rotflmfao", "ahahaha")
+            .Replace("lmao", "ahahaha")
             .Replace(":D", ".")
             .Replace(":3", ".")
-            .Replace(":P", ".");
+            .Replace(":P", ".")
+            .Replace("<3", "love");
             foreach (char character in @"@#$%^&*()_+{}:;\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
