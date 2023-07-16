@@ -158,7 +158,7 @@ namespace RoleplayingVoiceCore {
                                 audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
                             }
                             VoicesUpdated?.Invoke(this, EventArgs.Empty);
-                            MemoryStream playbackStream = Concatenate(audioPaths.ToArray());
+                            MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {
                                 using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
                                     playbackStream.Position = 0;
@@ -172,13 +172,17 @@ namespace RoleplayingVoiceCore {
 
                             }
                         }
-                        WaveOutEvent output = new WaveOutEvent();
                         Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
-                        using (var player = new AudioFileReader(stitchedPath)) {
-                            var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                            volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
-                            output.Init(volumeSampleProvider);
-                            output.Play();
+                        try {
+                            WaveOutEvent output = new WaveOutEvent();
+                            using (var player = new AudioFileReader(stitchedPath)) {
+                                var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                                volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
+                                output.Init(volumeSampleProvider);
+                                output.Play();
+                            }
+                        } catch {
+                            File.Delete(stitchedPath);
                         }
                     }
                 } catch {
@@ -250,11 +254,13 @@ namespace RoleplayingVoiceCore {
             }
             return newText;
         }
-        public MemoryStream Concatenate(params string[] mp3filenames) {
+        public MemoryStream ConcatenateAudio(params string[] mp3filenames) {
             MemoryStream output = new MemoryStream();
             foreach (string filename in mp3filenames) {
-                using (Stream stream = File.OpenRead(filename)) {
-                    stream.CopyTo(output);
+                if (File.Exists(filename)) {
+                    using (Stream stream = File.OpenRead(filename)) {
+                        stream.CopyTo(output);
+                    }
                 }
             }
             return output;
@@ -311,8 +317,8 @@ namespace RoleplayingVoiceCore {
             string temp = "";
             for (int i = 0; i < strings.Length; i++) {
                 temp += strings[i] + " ";
-                if (strings[i].Contains(",") || (strings[i].Contains(".") && !strings[i].Contains("...")) 
-                    || strings[i].Contains("!") || strings[i].Contains("?") || strings[i].Contains(";") 
+                if (strings[i].Contains(",") || (strings[i].Contains(".") && !strings[i].Contains("..."))
+                    || strings[i].Contains("!") || strings[i].Contains("?") || strings[i].Contains(";")
                     || strings[i].Contains(":") || strings[i].Contains("·")) {
                     quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
                     temp = "";
