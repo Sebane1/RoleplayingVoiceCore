@@ -6,13 +6,14 @@ namespace FFXIVLooseTextureCompiler.Networking {
     public class NetworkedClient : IDisposable {
         private bool disposedValue;
         private bool connected;
-        int connectionAttempts = 0;
+        int portCycle = 0;
         private string id;
         private string _ipAddress;
+        private int connectionAttempts;
 
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
-        public int Port { get { return 5105 + (connectionAttempts * 100); } }
+        public int Port { get { return 5105 + (portCycle * 100); } }
 
         public event EventHandler OnSendFailed;
         public event EventHandler OnConnectionFailed;
@@ -22,14 +23,14 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
         public async void Start(TcpClient sendingClient) {
             try {
-                sendingClient.LingerState = new LingerOption(false, 5);
+                sendingClient.LingerState = new LingerOption(false, 0);
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
-                    if (connectionAttempts < 10) {
-                        connectionAttempts++;
+                    if (portCycle < 9) {
+                        portCycle++;
                     } else {
-                        connectionAttempts = 0;
+                        portCycle = 0;
                     }
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 }
@@ -63,14 +64,19 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     }
                 }
             } catch {
+                portCycle++;
+                if (portCycle > 9) {
+                    portCycle = 0;
+                }
                 connectionAttempts++;
-                if (connectionAttempts <= 10) {
+                if (connectionAttempts < 20) {
                     return await SendFile(sendID, path, position);
                 } else {
                     OnSendFailed?.Invoke(this, EventArgs.Empty);
                     connectionAttempts = 0;
                 }
             }
+            connectionAttempts = 0;
             return true;
         }
 
@@ -89,8 +95,10 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
 
         public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath) {
+            Random random = new Random();
             string path = Path.Combine(tempPath, sendID + ".mp3");
             Vector3 position = new Vector3(-1, -1, -1);
+            Directory.CreateDirectory(tempPath);
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -103,6 +111,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 if (value != 0) {
                     position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     long length = reader.ReadInt64();
+                    while (File.Exists(path) && IsFileLocked(path)) {
+                        Thread.Sleep(200);
+                    }
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
                     }
@@ -110,16 +121,22 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 Close(sendingClient);
             } catch {
                 try {
+                    portCycle++;
+                    if (portCycle < 9) {
+                        portCycle = 0;
+                    }
                     connectionAttempts++;
-                    if (connectionAttempts < 10) {
+                    if (connectionAttempts < 20) {
                         return await GetFile(sendID, tempPath);
                     } else {
                         connectionAttempts = 0;
+                        connected = false;
                     }
                 } catch {
                     connected = false;
                 }
             }
+            connectionAttempts = 0;
             return new KeyValuePair<Vector3, string>(position, path);
         }
 
@@ -140,19 +157,40 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 return position;
             } catch {
                 try {
+                    portCycle++;
+                    if (portCycle < 9) {
+                        portCycle = 0;
+                    }
                     connectionAttempts++;
-                    if (connectionAttempts < 10) {
+                    if (connectionAttempts < 20) {
                         return await GetPosition(sendID);
                     } else {
                         connectionAttempts = 0;
+                        connected = false;
                     }
                 } catch {
                     connected = false;
                 }
             }
+            connectionAttempts = 0;
             return position;
         }
+        protected virtual bool IsFileLocked(string path) {
+            try {
+                using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None)) {
+                    stream.Close();
+                }
+            } catch (IOException) {
+                //the file is unavailable because it is:
+                //still being written to
+                //or being processed by another thread
+                //or does not exist (has already been processed)
+                return true;
+            }
 
+            //file is not locked
+            return false;
+        }
         public static void CopyStream(Stream input, Stream output, int bytes) {
             byte[] buffer = new byte[32768];
             int read;

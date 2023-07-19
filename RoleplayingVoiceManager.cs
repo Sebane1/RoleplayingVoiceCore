@@ -9,6 +9,7 @@ using RoleplayingVoiceCore.AudioRecycler;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
@@ -173,23 +174,40 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                         Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
-                        try {
-                            WaveOutEvent output = new WaveOutEvent();
-                            using (var player = new AudioFileReader(stitchedPath)) {
-                                var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                                volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
-                                output.Init(volumeSampleProvider);
-                                output.Play();
-                            }
-                        } catch {
-                            File.Delete(stitchedPath);
-                        }
+                        clipPath = stitchedPath;
+                        //try {
+                        //    WaveOutEvent output = new WaveOutEvent();
+                        //    using (var player = new AudioFileReader(stitchedPath)) {
+                        //        var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                        //        volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
+                        //        output.Init(volumeSampleProvider);
+                        //        output.Play();
+                        //    }
+                        //} catch {
+                        //    File.Delete(stitchedPath);
+                        //}
                     }
                 } catch {
 
                 }
             }
             return clipPath;
+        }
+
+        public async void SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
+            string hash = Shai1Hash(sender + identifier);
+            Task.Run(() => _networkedClient.SendFile(hash, soundOnDisk, position));
+            //try {
+            //    WaveOutEvent output = new WaveOutEvent();
+            //    using (var player = new AudioFileReader(soundOnDisk)) {
+            //        var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+            //        volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
+            //        output.Init(volumeSampleProvider);
+            //        output.Play();
+            //    }
+            //} catch {
+
+            //}
         }
 
         private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
@@ -343,38 +361,28 @@ namespace RoleplayingVoiceCore {
             using var sha1 = SHA1.Create();
             return Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(input)));
         }
-        public async Task<string> GetVoice(string sender, string text, float volume, Vector3 centerPosition, bool isShoutYell) {
+
+        public async Task<string> GetSound(string sender, string identifier, float volume,
+            Vector3 centerPosition, bool isShoutYell, string subDirectory = null, bool ignoreCache = false) {
+            string path = "";
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
-                string path = "";
                 Vector3 position = new Vector3();
-                string hash = Shai1Hash(sender + text);
-                string localPath = Path.Combine(rpVoiceCache, hash + ".mp3");
-                if (!File.Exists(localPath)) {
-                    data = await _networkedClient.GetFile(hash, rpVoiceCache);
+                string hash = Shai1Hash(sender + identifier);
+                string localPath = Path.Combine(rpVoiceCache + subDirectory, hash + ".mp3");
+                if (!File.Exists(localPath) || ignoreCache) {
+                    data = await _networkedClient.GetFile(hash, rpVoiceCache + subDirectory);
                     path = data.Value;
                     position = data.Key;
                 } else {
                     path = localPath;
                     position = await _networkedClient.GetPosition(hash);
                 }
-                if (!string.IsNullOrEmpty(path)) {
-                    if (File.Exists(path)) {
-                        WaveOutEvent output = new WaveOutEvent();
-                        using (var player = new AudioFileReader(path)) {
-                            float distance = !isShoutYell ? Vector3.Distance(centerPosition, position) : 0;
-                            float newVolume = volume * ((20 - distance) / 20);
-                            var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                            volumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
-                            output.Init(volumeSampleProvider);
-                            output.Play();
-                        }
-                    }
-                }
             }
-            return "";
+            return path;
         }
     }
+
     public class ValidationResult : EventArgs {
         public bool ValidationSuceeded { get; set; }
         // ValidationState 3 is meant for api calls failed when they shouldn't have
