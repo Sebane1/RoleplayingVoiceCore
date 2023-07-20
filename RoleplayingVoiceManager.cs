@@ -3,13 +3,10 @@ using ElevenLabs.History;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using RoleplayingVoiceCore.AudioRecycler;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
@@ -175,7 +172,10 @@ namespace RoleplayingVoiceCore {
                         }
                         Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
                         clipPath = stitchedPath;
+                    } else {
+                        return "";
                     }
+
                 } catch {
 
                 }
