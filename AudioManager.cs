@@ -23,7 +23,7 @@ namespace RoleplayingVoiceCore {
             Task.Run(() => Update());
         }
 
-        public async void PlayAudio(IPlayerObject playerObject, string audioPath, SoundType soundType) {
+        public async void PlayAudio(IPlayerObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
             Task.Run(() => {
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
@@ -35,22 +35,32 @@ namespace RoleplayingVoiceCore {
                                         while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing) {
                                             Thread.Sleep(100);
                                         }
-                                    } else if (soundType == SoundType.Song || soundType == SoundType.Emote) {
+                                    } else if (soundType == SoundType.Song || 
+                                    soundType == SoundType.Emote || 
+                                    soundType == SoundType.OtherPlayer) {
                                         playbackSounds[playerObject.Name].WaveOutEvent.Stop();
                                     }
                                 }
                             }
                             playbackSounds[playerObject.Name] = new SoundObject() {
+                                PlayerObject = playerObject,
                                 WaveOutEvent = new WaveOutEvent(),
                                 SoundType = soundType,
                                 SoundPath = audioPath,
                             };
                             try {
+                                float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
+                                float distance = _mainPlayer.Name != playbackSounds[playerObject.Name].PlayerObject.Name ?
+                                Vector3.Distance(_mainPlayer.Position, playbackSounds[playerObject.Name].PlayerObject.Position) : 1;
+                                float newVolume = volume * ((20 - distance) / 20);
                                 if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
                                     playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
                                 }
+                                if (delay > 0) {
+                                    Thread.Sleep(delay);
+                                }
                                 playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                                playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = 1;
+                                playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
                                 playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].VolumeSampleProvider);
                                 playbackSounds[playerObject.Name].WaveOutEvent?.Play();
                             } catch {
@@ -102,8 +112,9 @@ namespace RoleplayingVoiceCore {
                     switch (soundType) {
                         case SoundType.MainPlayerTts:
                             return _mainPlayerVolume;
+                        case SoundType.Emote:
                         case SoundType.MainPlayerVoice:
-                            return _mainPlayerVolume * 0.6f;
+                            return _mainPlayerVolume * 0.7f;
                         case SoundType.OtherPlayer:
                             return _otherPlayerVolume;
                         case SoundType.Song:
