@@ -35,10 +35,8 @@ namespace RoleplayingVoiceCore {
                                         while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing) {
                                             Thread.Sleep(100);
                                         }
-                                        playbackSounds[playerObject.Name].WaveOutEvent.Dispose();
                                     } else if (soundType == SoundType.Song || soundType == SoundType.Emote) {
                                         playbackSounds[playerObject.Name].WaveOutEvent.Stop();
-                                        playbackSounds[playerObject.Name].WaveOutEvent.Dispose();
                                     }
                                 }
                             }
@@ -58,7 +56,7 @@ namespace RoleplayingVoiceCore {
                             } catch {
 
                             }
-                            player?.Dispose();
+                            //player?.Dispose();
                         }
                     }
                 }

@@ -175,17 +175,6 @@ namespace RoleplayingVoiceCore {
                         }
                         Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
                         clipPath = stitchedPath;
-                        //try {
-                        //    WaveOutEvent output = new WaveOutEvent();
-                        //    using (var player = new AudioFileReader(stitchedPath)) {
-                        //        var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                        //        volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
-                        //        output.Init(volumeSampleProvider);
-                        //        output.Play();
-                        //    }
-                        //} catch {
-                        //    File.Delete(stitchedPath);
-                        //}
                     }
                 } catch {
 
@@ -194,22 +183,18 @@ namespace RoleplayingVoiceCore {
             return clipPath;
         }
 
-        public async void SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
+        public async Task<bool> SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
             string hash = Shai1Hash(sender + identifier);
-            Task.Run(() => _networkedClient.SendFile(hash, soundOnDisk, position));
-            //try {
-            //    WaveOutEvent output = new WaveOutEvent();
-            //    using (var player = new AudioFileReader(soundOnDisk)) {
-            //        var volumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-            //        volumeSampleProvider.Volume = Math.Clamp(volume, 0, 1);
-            //        output.Init(volumeSampleProvider);
-            //        output.Play();
-            //    }
-            //} catch {
-
-            //}
+            bool sendState = false;
+            await Task.Run(async () => { sendState = await _networkedClient.SendFile(hash, soundOnDisk, position); });
+            return sendState;
         }
-
+        public async Task<bool> SendZip(string sender, string soundOnDisk) {
+            string hash = Shai1Hash(sender);
+            bool sendState = false;
+            await Task.Run(async () => { sendState = await _networkedClient.SendZip(hash, soundOnDisk); });
+            return sendState;
+        }
         private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
@@ -357,7 +342,7 @@ namespace RoleplayingVoiceCore {
                 return Convert.ToHexString(hashBytes); // .NET 5 +
             }
         }
-        static string Shai1Hash(string input) {
+        public static string Shai1Hash(string input) {
             using var sha1 = SHA1.Create();
             return Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(input)));
         }
@@ -368,10 +353,11 @@ namespace RoleplayingVoiceCore {
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
                 Vector3 position = new Vector3();
+                Guid id = Guid.NewGuid();
                 string hash = Shai1Hash(sender + identifier);
-                string localPath = Path.Combine(rpVoiceCache + subDirectory, hash + ".mp3");
+                string localPath = Path.Combine(rpVoiceCache + subDirectory, (!ignoreCache ? hash : id) + ".mp3");
                 if (!File.Exists(localPath) || ignoreCache) {
-                    data = await _networkedClient.GetFile(hash, rpVoiceCache + subDirectory);
+                    data = await _networkedClient.GetFile(hash, rpVoiceCache + subDirectory, id.ToString());
                     path = data.Value;
                     position = data.Key;
                 } else {
@@ -380,6 +366,13 @@ namespace RoleplayingVoiceCore {
                 }
             }
             return path;
+        }
+        public async Task<string> GetZip(string sender, string path) {
+            if (_networkedClient != null) {
+                string hash = Shai1Hash(sender);
+                return await _networkedClient.GetZip(hash, path);
+            }
+            return "";
         }
     }
 

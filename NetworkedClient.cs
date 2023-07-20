@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.IO.Compression;
+using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
 
@@ -13,7 +14,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
-        public int Port { get { return 5105 + (portCycle * 100); } }
+        public int Port { get { return 5105 + (portCycle); } }
 
         public event EventHandler OnSendFailed;
         public event EventHandler OnConnectionFailed;
@@ -27,7 +28,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
-                    if (portCycle < 9) {
+                    if (portCycle < 1000) {
                         portCycle++;
                     } else {
                         portCycle = 0;
@@ -65,7 +66,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             } catch {
                 portCycle++;
-                if (portCycle > 9) {
+                if (portCycle > 1000) {
                     portCycle = 0;
                 }
                 connectionAttempts++;
@@ -77,7 +78,46 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             }
             connectionAttempts = 0;
-            return true;
+            return false;
+        }
+
+        public async Task<bool> SendZip(string sendID, string path) {
+            try {
+                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                Start(sendingClient);
+                string zipPath = path + ".zip";
+                ZipFile.CreateFromDirectory(path, zipPath);
+                using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                    using (BinaryWriter writer = new(sendingClient.GetStream())) {
+                        writer.Write(sendID);
+                        writer.Write(4);
+                        writer.Write(fileStream.Length);
+
+                        CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+
+                        writer.Write(900000);
+                        writer.Flush();
+                        fileStream.Dispose();
+                        Close(sendingClient);
+                        File.Delete(zipPath);
+                        return true;
+                    }
+                }
+            } catch {
+                portCycle++;
+                if (portCycle > 1000) {
+                    portCycle = 0;
+                }
+                connectionAttempts++;
+                if (connectionAttempts < 20) {
+                    return await SendZip(sendID, path);
+                } else {
+                    OnSendFailed?.Invoke(this, EventArgs.Empty);
+                    connectionAttempts = 0;
+                }
+            }
+            connectionAttempts = 0;
+            return false;
         }
 
         private void Close(TcpClient sendingClient) {
@@ -94,9 +134,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
             connected = false;
         }
 
-        public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath) {
+        public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath, string filename = "") {
             Random random = new Random();
-            string path = Path.Combine(tempPath, sendID + ".mp3");
+            string path = Path.Combine(tempPath, (!string.IsNullOrEmpty(filename) ? filename : sendID) + ".mp3");
             Vector3 position = new Vector3(-1, -1, -1);
             Directory.CreateDirectory(tempPath);
             try {
@@ -111,9 +151,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 if (value != 0) {
                     position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     long length = reader.ReadInt64();
-                    while (File.Exists(path) && IsFileLocked(path)) {
-                        Thread.Sleep(200);
-                    }
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
                     }
@@ -122,7 +159,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 try {
                     portCycle++;
-                    if (portCycle < 9) {
+                    if (portCycle > 1000) {
                         portCycle = 0;
                     }
                     connectionAttempts++;
@@ -138,6 +175,56 @@ namespace FFXIVLooseTextureCompiler.Networking {
             }
             connectionAttempts = 0;
             return new KeyValuePair<Vector3, string>(position, path);
+        }
+
+        public async Task<string> GetZip(string sendID, string tempPath) {
+            Random random = new Random();
+            string path = Path.Combine(tempPath, sendID + ".zip");
+            string zipDirectory = tempPath + @"\" + sendID;
+            Vector3 position = new Vector3(-1, -1, -1);
+            try {
+                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
+                Start(sendingClient);
+                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
+                BinaryReader reader = new BinaryReader(sendingClient.GetStream());
+                writer.Write(sendID);
+                writer.Write(1);
+                byte value = reader.ReadByte();
+                if (value != 0) {
+                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    long length = reader.ReadInt64();
+                    using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
+                        CopyStream(reader.BaseStream, fileStream, (int)length);
+                    }
+                    Directory.CreateDirectory(tempPath);
+                    if (File.Exists(zipDirectory)) {
+                        File.Delete(zipDirectory);
+                    }
+                    ZipFile.ExtractToDirectory(path, zipDirectory);
+                    if (File.Exists(path)) {
+                        File.Delete(path);
+                    }
+                }
+                Close(sendingClient);
+            } catch {
+                try {
+                    portCycle++;
+                    if (portCycle > 1000) {
+                        portCycle = 0;
+                    }
+                    connectionAttempts++;
+                    if (connectionAttempts < 20) {
+                        return await GetZip(sendID, tempPath);
+                    } else {
+                        connectionAttempts = 0;
+                        connected = false;
+                    }
+                } catch {
+                    connected = false;
+                }
+            }
+            connectionAttempts = 0;
+            return zipDirectory;
         }
 
         public async Task<Vector3> GetPosition(string sendID) {
@@ -158,7 +245,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 try {
                     portCycle++;
-                    if (portCycle < 9) {
+                    if (portCycle < 1000) {
                         portCycle = 0;
                     }
                     connectionAttempts++;
