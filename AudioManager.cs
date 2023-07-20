@@ -17,7 +17,7 @@ namespace RoleplayingVoiceCore {
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
         public float SongVolume { get => _songVolume; set => _songVolume = value; }
-
+        public event EventHandler OnNewAudioTriggered;
         public AudioManager(IPlayerObject playerObject) {
             _mainPlayer = playerObject;
             Task.Run(() => Update());
@@ -25,6 +25,7 @@ namespace RoleplayingVoiceCore {
 
         public async void PlayAudio(IPlayerObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
             Task.Run(() => {
+                OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if (File.Exists(audioPath)) {
@@ -35,8 +36,8 @@ namespace RoleplayingVoiceCore {
                                         while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing) {
                                             Thread.Sleep(100);
                                         }
-                                    } else if (soundType == SoundType.Song || 
-                                    soundType == SoundType.Emote || 
+                                    } else if (soundType == SoundType.Song ||
+                                    soundType == SoundType.Emote ||
                                     soundType == SoundType.OtherPlayer) {
                                         playbackSounds[playerObject.Name].WaveOutEvent.Stop();
                                     }
