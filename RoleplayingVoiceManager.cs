@@ -113,6 +113,7 @@ namespace RoleplayingVoiceCore {
             }
             _info = value;
         }
+
         public async Task<string> DoVoice(string sender, string text, string voiceType,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing) {
             string clipPath = "";
@@ -131,6 +132,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
+
             Voice? characterVoice = null;
             if (voices != null) {
                 foreach (var voice in voices) {
@@ -140,6 +142,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
+
             if (characterVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
@@ -186,12 +189,14 @@ namespace RoleplayingVoiceCore {
             await Task.Run(async () => { sendState = await _networkedClient.SendFile(hash, soundOnDisk, position); });
             return sendState;
         }
+
         public async Task<bool> SendZip(string sender, string soundOnDisk) {
             string hash = Shai1Hash(sender);
             bool sendState = false;
             await Task.Run(async () => { sendState = await _networkedClient.SendZip(hash, soundOnDisk); });
             return sendState;
         }
+
         private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
@@ -217,6 +222,7 @@ namespace RoleplayingVoiceCore {
             string audioPath = "";
             bool foundInHistory = false;
             var history = await _api.HistoryEndpoint.GetHistoryAsync();
+
             foreach (var item in history) {
                 if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
                     if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim()
@@ -227,6 +233,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
+
             if (!foundInHistory) {
                 audioPath = await _api.TextToSpeechEndpoint
                     .TextToSpeechAsync(finalText, characterVoice,
@@ -254,6 +261,7 @@ namespace RoleplayingVoiceCore {
             }
             return newText;
         }
+
         public MemoryStream ConcatenateAudio(params string[] mp3filenames) {
             MemoryStream output = new MemoryStream();
             foreach (string filename in mp3filenames) {
@@ -265,6 +273,7 @@ namespace RoleplayingVoiceCore {
             }
             return output;
         }
+
         private string ExtractQuotations(string text) {
             string newText = "";
             string[] strings = null;
@@ -335,7 +344,6 @@ namespace RoleplayingVoiceCore {
             using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create()) {
                 byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
                 byte[] hashBytes = md5.ComputeHash(inputBytes);
-
                 return Convert.ToHexString(hashBytes); // .NET 5 +
             }
         }
