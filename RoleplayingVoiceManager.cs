@@ -115,7 +115,7 @@ namespace RoleplayingVoiceCore {
         }
 
         public async Task<string> DoVoice(string sender, string text, string voiceType,
-            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing) {
+            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
             ValidationResult state = new ValidationResult();
@@ -170,7 +170,9 @@ namespace RoleplayingVoiceCore {
 
                             }
                         }
-                        Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
+                        if (useSync) {
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
+                        }
                         clipPath = stitchedPath;
                     } else {
                         return "";
