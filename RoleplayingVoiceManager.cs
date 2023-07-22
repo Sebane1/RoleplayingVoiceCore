@@ -15,8 +15,6 @@ namespace RoleplayingVoiceCore {
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
         SubscriptionInfo _info = new SubscriptionInfo();
-
-        private string clipPath = "";
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
 
@@ -45,8 +43,6 @@ namespace RoleplayingVoiceCore {
                 }
             });
         }
-
-        public string ClipPath { get => clipPath; set => clipPath = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
         public SubscriptionInfo Info { get => _info; set => _info = value; }
@@ -119,6 +115,7 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<string> DoVoice(string sender, string text, string voiceType,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing) {
+            string clipPath = "";
             string hash = Shai1Hash(sender + text);
             ValidationResult state = new ValidationResult();
             IReadOnlyList<Voice>? voices = null;

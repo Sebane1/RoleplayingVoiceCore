@@ -11,7 +11,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
         private string id;
         private string _ipAddress;
         private int connectionAttempts;
-
+        const int maxPortCycle = 50;
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
         public int Port { get { return 5105 + (portCycle); } }
@@ -28,7 +28,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 try {
                     sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
                 } catch {
-                    if (portCycle < 1000) {
+                    if (portCycle < maxPortCycle) {
                         portCycle++;
                     } else {
                         portCycle = 0;
@@ -66,7 +66,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             } catch {
                 portCycle++;
-                if (portCycle > 1000) {
+                if (portCycle > maxPortCycle) {
                     portCycle = 0;
                 }
                 connectionAttempts++;
@@ -95,7 +95,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
                         CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
 
-                        writer.Write(900000);
+                        writer.Write(3600000);
                         writer.Flush();
                         fileStream.Dispose();
                         Close(sendingClient);
@@ -105,7 +105,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             } catch {
                 portCycle++;
-                if (portCycle > 1000) {
+                if (portCycle > maxPortCycle) {
                     portCycle = 0;
                 }
                 connectionAttempts++;
@@ -159,7 +159,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 try {
                     portCycle++;
-                    if (portCycle > 1000) {
+                    if (portCycle > maxPortCycle) {
                         portCycle = 0;
                     }
                     connectionAttempts++;
@@ -209,7 +209,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 try {
                     portCycle++;
-                    if (portCycle > 1000) {
+                    if (portCycle > maxPortCycle) {
                         portCycle = 0;
                     }
                     connectionAttempts++;
@@ -245,7 +245,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
                 try {
                     portCycle++;
-                    if (portCycle < 1000) {
+                    if (portCycle < maxPortCycle) {
                         portCycle = 0;
                     }
                     connectionAttempts++;
