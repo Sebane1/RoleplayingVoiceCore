@@ -1,6 +1,7 @@
 ﻿using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace RoleplayingVoiceCore {
@@ -31,15 +32,20 @@ namespace RoleplayingVoiceCore {
                     if (File.Exists(audioPath)) {
                         using (var player = new AudioFileReader(audioPath)) {
                             if (playbackSounds.ContainsKey(playerObject.Name)) {
-                                if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
-                                    if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
-                                        while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing) {
-                                            Thread.Sleep(100);
+                                if (playbackSounds[playerObject.Name].WaveOutEvent != null) {
+                                    if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
+                                        if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
+                                            Stopwatch waitTimer = new Stopwatch();
+                                            waitTimer.Start();
+                                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing 
+                                            && waitTimer.ElapsedMilliseconds < 10000) {
+                                                Thread.Sleep(100);
+                                            }
+                                        } else if (soundType == SoundType.Song ||
+                                        soundType == SoundType.Emote ||
+                                        soundType == SoundType.OtherPlayer) {
+                                            playbackSounds[playerObject.Name].WaveOutEvent.Stop();
                                         }
-                                    } else if (soundType == SoundType.Song ||
-                                    soundType == SoundType.Emote ||
-                                    soundType == SoundType.OtherPlayer) {
-                                        playbackSounds[playerObject.Name].WaveOutEvent.Stop();
                                     }
                                 }
                             }
@@ -67,7 +73,6 @@ namespace RoleplayingVoiceCore {
                             } catch {
 
                             }
-                            //player?.Dispose();
                         }
                     }
                 }
