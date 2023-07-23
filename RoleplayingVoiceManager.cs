@@ -146,7 +146,7 @@ namespace RoleplayingVoiceCore {
             if (characterVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
-                        string stitchedPath = Path.Combine(rpVoiceCache, hash + ".mp3");
+                        string stitchedPath = Path.Combine(rpVoiceCache, characterVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
@@ -165,9 +165,7 @@ namespace RoleplayingVoiceCore {
                                     stitchedStream.Close();
                                 }
                             } catch (Exception e) {
-
                                 var error = e.Message;
-
                             }
                         }
                         if (useSync) {
