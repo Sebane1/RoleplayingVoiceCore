@@ -88,10 +88,10 @@ namespace RoleplayingVoiceCore {
                     string playerName = playbackSounds.Keys.ElementAt<string>(i);
                     lock (playbackSounds[playerName]) {
                         if (playbackSounds[playerName].PlayerObject != null) {
-                            float volume = GetVolume(playbackSounds[playerName].SoundType, playbackSounds[playerName].PlayerObject);
-                            float distance = Vector3.Distance(_mainPlayer.Position, playbackSounds[playerName].PlayerObject.Position);
-                            float newVolume = volume * ((20 - distance) / 20);
                             try {
+                                float volume = GetVolume(playbackSounds[playerName].SoundType, playbackSounds[playerName].PlayerObject);
+                                float distance = Vector3.Distance(_mainPlayer.Position, playbackSounds[playerName].PlayerObject.Position);
+                                float newVolume = volume * ((20 - distance) / 20);
                                 playbackSounds[playerName].VolumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
                                 if (playbackSounds[playerName].WaveOutEvent.PlaybackState == PlaybackState.Stopped) {
                                     if (playbackSounds[playerName].SoundType == SoundType.Song) {
