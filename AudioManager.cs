@@ -37,7 +37,7 @@ namespace RoleplayingVoiceCore {
                                         if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
                                             Stopwatch waitTimer = new Stopwatch();
                                             waitTimer.Start();
-                                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing 
+                                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
                                             && waitTimer.ElapsedMilliseconds < 10000) {
                                                 Thread.Sleep(100);
                                             }
@@ -135,6 +135,7 @@ namespace RoleplayingVoiceCore {
 
         public void Dispose() {
             notDisposed = false;
+            playbackSounds.Clear();
         }
     }
 }
