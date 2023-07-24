@@ -24,24 +24,38 @@ namespace RoleplayingVoiceCore {
 
         public RoleplayingVoiceManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
-            // Spin a new thread for this
-            Task.Run(() => {
-                _apiKey = apiKey;
-                try {
-                    _api = new ElevenLabsClient(apiKey);
-                    var test = _api.UserEndpoint.GetUserInfoAsync().Result;
-                    apiValid = true;
-                } catch (Exception e) {
-                    var errorMain = e.Message.ToString();
-                    if (errorMain.Contains("invalid_api_key")) {
-                        apiValid = false;
+            _networkedClient = client;
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                apiValid = false;
+            }
+            else
+            {
+                // Spin a new thread for this
+                Task.Run(() =>
+                {
+                    _apiKey = apiKey;
+                    try
+                    {
+                        _api = new ElevenLabsClient(apiKey);
+                        var test = _api.UserEndpoint.GetUserInfoAsync().Result;
+                        apiValid = true;
                     }
-                }
-                _networkedClient = client;
-                if (characterVoices != null) {
-                    _characterVoices = characterVoices;
-                }
-            });
+                    catch (Exception e)
+                    {
+                        var errorMain = e.Message.ToString();
+                        if (errorMain.Contains("invalid_api_key"))
+                        {
+                            apiValid = false;
+                        }
+                    }
+                    if (characterVoices != null)
+                    {
+                        _characterVoices = characterVoices;
+                    }
+
+                });
+            }
         }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
@@ -49,7 +63,7 @@ namespace RoleplayingVoiceCore {
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
 
         public async Task<bool> ApiValidation(string key) {
-            if (!string.IsNullOrEmpty(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
+            if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
                 try {
                     var api = new ElevenLabsClient(key);
                     await api.UserEndpoint.GetUserInfoAsync();
@@ -60,6 +74,10 @@ namespace RoleplayingVoiceCore {
                         apiValid = false;
                     }
                 }
+            }
+            if (string.IsNullOrWhiteSpace(key) || !key.All(c => char.IsAsciiLetterOrDigit(c)))
+            {
+                apiValid = false;
             }
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
@@ -353,7 +371,7 @@ namespace RoleplayingVoiceCore {
         }
 
         public async Task<string> GetSound(string sender, string identifier, float volume,
-            Vector3 centerPosition, bool isShoutYell, string subDirectory = null, bool ignoreCache = false) {
+            Vector3 centerPosition, bool isShoutYell, string? subDirectory = null, bool ignoreCache = false) {
             string path = "";
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
