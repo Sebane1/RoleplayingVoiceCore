@@ -24,6 +24,7 @@ namespace RoleplayingVoiceCore {
 
         public RoleplayingVoiceManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
+            _networkedClient = client;
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 apiValid = false;
@@ -48,7 +49,6 @@ namespace RoleplayingVoiceCore {
                             apiValid = false;
                         }
                     }
-                    _networkedClient = client;
                     if (characterVoices != null)
                     {
                         _characterVoices = characterVoices;
