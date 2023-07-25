@@ -107,6 +107,7 @@ namespace RoleplayingVoiceCore {
                         }
                     }
                 }
+                Thread.Sleep(100);
             }
         }
 
