@@ -1,6 +1,7 @@
 ﻿using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 
@@ -102,7 +103,8 @@ namespace RoleplayingVoiceCore {
                                     }
                                 }
                             } catch {
-
+                                SoundObject deadObject;
+                                playbackSounds.TryRemove(playerName, out deadObject);
                             }
                         }
                     }
