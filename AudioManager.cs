@@ -103,8 +103,8 @@ namespace RoleplayingVoiceCore {
                                     }
                                 }
                             } catch {
-                                SoundObject deadObject;
-                                playbackSounds.TryRemove(playerName, out deadObject);
+                                //SoundObject deadObject;
+                                //playbackSounds.TryRemove(playerName, out deadObject);
                             }
                         }
                     }
