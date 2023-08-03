@@ -57,20 +57,22 @@ namespace RoleplayingVoiceCore {
                                 SoundPath = audioPath,
                             };
                             try {
-                                float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
-                                float distance = _mainPlayer.Name != playbackSounds[playerObject.Name].PlayerObject.Name ?
-                                Vector3.Distance(_mainPlayer.Position, playbackSounds[playerObject.Name].PlayerObject.Position) : 1;
-                                float newVolume = volume * ((20 - distance) / 20);
-                                if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
-                                    playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
+                                lock (playbackSounds[playerObject.Name]) {
+                                    float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
+                                    float distance = _mainPlayer.Name != playbackSounds[playerObject.Name].PlayerObject.Name ?
+                                    Vector3.Distance(_mainPlayer.Position, playbackSounds[playerObject.Name].PlayerObject.Position) : 1;
+                                    float newVolume = volume * ((20 - distance) / 20);
+                                    if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
+                                        playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
+                                    }
+                                    if (delay > 0) {
+                                        Thread.Sleep(delay);
+                                    }
+                                    playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                                    playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
+                                    playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].VolumeSampleProvider);
+                                    playbackSounds[playerObject.Name].WaveOutEvent?.Play();
                                 }
-                                if (delay > 0) {
-                                    Thread.Sleep(delay);
-                                }
-                                playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                                playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
-                                playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].VolumeSampleProvider);
-                                playbackSounds[playerObject.Name].WaveOutEvent?.Play();
                             } catch {
 
                             }
@@ -93,13 +95,17 @@ namespace RoleplayingVoiceCore {
                                 float volume = GetVolume(playbackSounds[playerName].SoundType, playbackSounds[playerName].PlayerObject);
                                 float distance = Vector3.Distance(_mainPlayer.Position, playbackSounds[playerName].PlayerObject.Position);
                                 float newVolume = volume * ((20 - distance) / 20);
-                                playbackSounds[playerName].VolumeSampleProvider.Volume = Math.Clamp(newVolume > -20 ? newVolume : volume, 0, 1);
-                                if (playbackSounds[playerName].WaveOutEvent.PlaybackState == PlaybackState.Stopped) {
-                                    if (playbackSounds[playerName].SoundType == SoundType.Song) {
-                                        PlayAudio(
-                                            playbackSounds[playerName].PlayerObject,
-                                            playbackSounds[playerName].SoundPath,
-                                            playbackSounds[playerName].SoundType);
+                                if (playbackSounds[playerName].VolumeSampleProvider != null) {
+                                    playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
+                                    if (playbackSounds[playerName].WaveOutEvent != null) {
+                                        if (playbackSounds[playerName].WaveOutEvent.PlaybackState == PlaybackState.Stopped) {
+                                            if (playbackSounds[playerName].SoundType == SoundType.Song) {
+                                                PlayAudio(
+                                                    playbackSounds[playerName].PlayerObject,
+                                                    playbackSounds[playerName].SoundPath,
+                                                    playbackSounds[playerName].SoundType);
+                                            }
+                                        }
                                     }
                                 }
                             } catch {
