@@ -94,7 +94,7 @@ namespace RoleplayingVoiceCore {
                             try {
                                 float volume = GetVolume(playbackSounds[playerName].SoundType, playbackSounds[playerName].PlayerObject);
                                 float distance = Vector3.Distance(_mainPlayer.Position, playbackSounds[playerName].PlayerObject.Position);
-                                float newVolume = volume * ((20 - distance) / 20);
+                                float newVolume = Math.Clamp(volume * ((20 - distance) / 20), 0f, 1f);
                                 if (playbackSounds[playerName].VolumeSampleProvider != null) {
                                     playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
                                     if (playbackSounds[playerName].WaveOutEvent != null) {
