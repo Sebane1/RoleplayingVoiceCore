@@ -1,7 +1,6 @@
 ﻿using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 
@@ -19,6 +18,7 @@ namespace RoleplayingVoiceCore {
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
         public float SongVolume { get => _songVolume; set => _songVolume = value; }
+
         public event EventHandler OnNewAudioTriggered;
         public AudioManager(IPlayerObject playerObject) {
             _mainPlayer = playerObject;
@@ -26,6 +26,7 @@ namespace RoleplayingVoiceCore {
         }
 
         public async void PlayAudio(IPlayerObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
                 OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
@@ -39,23 +40,25 @@ namespace RoleplayingVoiceCore {
                                             Stopwatch waitTimer = new Stopwatch();
                                             waitTimer.Start();
                                             while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
-                                            && waitTimer.ElapsedMilliseconds < 10000) {
+                                            && waitTimer.ElapsedMilliseconds < 20000) {
                                                 Thread.Sleep(100);
                                             }
-                                        } else if (soundType == SoundType.Song ||
-                                        soundType == SoundType.Emote ||
-                                        soundType == SoundType.OtherPlayer) {
+                                        } else {
                                             playbackSounds[playerObject.Name].WaveOutEvent.Stop();
                                         }
                                     }
                                 }
                             }
-                            playbackSounds[playerObject.Name] = new SoundObject() {
-                                PlayerObject = playerObject,
-                                WaveOutEvent = new WaveOutEvent(),
-                                SoundType = soundType,
-                                SoundPath = audioPath,
-                            };
+                            if (soundType != SoundType.MainPlayerTts) {
+                                if (player.TotalTime.TotalSeconds > 20) {
+                                    soundType = SoundType.Song;
+                                }
+                            }
+                            playbackSounds[playerObject.Name] = new SoundObject(playerObject,
+                              new WaveOutEvent(),
+                               soundType,
+                               audioPath);
+
                             try {
                                 lock (playbackSounds[playerObject.Name]) {
                                     float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
@@ -80,6 +83,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             });
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
         }
         public void StopAudio(IPlayerObject playerObject) {
             playbackSounds[playerObject.Name].WaveOutEvent.Stop();
@@ -97,16 +101,6 @@ namespace RoleplayingVoiceCore {
                                 float newVolume = Math.Clamp(volume * ((20 - distance) / 20), 0f, 1f);
                                 if (playbackSounds[playerName].VolumeSampleProvider != null) {
                                     playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
-                                    if (playbackSounds[playerName].WaveOutEvent != null) {
-                                        if (playbackSounds[playerName].WaveOutEvent.PlaybackState == PlaybackState.Stopped) {
-                                            if (playbackSounds[playerName].SoundType == SoundType.Song) {
-                                                PlayAudio(
-                                                    playbackSounds[playerName].PlayerObject,
-                                                    playbackSounds[playerName].SoundPath,
-                                                    playbackSounds[playerName].SoundType);
-                                            }
-                                        }
-                                    }
                                 }
                             } catch {
                                 //SoundObject deadObject;
