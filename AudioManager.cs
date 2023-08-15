@@ -31,7 +31,7 @@ namespace RoleplayingVoiceCore {
                 OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if (File.Exists(audioPath)) {
+                    if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
                         using (var player = new AudioFileReader(audioPath)) {
                             if (playbackSounds.ContainsKey(playerObject.Name)) {
                                 if (playbackSounds[playerObject.Name].WaveOutEvent != null) {

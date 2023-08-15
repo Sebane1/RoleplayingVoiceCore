@@ -20,13 +20,19 @@ namespace RoleplayingVoiceCore {
             this.soundType = soundType;
             if (soundType == SoundType.Song) {
                 waveOutEvent.PlaybackStopped += delegate {
-                    using (var player = new AudioFileReader(soundPath)) {
-                        if (!stopForReal) {
-                            VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                            VolumeSampleProvider.Volume = 1;
-                            WaveOutEvent?.Init(VolumeSampleProvider);
-                            WaveOutEvent?.Play();
+                    try {
+                        if (File.Exists(soundPath)) {
+                            using (var player = new AudioFileReader(soundPath)) {
+                                if (!stopForReal) {
+                                    VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                                    VolumeSampleProvider.Volume = 1;
+                                    WaveOutEvent?.Init(VolumeSampleProvider);
+                                    WaveOutEvent?.Play();
+                                }
+                            }
                         }
+                    } catch {
+
                     }
                 };
                 Task.Run(async () => {
