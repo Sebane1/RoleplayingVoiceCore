@@ -1,4 +1,5 @@
-﻿using NAudio.Wave;
+﻿using NAudio.Vorbis;
+using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Numerics;
 
@@ -22,7 +23,8 @@ namespace RoleplayingVoiceCore {
                 waveOutEvent.PlaybackStopped += delegate {
                     try {
                         if (File.Exists(soundPath)) {
-                            using (var player = new AudioFileReader(soundPath)) {
+                            using (WaveStream player = soundPath.EndsWith(".ogg") ?
+                            new VorbisWaveReader(soundPath) : new AudioFileReader(soundPath)) {
                                 if (!stopForReal) {
                                     VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                                     VolumeSampleProvider.Volume = 1;
@@ -62,6 +64,12 @@ namespace RoleplayingVoiceCore {
         public SoundType SoundType { get => soundType; set => soundType = value; }
         public bool StopPlaybackOnMovement { get => stopPlaybackOnMovement; set => stopPlaybackOnMovement = value; }
         public string SoundPath { get => _soundPath; set => _soundPath = value; }
+        public void Stop() {
+            if (WaveOutEvent != null) {
+                stopForReal = true;
+                WaveOutEvent.Stop();
+            }
+        }
     }
 
     public enum SoundType {

@@ -1,4 +1,5 @@
-﻿using NAudio.Wave;
+﻿using NAudio.Vorbis;
+using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -31,54 +32,15 @@ namespace RoleplayingVoiceCore {
                 OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
+                    if (audioPath.EndsWith(".ogg")) {
+                        if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
+                            using (var player = new VorbisWaveReader(audioPath)) {
+                                ConfigureAudio(playerObject, audioPath, soundType, player, delay);
+                            }
+                        }
+                    } else if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
                         using (var player = new AudioFileReader(audioPath)) {
-                            if (playbackSounds.ContainsKey(playerObject.Name)) {
-                                if (playbackSounds[playerObject.Name].WaveOutEvent != null) {
-                                    if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
-                                        if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
-                                            Stopwatch waitTimer = new Stopwatch();
-                                            waitTimer.Start();
-                                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
-                                            && waitTimer.ElapsedMilliseconds < 20000) {
-                                                Thread.Sleep(100);
-                                            }
-                                        } else {
-                                            playbackSounds[playerObject.Name].WaveOutEvent.Stop();
-                                        }
-                                    }
-                                }
-                            }
-                            if (soundType != SoundType.MainPlayerTts) {
-                                if (player.TotalTime.TotalSeconds > 20) {
-                                    soundType = SoundType.Song;
-                                }
-                            }
-                            playbackSounds[playerObject.Name] = new SoundObject(playerObject,
-                              new WaveOutEvent(),
-                               soundType,
-                               audioPath);
-
-                            try {
-                                lock (playbackSounds[playerObject.Name]) {
-                                    float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
-                                    float distance = _mainPlayer.Name != playbackSounds[playerObject.Name].PlayerObject.Name ?
-                                    Vector3.Distance(_mainPlayer.Position, playbackSounds[playerObject.Name].PlayerObject.Position) : 1;
-                                    float newVolume = volume * ((20 - distance) / 20);
-                                    if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
-                                        playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
-                                    }
-                                    if (delay > 0) {
-                                        Thread.Sleep(delay);
-                                    }
-                                    playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                                    playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
-                                    playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].VolumeSampleProvider);
-                                    playbackSounds[playerObject.Name].WaveOutEvent?.Play();
-                                }
-                            } catch {
-
-                            }
+                            ConfigureAudio(playerObject, audioPath, soundType, player, delay);
                         }
                     }
                 }
@@ -86,9 +48,56 @@ namespace RoleplayingVoiceCore {
 #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
         }
         public void StopAudio(IPlayerObject playerObject) {
-            playbackSounds[playerObject.Name].WaveOutEvent.Stop();
+            playbackSounds[playerObject.Name].Stop();
         }
+        public async void ConfigureAudio(IPlayerObject playerObject, string audioPath, SoundType soundType, WaveStream player, int delay = 0) {
+            if (playbackSounds.ContainsKey(playerObject.Name)) {
+                if (playbackSounds[playerObject.Name].WaveOutEvent != null) {
+                    if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
+                        if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
+                            Stopwatch waitTimer = new Stopwatch();
+                            waitTimer.Start();
+                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
+                            && waitTimer.ElapsedMilliseconds < 20000) {
+                                Thread.Sleep(100);
+                            }
+                        } else {
+                            playbackSounds[playerObject.Name].Stop();
+                        }
+                    }
+                }
+            }
+            if (soundType != SoundType.MainPlayerTts) {
+                if (player.TotalTime.TotalSeconds > 20) {
+                    soundType = SoundType.Song;
+                }
+            }
+            playbackSounds[playerObject.Name] = new SoundObject(playerObject,
+              new WaveOutEvent(),
+               soundType,
+               audioPath);
 
+            try {
+                lock (playbackSounds[playerObject.Name]) {
+                    float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
+                    float distance = _mainPlayer.Name != playbackSounds[playerObject.Name].PlayerObject.Name ?
+                    Vector3.Distance(_mainPlayer.Position, playbackSounds[playerObject.Name].PlayerObject.Position) : 1;
+                    float newVolume = volume * ((20 - distance) / 20);
+                    if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
+                        playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
+                    }
+                    if (delay > 0) {
+                        Thread.Sleep(delay);
+                    }
+                    playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
+                    playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
+                    playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].VolumeSampleProvider);
+                    playbackSounds[playerObject.Name].WaveOutEvent?.Play();
+                }
+            } catch {
+
+            }
+        }
         private async void Update() {
             while (notDisposed) {
                 for (int i = 0; i < playbackSounds.Count; i++) {
