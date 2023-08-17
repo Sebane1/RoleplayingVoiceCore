@@ -67,7 +67,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
-            if (soundType != SoundType.MainPlayerTts) {
+            if (soundType != SoundType.MainPlayerTts && soundType != SoundType.OtherPlayerTts) {
                 if (player.TotalTime.TotalSeconds > 20) {
                     soundType = SoundType.Song;
                 }
@@ -133,6 +133,7 @@ namespace RoleplayingVoiceCore {
                         case SoundType.Emote:
                         case SoundType.MainPlayerVoice:
                             return _mainPlayerVolume * 0.7f;
+                        case SoundType.OtherPlayerTts:
                         case SoundType.OtherPlayer:
                             return _otherPlayerVolume;
                         case SoundType.Song:

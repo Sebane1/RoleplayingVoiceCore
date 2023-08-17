@@ -75,6 +75,7 @@ namespace RoleplayingVoiceCore {
     public enum SoundType {
         MainPlayerTts,
         MainPlayerVoice,
+        OtherPlayerTts,
         OtherPlayer,
         Emote,
         Song
