@@ -111,9 +111,10 @@ namespace RoleplayingVoiceCore {
                     lock (playbackSounds[playerName]) {
                         if (playbackSounds[playerName].PlayerObject != null) {
                             try {
+                                float maxDistance = playerName == _mainPlayer.Name ? 100 : 20;
                                 float volume = GetVolume(playbackSounds[playerName].SoundType, playbackSounds[playerName].PlayerObject);
                                 float distance = Vector3.Distance(_camera.Position, playbackSounds[playerName].PlayerObject.Position);
-                                float newVolume = Math.Clamp(volume * ((20 - distance) / 20), 0f, 1f);
+                                float newVolume = Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f);
                                 Vector3 dir = playbackSounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                                 if (playbackSounds[playerName].VolumeSampleProvider != null) {
@@ -161,6 +162,9 @@ namespace RoleplayingVoiceCore {
 
         public void Dispose() {
             notDisposed = false;
+            foreach(var sound in playbackSounds) {
+                sound.Value.Stop();
+            }
             playbackSounds.Clear();
         }
     }
