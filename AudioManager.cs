@@ -98,7 +98,7 @@ namespace RoleplayingVoiceCore {
                     new PanningSampleProvider(playbackSounds[playerObject.Name].VolumeSampleProvider.ToMono());
                     Vector3 dir = playbackSounds[playerObject.Name].PlayerObject.Position - _camera.Position;
                     float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                    playbackSounds[playerObject.Name].PanningSampleProvider.Pan = direction / 3;
+                    playbackSounds[playerObject.Name].PanningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                     playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].PanningSampleProvider);
                     playbackSounds[playerObject.Name].WaveOutEvent?.Play();
                 }
@@ -122,7 +122,7 @@ namespace RoleplayingVoiceCore {
                                 if (playbackSounds[playerName].VolumeSampleProvider != null) {
                                     playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
                                     if (playbackSounds[playerName].PanningSampleProvider != null) {
-                                        playbackSounds[playerName].PanningSampleProvider.Pan = direction / 3;
+                                        playbackSounds[playerName].PanningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                                     }
                                 }
                             } catch {
