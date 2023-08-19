@@ -95,7 +95,7 @@ namespace RoleplayingVoiceCore {
                     playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                     playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
                     playbackSounds[playerObject.Name].PanningSampleProvider =
-                    new PanningSampleProvider(playbackSounds[playerObject.Name].VolumeSampleProvider);
+                    new PanningSampleProvider(playbackSounds[playerObject.Name].VolumeSampleProvider.ToMono());
 
                     playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].PanningSampleProvider);
                     playbackSounds[playerObject.Name].WaveOutEvent?.Play();
@@ -119,7 +119,9 @@ namespace RoleplayingVoiceCore {
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                                 if (playbackSounds[playerName].VolumeSampleProvider != null) {
                                     playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
-                                    playbackSounds[playerName].PanningSampleProvider.Pan = direction / 3;
+                                    if (playbackSounds[playerName].PanningSampleProvider != null) {
+                                        playbackSounds[playerName].PanningSampleProvider.Pan = direction / 3;
+                                    }
                                 }
                             } catch {
                                 //SoundObject deadObject;
@@ -162,7 +164,7 @@ namespace RoleplayingVoiceCore {
 
         public void Dispose() {
             notDisposed = false;
-            foreach(var sound in playbackSounds) {
+            foreach (var sound in playbackSounds) {
                 sound.Value.Stop();
             }
             playbackSounds.Clear();
