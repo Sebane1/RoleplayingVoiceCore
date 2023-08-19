@@ -5,8 +5,9 @@ using System.Numerics;
 
 namespace RoleplayingVoiceCore {
     public class SoundObject {
-        private IPlayerObject _playerObject;
+        private IGameObject _playerObject;
         private VolumeSampleProvider _volumeSampleProvider;
+        private PanningSampleProvider _panningSampleProvider;
         private WaveOutEvent _waveOutEvent;
         private string _soundPath;
         private SoundType soundType;
@@ -14,7 +15,7 @@ namespace RoleplayingVoiceCore {
         private Vector3 lastPosition;
         private bool stopForReal;
 
-        public SoundObject(IPlayerObject playerObject, WaveOutEvent waveOutEvent, SoundType soundType, string soundPath) {
+        public SoundObject(IGameObject playerObject, WaveOutEvent waveOutEvent, SoundType soundType, string soundPath) {
             _playerObject = playerObject;
             _waveOutEvent = waveOutEvent;
             _soundPath = soundPath;
@@ -28,7 +29,8 @@ namespace RoleplayingVoiceCore {
                                 if (!stopForReal) {
                                     VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                                     VolumeSampleProvider.Volume = 1;
-                                    WaveOutEvent?.Init(VolumeSampleProvider);
+                                    PanningSampleProvider = new PanningSampleProvider(VolumeSampleProvider);
+                                    WaveOutEvent?.Init(PanningSampleProvider);
                                     WaveOutEvent?.Play();
                                 }
                             }
@@ -58,12 +60,14 @@ namespace RoleplayingVoiceCore {
             }
         }
 
-        public IPlayerObject PlayerObject { get => _playerObject; set => _playerObject = value; }
+        public IGameObject PlayerObject { get => _playerObject; set => _playerObject = value; }
         public VolumeSampleProvider VolumeSampleProvider { get => _volumeSampleProvider; set => _volumeSampleProvider = value; }
         public WaveOutEvent WaveOutEvent { get => _waveOutEvent; set => _waveOutEvent = value; }
         public SoundType SoundType { get => soundType; set => soundType = value; }
         public bool StopPlaybackOnMovement { get => stopPlaybackOnMovement; set => stopPlaybackOnMovement = value; }
         public string SoundPath { get => _soundPath; set => _soundPath = value; }
+        public PanningSampleProvider PanningSampleProvider { get => _panningSampleProvider; set => _panningSampleProvider = value; }
+
         public void Stop() {
             if (WaveOutEvent != null) {
                 stopForReal = true;
