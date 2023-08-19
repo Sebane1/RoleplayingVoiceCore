@@ -86,6 +86,9 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
                 string zipPath = path + ".zip";
+                if (File.Exists(zipPath)) {
+                    File.Delete(zipPath);
+                }
                 ZipFile.CreateFromDirectory(path, zipPath);
                 using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
                     using (BinaryWriter writer = new(sendingClient.GetStream())) {

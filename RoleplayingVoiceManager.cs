@@ -25,32 +25,23 @@ namespace RoleplayingVoiceCore {
         public RoleplayingVoiceManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
             _networkedClient = client;
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
+            if (string.IsNullOrWhiteSpace(apiKey)) {
                 apiValid = false;
-            }
-            else
-            {
+            } else {
                 // Spin a new thread for this
-                Task.Run(() =>
-                {
+                Task.Run(() => {
                     _apiKey = apiKey;
-                    try
-                    {
+                    try {
                         _api = new ElevenLabsClient(apiKey);
                         var test = _api.UserEndpoint.GetUserInfoAsync().Result;
                         apiValid = true;
-                    }
-                    catch (Exception e)
-                    {
+                    } catch (Exception e) {
                         var errorMain = e.Message.ToString();
-                        if (errorMain.Contains("invalid_api_key"))
-                        {
+                        if (errorMain.Contains("invalid_api_key")) {
                             apiValid = false;
                         }
                     }
-                    if (characterVoices != null)
-                    {
+                    if (characterVoices != null) {
                         _characterVoices = characterVoices;
                     }
 
@@ -75,8 +66,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
-            if (string.IsNullOrWhiteSpace(key) || !key.All(c => char.IsAsciiLetterOrDigit(c)))
-            {
+            if (string.IsNullOrWhiteSpace(key) || !key.All(c => char.IsAsciiLetterOrDigit(c))) {
                 apiValid = false;
             }
             ValidationResult validationResult = new ValidationResult();
@@ -164,7 +154,8 @@ namespace RoleplayingVoiceCore {
             if (characterVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
-                        string stitchedPath = Path.Combine(rpVoiceCache, characterVoice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", characterVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
