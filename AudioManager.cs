@@ -96,7 +96,9 @@ namespace RoleplayingVoiceCore {
                     playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
                     playbackSounds[playerObject.Name].PanningSampleProvider =
                     new PanningSampleProvider(playbackSounds[playerObject.Name].VolumeSampleProvider.ToMono());
-
+                    Vector3 dir = playbackSounds[playerObject.Name].PlayerObject.Position - _camera.Position;
+                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                    playbackSounds[playerObject.Name].PanningSampleProvider.Pan = direction / 3;
                     playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].PanningSampleProvider);
                     playbackSounds[playerObject.Name].WaveOutEvent?.Play();
                 }

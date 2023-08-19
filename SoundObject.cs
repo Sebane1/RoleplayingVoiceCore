@@ -29,7 +29,9 @@ namespace RoleplayingVoiceCore {
                                 if (!stopForReal) {
                                     VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
                                     VolumeSampleProvider.Volume = 1;
+                                    float panning = PanningSampleProvider.Pan;
                                     PanningSampleProvider = new PanningSampleProvider(VolumeSampleProvider.ToMono());
+                                    PanningSampleProvider.Pan = panning;
                                     WaveOutEvent?.Init(PanningSampleProvider);
                                     WaveOutEvent?.Play();
                                 }
