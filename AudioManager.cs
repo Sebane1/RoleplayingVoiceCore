@@ -72,8 +72,9 @@ namespace RoleplayingVoiceCore {
             }
             if (soundType != SoundType.MainPlayerTts &&
                 soundType != SoundType.OtherPlayerTts &&
+                soundType != SoundType.LoopWhileMoving &&
                 player.TotalTime.TotalSeconds > 20) {
-                soundType = SoundType.Song;
+                soundType = SoundType.Loop;
             }
             playbackSounds[playerObject.Name] = new SoundObject(playerObject,
               new WaveOutEvent(),
@@ -154,7 +155,9 @@ namespace RoleplayingVoiceCore {
                         case SoundType.OtherPlayerTts:
                         case SoundType.OtherPlayer:
                             return _otherPlayerVolume;
-                        case SoundType.Song:
+                        case SoundType.Loop:
+                            return _songVolume;
+                        case SoundType.LoopWhileMoving:
                             return _songVolume;
                     }
                 } else {
