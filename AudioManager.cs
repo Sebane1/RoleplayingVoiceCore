@@ -150,7 +150,7 @@ namespace RoleplayingVoiceCore {
                             return _mainPlayerVolume;
                         case SoundType.Emote:
                         case SoundType.MainPlayerVoice:
-                            return _mainPlayerVolume * 0.7f;
+                            return _mainPlayerVolume * 1f;
                         case SoundType.OtherPlayerTts:
                         case SoundType.OtherPlayer:
                             return _otherPlayerVolume;

@@ -27,8 +27,9 @@ namespace RoleplayingVoiceCore {
                             using (WaveStream player = soundPath.EndsWith(".ogg") ?
                             new VorbisWaveReader(soundPath) : new AudioFileReader(soundPath)) {
                                 if (!stopForReal) {
+                                    float volume = VolumeSampleProvider.Volume = 1;
                                     VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                                    VolumeSampleProvider.Volume = 1;
+                                    VolumeSampleProvider.Volume = volume;
                                     float panning = PanningSampleProvider.Pan;
                                     PanningSampleProvider = new PanningSampleProvider(VolumeSampleProvider.ToMono());
                                     PanningSampleProvider.Pan = panning;
