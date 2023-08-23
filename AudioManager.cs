@@ -50,7 +50,9 @@ namespace RoleplayingVoiceCore {
 #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
         }
         public void StopAudio(IGameObject playerObject) {
-            playbackSounds[playerObject.Name].Stop();
+            if (playbackSounds.ContainsKey(playerObject.Name)) {
+                playbackSounds[playerObject.Name].Stop();
+            }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, WaveStream player, int delay = 0) {
