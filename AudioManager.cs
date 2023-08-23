@@ -13,13 +13,13 @@ namespace RoleplayingVoiceCore {
         float _mainPlayerVolume = 1.0f;
         float _otherPlayerVolume = 1.0f;
         float _unfocusedPlayerVolume = 1.0f;
-        float _songVolume = 1.0f;
+        float _sfxVolume = 1.0f;
         private bool notDisposed = true;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
-        public float SongVolume { get => _songVolume; set => _songVolume = value; }
+        public float SFXVolume { get => _sfxVolume; set => _sfxVolume = value; }
 
         public event EventHandler OnNewAudioTriggered;
         public AudioManager(IGameObject playerObject, IGameObject camera) {
@@ -156,9 +156,9 @@ namespace RoleplayingVoiceCore {
                         case SoundType.OtherPlayer:
                             return _otherPlayerVolume;
                         case SoundType.Loop:
-                            return _songVolume;
+                            return _sfxVolume;
                         case SoundType.LoopWhileMoving:
-                            return _songVolume;
+                            return _sfxVolume;
                     }
                 } else {
                     return _unfocusedPlayerVolume;
