@@ -273,8 +273,7 @@ namespace RoleplayingVoiceCore {
             };
             foreach (var word in wordReplacements)
             {
-                // \b assert position at a word boundary
-                newText = Regex.Replace(newText, $"\b{word.Key}\b", word.Value, RegexOptions.IgnoreCase);
+                newText = Regex.Replace(newText, $@"(?<=^|\s){word.Key}(?=\s|$)", word.Value, RegexOptions.IgnoreCase);
             }
             foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
