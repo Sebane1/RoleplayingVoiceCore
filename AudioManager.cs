@@ -75,7 +75,7 @@ namespace RoleplayingVoiceCore {
             if (soundType != SoundType.MainPlayerTts &&
                 soundType != SoundType.OtherPlayerTts &&
                 soundType != SoundType.LoopWhileMoving &&
-                player.TotalTime.TotalSeconds > 20) {
+                player.TotalTime.TotalSeconds > 13) {
                 soundType = SoundType.Loop;
             }
             playbackSounds[playerObject.Name] = new SoundObject(playerObject,
