@@ -7,6 +7,7 @@ using RoleplayingVoiceCore.AudioRecycler;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace RoleplayingVoiceCore {
     public class RoleplayingVoiceManager {
@@ -253,18 +254,27 @@ namespace RoleplayingVoiceCore {
         }
 
         private string TrimText(string text) {
-            string newText = text.Replace("XD", "ahahaha")
-            .Replace("lmao", "ahahaha")
-            .Replace("lol", "ahahaha")
-            .Replace("lmfao", "ahahaha")
-            .Replace("kek", "ahahaha")
-            .Replace("rotflmao", "ahahaha")
-            .Replace("rotflmfao", "ahahaha")
-            .Replace("lmao", "ahahaha")
-            .Replace(":D", ".")
-            .Replace(":3", ".")
-            .Replace(":P", ".")
-            .Replace("<3", "love");
+            string newText = text;
+            var wordReplacements = new Dictionary<string, string>
+            {
+                {"XD", "ahahaha" },
+                {"lmao", "ahahaha" },
+                {"lol", "ahahaha" },
+                {"lmfao", "ahahaha" },
+                {"kek", "ahahaha" },
+                {"kekw", "ahahaha" },
+                {"rotflmao", "ahahaha" },
+                {"rotflmfao", "ahahaha" },
+                {"lmao", "ahahaha" },
+                {":D", "." },
+                {":P", "." },
+                {":3", "." },
+                {"<3", "love" }
+            };
+            foreach (var word in wordReplacements)
+            {
+                newText = Regex.Replace(newText, $@"(?<=^|\s){word.Key}(?=\s|$)", word.Value, RegexOptions.IgnoreCase);
+            }
             foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray()) {
                 newText = newText.Replace(character + "", null);
             }
