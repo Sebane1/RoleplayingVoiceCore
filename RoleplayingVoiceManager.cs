@@ -265,7 +265,6 @@ namespace RoleplayingVoiceCore {
                 {"kekw", "ahahaha" },
                 {"rotflmao", "ahahaha" },
                 {"rotflmfao", "ahahaha" },
-                {"lmao", "ahahaha" },
                 {":D", "." },
                 {":P", "." },
                 {":3", "." },
