@@ -34,16 +34,8 @@ namespace RoleplayingVoiceCore {
                 OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if (audioPath.EndsWith(".ogg")) {
-                        if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
-                            using (var player = new VorbisWaveReader(audioPath)) {
-                                ConfigureAudio(playerObject, audioPath, soundType, player, delay);
-                            }
-                        }
-                    } else if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
-                        using (var player = new AudioFileReader(audioPath)) {
-                            ConfigureAudio(playerObject, audioPath, soundType, player, delay);
-                        }
+                    if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
+                        ConfigureAudio(playerObject, audioPath, soundType, delay);
                     }
                 }
             });
@@ -55,7 +47,7 @@ namespace RoleplayingVoiceCore {
             }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
-            SoundType soundType, WaveStream player, int delay = 0) {
+            SoundType soundType, int delay = 0) {
             if (playbackSounds.ContainsKey(playerObject.Name)) {
                 if (playbackSounds[playerObject.Name].WaveOutEvent != null) {
                     if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
@@ -72,38 +64,13 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
-            if (soundType != SoundType.MainPlayerTts &&
-                soundType != SoundType.OtherPlayerTts &&
-                soundType != SoundType.LoopWhileMoving &&
-                player.TotalTime.TotalSeconds > 13) {
-                soundType = SoundType.Loop;
-            }
-            playbackSounds[playerObject.Name] = new SoundObject(playerObject,
-              new WaveOutEvent(),
+            playbackSounds[playerObject.Name] = new SoundObject(playerObject, _camera,
                soundType,
                audioPath);
-
             try {
                 lock (playbackSounds[playerObject.Name]) {
                     float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
-                    float distance =
-                    Vector3.Distance(_camera.Position, playbackSounds[playerObject.Name].PlayerObject.Position);
-                    float newVolume = volume * ((20 - distance) / 20);
-                    if (playbackSounds[playerObject.Name].WaveOutEvent == null) {
-                        playbackSounds[playerObject.Name].WaveOutEvent = new WaveOutEvent();
-                    }
-                    if (delay > 0) {
-                        Thread.Sleep(delay);
-                    }
-                    playbackSounds[playerObject.Name].VolumeSampleProvider = new VolumeSampleProvider(player.ToSampleProvider());
-                    playbackSounds[playerObject.Name].VolumeSampleProvider.Volume = newVolume;
-                    playbackSounds[playerObject.Name].PanningSampleProvider =
-                    new PanningSampleProvider(playbackSounds[playerObject.Name].VolumeSampleProvider.ToMono());
-                    Vector3 dir = playbackSounds[playerObject.Name].PlayerObject.Position - _camera.Position;
-                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                    playbackSounds[playerObject.Name].PanningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                    playbackSounds[playerObject.Name].WaveOutEvent?.Init(playbackSounds[playerObject.Name].PanningSampleProvider);
-                    playbackSounds[playerObject.Name].WaveOutEvent?.Play();
+                    playbackSounds[playerObject.Name].Play(audioPath, volume, delay);
                 }
             } catch {
 
@@ -171,6 +138,9 @@ namespace RoleplayingVoiceCore {
 
         public void Dispose() {
             notDisposed = false;
+            CleanSounds();
+        }
+        public void CleanSounds() {
             foreach (var sound in playbackSounds) {
                 sound.Value.Stop();
             }
