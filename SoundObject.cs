@@ -18,7 +18,6 @@ namespace RoleplayingVoiceCore {
         private SoundType _soundType;
         private bool stopPlaybackOnMovement;
         private Vector3 lastPosition;
-        private bool stopForReal;
         private WaveStream _player;
         LibVLC libVLC;
         MediaPlayer _vlcPlayer;
@@ -44,7 +43,6 @@ namespace RoleplayingVoiceCore {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
                           (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                stopForReal = true;
                                 _waveOutEvent.Stop();
                                 break;
                             }
@@ -85,7 +83,25 @@ namespace RoleplayingVoiceCore {
                 }
             }
         }
-        public WaveOutEvent WaveOutEvent { get => _waveOutEvent; set => _waveOutEvent = value; }
+        public PlaybackState PlaybackState {
+            get {
+                if (_waveOutEvent != null) {
+                    try {
+                        return _waveOutEvent.PlaybackState;
+                    } catch {
+                        return PlaybackState.Stopped;
+                    }
+                } else if (_vlcPlayer != null) {
+                    try {
+                        return _vlcPlayer.IsPlaying ? PlaybackState.Playing : PlaybackState.Stopped;
+                    } catch {
+                        return PlaybackState.Stopped;
+                    }
+                } else {
+                    return PlaybackState.Stopped;
+                }
+            }
+        }
         public SoundType SoundType { get => _soundType; set => _soundType = value; }
         public bool StopPlaybackOnMovement { get => stopPlaybackOnMovement; set => stopPlaybackOnMovement = value; }
         public string SoundPath { get => _soundPath; set => _soundPath = value; }
@@ -106,20 +122,16 @@ namespace RoleplayingVoiceCore {
         }
 
         public void Stop() {
-            try {
-                if (WaveOutEvent != null) {
-                    stopForReal = true;
-                    WaveOutEvent?.Stop();
-                    _waveOutEvent?.Dispose();
-                    _player?.Dispose();
-                }
-            } catch { }
-            try {
-                if (_vlcPlayer != null) {
+            if (_waveOutEvent != null) {
+                try {
+                    _waveOutEvent?.Stop();
+                } catch { }
+            }
+            if (_vlcPlayer != null) {
+                try {
                     _vlcPlayer?.Stop();
-                    _vlcPlayer?.Dispose();
-                }
-            } catch { }
+                } catch { }
+            }
         }
         public async void Play(string soundPath, float volume, int delay) {
             if (!string.IsNullOrEmpty(soundPath)) {
