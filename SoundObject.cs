@@ -104,18 +104,18 @@ namespace RoleplayingVoiceCore {
         }
 
         public void Stop() {
-            if (WaveOutEvent != null) {
-                stopForReal = true;
-                WaveOutEvent?.Stop();
-                _waveOutEvent?.Dispose();
-                _player?.Dispose();
-            }
-            if (mediaPlayer != null) {
-                try {
+            try {
+                if (WaveOutEvent != null) {
+                    stopForReal = true;
+                    WaveOutEvent?.Stop();
+                    _waveOutEvent?.Dispose();
+                    _player?.Dispose();
+                }
+                if (mediaPlayer != null) {
                     mediaPlayer?.Stop();
                     mediaPlayer?.Dispose();
-                } catch { }
-            }
+                }
+            } catch { }
         }
         public async void Play(string soundPath, float volume, int delay) {
             if (!string.IsNullOrEmpty(soundPath)) {
@@ -152,8 +152,8 @@ namespace RoleplayingVoiceCore {
                         try {
                             _waveOutEvent?.Init(_panningSampleProvider);
                             _waveOutEvent?.Play();
-                        } catch (Exception e) { 
-                        
+                        } catch (Exception e) {
+
                         }
                     }
                 } else {
