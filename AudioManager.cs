@@ -1,4 +1,5 @@
-﻿using NAudio.Vorbis;
+﻿using LibVLCSharp.Shared;
+using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System.Collections.Concurrent;
@@ -10,6 +11,7 @@ namespace RoleplayingVoiceCore {
         ConcurrentDictionary<string, SoundObject> playbackSounds = new ConcurrentDictionary<string, SoundObject>();
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
+        private string _libVLCPath;
         float _mainPlayerVolume = 1.0f;
         float _otherPlayerVolume = 1.0f;
         float _unfocusedPlayerVolume = 1.0f;
@@ -22,9 +24,10 @@ namespace RoleplayingVoiceCore {
         public float SFXVolume { get => _sfxVolume; set => _sfxVolume = value; }
 
         public event EventHandler OnNewAudioTriggered;
-        public AudioManager(IGameObject playerObject, IGameObject camera) {
+        public AudioManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
             _mainPlayer = playerObject;
             _camera = camera;
+            _libVLCPath = libVLCPath;
             Task.Run(() => Update());
         }
 
@@ -34,12 +37,18 @@ namespace RoleplayingVoiceCore {
                 OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if (File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) {
+                    if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath))) || audioPath.StartsWith("http")) {
                         ConfigureAudio(playerObject, audioPath, soundType, delay);
                     }
                 }
             });
 #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+        }
+        public async void PlayStream(string audioPath) {
+            _ = Task.Run(async () => {
+                OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
+                bool cancelOperation = false;
+            });
         }
         public void StopAudio(IGameObject playerObject) {
             if (playbackSounds.ContainsKey(playerObject.Name)) {
@@ -50,23 +59,22 @@ namespace RoleplayingVoiceCore {
             SoundType soundType, int delay = 0) {
             if (playbackSounds.ContainsKey(playerObject.Name)) {
                 if (playbackSounds[playerObject.Name].WaveOutEvent != null) {
-                    if (playbackSounds[playerObject.Name].VolumeSampleProvider != null) {
-                        if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
-                            Stopwatch waitTimer = new Stopwatch();
-                            waitTimer.Start();
-                            while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
-                            && waitTimer.ElapsedMilliseconds < 20000) {
-                                Thread.Sleep(100);
-                            }
-                        } else {
-                            playbackSounds[playerObject.Name].Stop();
+                    if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
+                        Stopwatch waitTimer = new Stopwatch();
+                        waitTimer.Start();
+                        while (playbackSounds[playerObject.Name].WaveOutEvent.PlaybackState == PlaybackState.Playing
+                        && waitTimer.ElapsedMilliseconds < 20000) {
+                            Thread.Sleep(100);
                         }
+                    } else {
+                        playbackSounds[playerObject.Name].Stop();
                     }
                 }
             }
             playbackSounds[playerObject.Name] = new SoundObject(playerObject, _camera,
                soundType,
-               audioPath);
+               audioPath,
+               _libVLCPath);
             try {
                 lock (playbackSounds[playerObject.Name]) {
                     float volume = GetVolume(playbackSounds[playerObject.Name].SoundType, playbackSounds[playerObject.Name].PlayerObject);
@@ -89,12 +97,8 @@ namespace RoleplayingVoiceCore {
                                 float newVolume = Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f);
                                 Vector3 dir = playbackSounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                if (playbackSounds[playerName].VolumeSampleProvider != null) {
-                                    playbackSounds[playerName].VolumeSampleProvider.Volume = newVolume;
-                                    if (playbackSounds[playerName].PanningSampleProvider != null) {
-                                        playbackSounds[playerName].PanningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                                    }
-                                }
+                                playbackSounds[playerName].Volume = newVolume;
+                                playbackSounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             } catch {
                                 //SoundObject deadObject;
                                 //playbackSounds.TryRemove(playerName, out deadObject);
