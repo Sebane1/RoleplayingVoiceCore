@@ -22,7 +22,6 @@ namespace RoleplayingVoiceCore {
         private WaveStream _player;
         LibVLC libVLC;
         MediaPlayer _vlcPlayer;
-        private MediaPlayer mediaPlayer;
 
         public SoundObject(IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -76,7 +75,10 @@ namespace RoleplayingVoiceCore {
                 }
                 if (_vlcPlayer != null) {
                     try {
-                        _vlcPlayer.Volume = (int)(value * 100f);
+                        int newValue = (int)(value * 100f);
+                        if (newValue != _vlcPlayer.Volume) {
+                            _vlcPlayer.Volume = newValue;
+                        }
                     } catch {
 
                     }
@@ -111,9 +113,11 @@ namespace RoleplayingVoiceCore {
                     _waveOutEvent?.Dispose();
                     _player?.Dispose();
                 }
-                if (mediaPlayer != null) {
-                    mediaPlayer?.Stop();
-                    mediaPlayer?.Dispose();
+            } catch { }
+            try {
+                if (_vlcPlayer != null) {
+                    _vlcPlayer?.Stop();
+                    _vlcPlayer?.Dispose();
                 }
             } catch { }
         }
@@ -126,6 +130,7 @@ namespace RoleplayingVoiceCore {
                     if (_soundType != SoundType.MainPlayerTts &&
                         _soundType != SoundType.OtherPlayerTts &&
                         _soundType != SoundType.LoopWhileMoving &&
+                        _soundType != SoundType.Livestream &&
                         _player.TotalTime.TotalSeconds > 13) {
                         _soundType = SoundType.Loop;
                     }
@@ -160,11 +165,11 @@ namespace RoleplayingVoiceCore {
                     try {
                         string location = _libVLCPath + @"\libvlc\win-x64";
                         Core.Initialize(location);
-                        libVLC = new LibVLC(enableDebugLogs: true);
-                        var media = new Media(libVLC, @"https://video-weaver.fra06.hls.ttvnw.net/v1/playlist/CswEnwrziuA8T6S00LHqoYfMVltwn6EuPP54B8r__wzTyb4HW4mxYuzOuX_07xRURNuyUJqpOG6JHSWI5j1mpG6iTVfIo4zqSMv8wUWzZHQbV8OWhqE3pq4mJH3yyIU8q7Q7CKWX2637JBIQaHdC51ySvEwD4WiwhILhy4bqd5wfDD6WzaSp_PYWt9Ang4h3439SepISKw3gFKZZTp0639OV2yZ2Rbplem_lBlwu0XxtSEYTRAXX7DNoIzRAPXpqVj1bJlRSNy2GWar_KSly3NThVizitg99Ws-GNycZ2LtSfbEOF0rcqbgpV6qbuDVjof8nSCh18dWh1Q_i7wfxQbyLORhi4CB9dyVozRRw-ZhtKNbswACg8aNcgaC6BKB_eLTs_RXDWjhRV6VyTSjObfpekdLlFwu3HUcLzli4Kb4QFXDSjhmNUXlUvfYva8yWCLVm4S8hi_4t59ojKsuwAOL5sLKJPNMdqQk_tt-Cnfg5D9n-XdvKBcC7oed1CHreFB4XB3TajJnvIJ-zXEAguO_Y_zn-kb4VcTLm5eElr9f-wL6p5b1G3Edv-E9IOZcBA7CJOBOvh0iWpfHAX3IkA9xQIdrsGpCTRy3z08R7ZZV18yKi_Pt208rwkj35tSEEQDHlYQdwJVBSIc3BEgHFcyeI7n7z-91Hibm1HyJYq1URadiN6a-Htn0E8vCVB1R4cNqWO7jsnkebrr0Cmo18IX8pQ5WubS3otORa1XsGOe1ugCr-i3HX_BpArUid-Wxl6Ayw3IEvIS7Dd7W-E0d6Ggzm8UA8aUrCJNrZqt0gASoJdXMtZWFzdC0yMLAH.m3u8", FromType.FromLocation);
+                        libVLC = new LibVLC("--no-video");
+                        var media = new Media(libVLC, soundPath, FromType.FromLocation);
                         await media.Parse(MediaParseOptions.ParseNetwork);
-                        mediaPlayer = new MediaPlayer(media);
-                        var value = mediaPlayer.Play();
+                        _vlcPlayer = new MediaPlayer(media);
+                        _vlcPlayer.Play();
                     } catch {
 
                     }
@@ -192,6 +197,7 @@ namespace RoleplayingVoiceCore {
         OtherPlayer,
         Emote,
         Loop,
-        LoopWhileMoving
+        LoopWhileMoving,
+        Livestream
     }
 }
