@@ -82,14 +82,16 @@ namespace RoleplayingVoiceCore {
             SoundType soundType, ConcurrentDictionary<string, SoundObject> sounds, int delay = 0) {
             bool soundIsPlayingAlready = false;
             if (sounds.ContainsKey(playerObject.Name)) {
-                if (soundType == SoundType.MainPlayerTts || soundType == SoundType.MainPlayerVoice) {
+                if (soundType == SoundType.MainPlayerVoice) {
+                    soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
+                } else if (soundType == SoundType.MainPlayerTts) {
                     Stopwatch waitTimer = new Stopwatch();
                     waitTimer.Start();
-                    //while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
-                    //&& waitTimer.ElapsedMilliseconds < 20000) {
-                    //    Thread.Sleep(100);
-                    //}
-                    soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
+                    while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
+                    && waitTimer.ElapsedMilliseconds < 20000) {
+                        Thread.Sleep(100);
+                    }
+                    sounds[playerObject.Name].Stop();
                 } else {
                     sounds[playerObject.Name].Stop();
                 }
