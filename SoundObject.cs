@@ -142,7 +142,7 @@ namespace RoleplayingVoiceCore {
                         desiredStream = new LoopStream(_player) { EnableLooping = true };
                     }
                     _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                    _volumeSampleProvider.Volume = volume;
+                    _volumeSampleProvider.Volume = newVolume;
                     _panningSampleProvider =
                     new PanningSampleProvider(_volumeSampleProvider.ToMono());
                     Vector3 dir = PlayerObject.Position - _camera.Position;
