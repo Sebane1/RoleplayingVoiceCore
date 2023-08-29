@@ -68,11 +68,32 @@ namespace RoleplayingVoiceCore {
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if (audioPath.StartsWith("http")) {
+                        foreach (var sound in playbackStreams) {
+                            sound.Value.Stop();
+                        }
+                        playbackStreams.Clear();
                         ConfigureAudio(playerObject, audioPath, SoundType.Livestream, playbackStreams, delay);
                     }
                 }
             });
         }
+
+        public bool IsAllowedToStartStream(IGameObject playerObject) {
+            if (playbackStreams.ContainsKey(playerObject.Name)) {
+                return true;
+            } else {
+                if (playbackStreams.Count == 0) {
+                    return true;
+                } else {
+                    foreach (string key in playbackStreams.Keys) {
+                        bool noStream = playbackStreams[key].PlaybackState == PlaybackState.Stopped;
+                        return noStream;
+                    }
+                }
+            }
+            return false;
+        }
+
         public void StopAudio(IGameObject playerObject) {
             if (voicePackSounds.ContainsKey(playerObject.Name)) {
                 voicePackSounds[playerObject.Name].Stop();

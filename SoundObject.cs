@@ -25,7 +25,6 @@ namespace RoleplayingVoiceCore {
         public SoundObject(IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
             _playerObject = playerObject;
-            _waveOutEvent = new WaveOutEvent();
             _soundPath = soundPath;
             _camera = camera;
             _libVLCPath = libVLCPath;
