@@ -6,11 +6,12 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 
-namespace RoleplayingVoiceCore {
-    public class AudioManager : IDisposable {
-        ConcurrentDictionary<string, SoundObject> textToSpeechSounds = new ConcurrentDictionary<string, SoundObject>();
-        ConcurrentDictionary<string, SoundObject> voicePackSounds = new ConcurrentDictionary<string, SoundObject>();
-        ConcurrentDictionary<string, SoundObject> playbackStreams = new ConcurrentDictionary<string, SoundObject>();
+namespace RoleplayingMediaCore {
+    public class MediaManager : IDisposable {
+        byte[] _lastFrame;
+        ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
         private string _libVLCPath;
@@ -26,9 +27,10 @@ namespace RoleplayingVoiceCore {
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
         public float SFXVolume { get => _sfxVolume; set => _sfxVolume = value; }
         public float LiveStreamVolume { get => _liveStreamVolume; set => _liveStreamVolume = value; }
+        public byte[] LastFrame { get => _lastFrame; set => _lastFrame = value; }
 
-        public event EventHandler OnNewAudioTriggered;
-        public AudioManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
+        public event EventHandler OnNewMediaTriggered;
+        public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
             _mainPlayer = playerObject;
             _camera = camera;
             _libVLCPath = libVLCPath;
@@ -38,14 +40,14 @@ namespace RoleplayingVoiceCore {
         public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
-                OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
+                OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
-                                ConfigureAudio(playerObject, audioPath, soundType, textToSpeechSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay);
                                 break;
 
                             case SoundType.MainPlayerVoice:
@@ -53,7 +55,7 @@ namespace RoleplayingVoiceCore {
                             case SoundType.Emote:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
-                                ConfigureAudio(playerObject, audioPath, soundType, voicePackSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
                                 break;
                         }
                     }
@@ -64,29 +66,29 @@ namespace RoleplayingVoiceCore {
         public async void PlayStream(IGameObject playerObject, string audioPath, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
-                OnNewAudioTriggered?.Invoke(this, EventArgs.Empty);
+                OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if (audioPath.StartsWith("http")) {
-                        foreach (var sound in playbackStreams) {
+                        foreach (var sound in _playbackStreams) {
                             sound.Value.Stop();
                         }
-                        playbackStreams.Clear();
-                        ConfigureAudio(playerObject, audioPath, SoundType.Livestream, playbackStreams, delay);
+                        _playbackStreams.Clear();
+                        ConfigureAudio(playerObject, audioPath, SoundType.Livestream, _playbackStreams, delay);
                     }
                 }
             });
         }
 
         public bool IsAllowedToStartStream(IGameObject playerObject) {
-            if (playbackStreams.ContainsKey(playerObject.Name)) {
+            if (_playbackStreams.ContainsKey(playerObject.Name)) {
                 return true;
             } else {
-                if (playbackStreams.Count == 0) {
+                if (_playbackStreams.Count == 0) {
                     return true;
                 } else {
-                    foreach (string key in playbackStreams.Keys) {
-                        bool noStream = playbackStreams[key].PlaybackState == PlaybackState.Stopped;
+                    foreach (string key in _playbackStreams.Keys) {
+                        bool noStream = _playbackStreams[key].PlaybackState == PlaybackState.Stopped;
                         return noStream;
                     }
                 }
@@ -95,12 +97,12 @@ namespace RoleplayingVoiceCore {
         }
 
         public void StopAudio(IGameObject playerObject) {
-            if (voicePackSounds.ContainsKey(playerObject.Name)) {
-                voicePackSounds[playerObject.Name].Stop();
+            if (_voicePackSounds.ContainsKey(playerObject.Name)) {
+                _voicePackSounds[playerObject.Name].Stop();
             }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
-            SoundType soundType, ConcurrentDictionary<string, SoundObject> sounds, int delay = 0) {
+            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0) {
             bool soundIsPlayingAlready = false;
             if (sounds.ContainsKey(playerObject.Name)) {
                 if (soundType == SoundType.MainPlayerVoice) {
@@ -119,7 +121,7 @@ namespace RoleplayingVoiceCore {
             }
             if (!soundIsPlayingAlready) {
                 try {
-                    sounds[playerObject.Name] = new SoundObject(playerObject, _camera,
+                    sounds[playerObject.Name] = new MediaObject(this, playerObject, _camera,
                    soundType,
                    audioPath,
                    _libVLCPath);
@@ -134,13 +136,13 @@ namespace RoleplayingVoiceCore {
         }
         private async void Update() {
             while (notDisposed) {
-                UpdateVolumes(textToSpeechSounds);
-                UpdateVolumes(voicePackSounds);
-                UpdateVolumes(playbackStreams);
+                UpdateVolumes(_textToSpeechSounds);
+                UpdateVolumes(_voicePackSounds);
+                UpdateVolumes(_playbackStreams);
                 Thread.Sleep(100);
             }
         }
-        public void UpdateVolumes(ConcurrentDictionary<string, SoundObject> sounds) {
+        public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
             for (int i = 0; i < sounds.Count; i++) {
                 string playerName = sounds.Keys.ElementAt<string>(i);
                 if (sounds.ContainsKey(playerName)) {
@@ -214,18 +216,19 @@ namespace RoleplayingVoiceCore {
             CleanSounds();
         }
         public void CleanSounds() {
-            foreach (var sound in textToSpeechSounds) {
+            foreach (var sound in _textToSpeechSounds) {
                 sound.Value.Stop();
             }
-            foreach (var sound in voicePackSounds) {
+            foreach (var sound in _voicePackSounds) {
                 sound.Value.Stop();
             }
-            foreach (var sound in playbackStreams) {
+            foreach (var sound in _playbackStreams) {
                 sound.Value.Stop();
             }
-            textToSpeechSounds.Clear();
-            voicePackSounds.Clear();
-            playbackStreams.Clear();
+            _lastFrame = null;
+            _textToSpeechSounds.Clear();
+            _voicePackSounds.Clear();
+            _playbackStreams.Clear();
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace RoleplayingVoiceCore {
+namespace RoleplayingMediaCore {
     public interface IGameObject {
         public string Name { get; }
         public Vector3 Position { get; }

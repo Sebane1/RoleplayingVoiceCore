@@ -3,14 +3,14 @@ using ElevenLabs.History;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
-using RoleplayingVoiceCore.AudioRecycler;
+using RoleplayingMediaCore.AudioRecycler;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace RoleplayingVoiceCore {
-    public class RoleplayingVoiceManager {
+namespace RoleplayingMediaCore {
+    public class RoleplayingMediaManager {
         private string _apiKey;
         private ElevenLabsClient? _api;
         private NetworkedClient _networkedClient;
@@ -23,7 +23,7 @@ namespace RoleplayingVoiceCore {
         private bool apiValid;
         private string rpVoiceCache;
 
-        public RoleplayingVoiceManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
+        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
             _networkedClient = client;
             if (string.IsNullOrWhiteSpace(apiKey)) {

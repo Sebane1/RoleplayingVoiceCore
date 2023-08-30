@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RoleplayingVoiceCore.Twitch {
+namespace RoleplayingMediaCore.Twitch {
     public class TwitchFeeds {
         public bool success { get; set; }
         public StreamUrls urls { get; set; }
@@ -32,7 +32,7 @@ namespace RoleplayingVoiceCore.Twitch {
     }
 
     public static class TwitchFeedManager {
-        public static string GetServerResponse(string url) {
+        public static string GetServerResponse(string url, TwitchFeedType type) {
             var httpWebRequest = (HttpWebRequest)WebRequest.Create(@"https://pwn.sh/tools/streamapi.py?url=" + url);
             httpWebRequest.ContentType = "application/json";
             httpWebRequest.Method = "POST";
@@ -41,8 +41,30 @@ namespace RoleplayingVoiceCore.Twitch {
             using (var streamReader = new StreamReader(httpResponse.GetResponseStream())) {
                 var result = streamReader.ReadToEnd();
                 var response = JsonConvert.DeserializeObject<TwitchFeeds>(result);
-                return response.urls.audio_only;
+                switch (type) {
+                    default:
+                    case TwitchFeedType.Audio:
+                        return response.urls.audio_only;
+                    case TwitchFeedType._160p:
+                        return response.urls._160p;
+                    case TwitchFeedType._360p:
+                        return response.urls._360p;
+                    case TwitchFeedType._480p:
+                        return response.urls._480p;
+                    case TwitchFeedType._720p:
+                        return response.urls._720p60;
+                    case TwitchFeedType._1080p:
+                        return response.urls._1080p60;
+                }
             }
+        }
+        public enum TwitchFeedType {
+            Audio,
+            _160p,
+            _360p,
+            _480p,
+            _720p,
+            _1080p,
         }
     }
 }

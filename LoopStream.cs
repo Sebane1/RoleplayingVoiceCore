@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RoleplayingVoiceCore {
+namespace RoleplayingMediaCore {
     public class LoopStream : WaveStream {
         WaveStream sourceStream;
 

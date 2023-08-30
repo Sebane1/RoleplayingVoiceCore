@@ -2,12 +2,17 @@
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using RoleplayingVoiceCore;
+using SixLabors.ImageSharp.Advanced;
 using System;
+using System.Collections.Concurrent;
+using System.IO.MemoryMappedFiles;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
-namespace RoleplayingVoiceCore {
-    public class SoundObject {
+namespace RoleplayingMediaCore {
+    public class MediaObject {
         private IGameObject _playerObject;
         private VolumeSampleProvider _volumeSampleProvider;
         private PanningSampleProvider _panningSampleProvider;
@@ -15,20 +20,57 @@ namespace RoleplayingVoiceCore {
         private string _soundPath;
         private IGameObject _camera;
         private string _libVLCPath;
+        private MediaManager _parent;
         private SoundType _soundType;
         private bool stopPlaybackOnMovement;
         private Vector3 lastPosition;
         private WaveStream _player;
         LibVLC libVLC;
         MediaPlayer _vlcPlayer;
+        private static MemoryMappedFile CurrentMappedFile;
+        private static MemoryMappedViewAccessor CurrentMappedViewAccessor;
+        private static readonly ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)> FilesToProcess = new ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)>();
+        private static long FrameCounter = 0;
 
-        public SoundObject(IGameObject playerObject, IGameObject camera,
+
+        private const uint _width = 640;
+        private const uint _height = 360;
+
+        /// <summary>
+        /// RGBA is used, so 4 byte per pixel, or 32 bits.
+        /// </summary>
+        private const uint BytePerPixel = 4;
+
+        /// <summary>
+        /// the number of bytes per "line"
+        /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
+        /// </summary>
+        private uint Pitch;
+
+        /// <summary>
+        /// The number of lines in the buffer.
+        /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
+        /// </summary>
+        private uint Lines;
+
+        public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
             _playerObject = playerObject;
             _soundPath = soundPath;
             _camera = camera;
             _libVLCPath = libVLCPath;
+            _parent = parent;
             this._soundType = soundType;
+            Pitch = Align(_width * BytePerPixel);
+            Lines = Align(_height);
+
+            uint Align(uint size) {
+                if (size % 32 == 0) {
+                    return size;
+                }
+
+                return ((size / 32) + 1) * 32;// Align on the next multiple of 32
+            }
         }
 
         private void SoundLoopCheck(WaveOutEvent waveOutEvent) {
@@ -133,7 +175,7 @@ namespace RoleplayingVoiceCore {
             }
         }
         public async void Play(string soundPath, float volume, int delay) {
-            if (!string.IsNullOrEmpty(soundPath)) {
+            if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
                 if (!soundPath.StartsWith("http")) {
                     _player = soundPath.EndsWith(".ogg") ?
                     new VorbisWaveReader(soundPath) : new AudioFileReader(soundPath);
@@ -175,18 +217,56 @@ namespace RoleplayingVoiceCore {
                 } else {
                     try {
                         string location = _libVLCPath + @"\libvlc\win-x64";
+                        //VideoView videoView = new VideoView();
                         Core.Initialize(location);
-                        libVLC = new LibVLC("--no-video");
+                        libVLC = new LibVLC("--vout", "none");
                         var media = new Media(libVLC, soundPath, FromType.FromLocation);
                         await media.Parse(MediaParseOptions.ParseNetwork);
                         _vlcPlayer = new MediaPlayer(media);
+                        var processingCancellationTokenSource = new CancellationTokenSource();
+                        _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
+                        _vlcPlayer.SetVideoFormat("RV32", _width, _height, Pitch);
+                        _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                         _vlcPlayer.Play();
+                        try {
+                            await ProcessThumbnailsAsync(processingCancellationTokenSource.Token);
+                        } catch {
+
+                        }
                     } catch {
 
                     }
                 }
             }
         }
+
+        private async Task ProcessThumbnailsAsync(CancellationToken token) {
+            var frameNumber = 0;
+            _parent.LastFrame = new byte[0];
+            while (!token.IsCancellationRequested) {
+                if (FilesToProcess.TryDequeue(out var file)) {
+                    using (var image = new Image<Bgra32>((int)(Pitch / BytePerPixel), (int)Lines))
+                    using (var sourceStream = file.file.CreateViewStream()) {
+                        var mg = image.GetPixelMemoryGroup();
+                        for (int i = 0; i < mg.Count; i++) {
+                            sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
+                        }
+                        lock (_parent.LastFrame) {
+                            MemoryStream stream = new MemoryStream();
+                            image.SaveAsJpeg(stream);
+                            stream.Flush();
+                            _parent.LastFrame = stream.ToArray();
+                        }
+                    }
+                    file.accessor.Dispose();
+                    file.file.Dispose();
+                    frameNumber++;
+                } else {
+                    await Task.Delay(16, token);
+                }
+            }
+        }
+
         private static string AssemblyDirectory {
             get {
                 string codeBase = Assembly.GetExecutingAssembly().CodeBase;
@@ -195,11 +275,35 @@ namespace RoleplayingVoiceCore {
                 return Path.GetDirectoryName(path);
             }
         }
+
         public static float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
             float dir = Vector3.Dot(perp, up);
             return dir;
         }
+
+        private IntPtr Lock(IntPtr opaque, IntPtr planes) {
+            CurrentMappedFile = MemoryMappedFile.CreateNew(null, Pitch * Lines);
+            CurrentMappedViewAccessor = CurrentMappedFile.CreateViewAccessor();
+            Marshal.WriteIntPtr(planes, CurrentMappedViewAccessor.SafeMemoryMappedViewHandle.DangerousGetHandle());
+            return IntPtr.Zero;
+        }
+
+        private void Display(IntPtr opaque, IntPtr picture) {
+            //if (FrameCounter % 100 == 0) {
+            FilesToProcess.Enqueue((CurrentMappedFile, CurrentMappedViewAccessor));
+            CurrentMappedFile = null;
+            CurrentMappedViewAccessor = null;
+            //} else {
+            //    CurrentMappedViewAccessor.Dispose();
+            //    CurrentMappedFile.Dispose();
+            //    CurrentMappedFile = null;
+            //    CurrentMappedViewAccessor = null;
+            //}
+            //FrameCounter++;
+        }
+
+
     }
     public enum SoundType {
         MainPlayerTts,
