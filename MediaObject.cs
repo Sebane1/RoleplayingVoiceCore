@@ -216,6 +216,7 @@ namespace RoleplayingMediaCore {
                     }
                 } else {
                     try {
+                        _parent.LastFrame = new byte[0];
                         string location = _libVLCPath + @"\libvlc\win-x64";
                         //VideoView videoView = new VideoView();
                         Core.Initialize(location);
@@ -228,41 +229,9 @@ namespace RoleplayingMediaCore {
                         _vlcPlayer.SetVideoFormat("RV32", _width, _height, Pitch);
                         _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                         _vlcPlayer.Play();
-                        try {
-                            await ProcessThumbnailsAsync(processingCancellationTokenSource.Token);
-                        } catch {
-
-                        }
                     } catch {
 
                     }
-                }
-            }
-        }
-
-        private async Task ProcessThumbnailsAsync(CancellationToken token) {
-            var frameNumber = 0;
-            _parent.LastFrame = new byte[0];
-            while (!token.IsCancellationRequested) {
-                if (FilesToProcess.TryDequeue(out var file)) {
-                    using (var image = new Image<Bgra32>((int)(Pitch / BytePerPixel), (int)Lines))
-                    using (var sourceStream = file.file.CreateViewStream()) {
-                        var mg = image.GetPixelMemoryGroup();
-                        for (int i = 0; i < mg.Count; i++) {
-                            sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
-                        }
-                        lock (_parent.LastFrame) {
-                            MemoryStream stream = new MemoryStream();
-                            image.SaveAsJpeg(stream);
-                            stream.Flush();
-                            _parent.LastFrame = stream.ToArray();
-                        }
-                    }
-                    file.accessor.Dispose();
-                    file.file.Dispose();
-                    frameNumber++;
-                } else {
-                    await Task.Delay(16, token);
                 }
             }
         }
@@ -283,17 +252,40 @@ namespace RoleplayingMediaCore {
         }
 
         private IntPtr Lock(IntPtr opaque, IntPtr planes) {
-            CurrentMappedFile = MemoryMappedFile.CreateNew(null, Pitch * Lines);
-            CurrentMappedViewAccessor = CurrentMappedFile.CreateViewAccessor();
-            Marshal.WriteIntPtr(planes, CurrentMappedViewAccessor.SafeMemoryMappedViewHandle.DangerousGetHandle());
-            return IntPtr.Zero;
+            try {
+                CurrentMappedFile = MemoryMappedFile.CreateNew(null, Pitch * Lines);
+                CurrentMappedViewAccessor = CurrentMappedFile.CreateViewAccessor();
+                Marshal.WriteIntPtr(planes, CurrentMappedViewAccessor.SafeMemoryMappedViewHandle.DangerousGetHandle());
+                return IntPtr.Zero;
+            } catch {
+                return IntPtr.Zero;
+            }
         }
 
         private void Display(IntPtr opaque, IntPtr picture) {
             //if (FrameCounter % 100 == 0) {
-            FilesToProcess.Enqueue((CurrentMappedFile, CurrentMappedViewAccessor));
-            CurrentMappedFile = null;
-            CurrentMappedViewAccessor = null;
+            try {
+                //FilesToProcess.Enqueue((CurrentMappedFile, CurrentMappedViewAccessor));
+                using (var image = new Image<Bgra32>((int)(Pitch / BytePerPixel), (int)Lines))
+                using (var sourceStream = CurrentMappedFile.CreateViewStream()) {
+                    var mg = image.GetPixelMemoryGroup();
+                    for (int i = 0; i < mg.Count; i++) {
+                        sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
+                    }
+                    lock (_parent.LastFrame) {
+                        MemoryStream stream = new MemoryStream();
+                        image.SaveAsJpeg(stream);
+                        stream.Flush();
+                        _parent.LastFrame = stream.ToArray();
+                    }
+                }
+                CurrentMappedViewAccessor.Dispose();
+                CurrentMappedFile.Dispose();
+                CurrentMappedFile = null;
+                CurrentMappedViewAccessor = null;
+            } catch {
+
+            }
             //} else {
             //    CurrentMappedViewAccessor.Dispose();
             //    CurrentMappedFile.Dispose();
