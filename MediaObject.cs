@@ -226,6 +226,7 @@ namespace RoleplayingMediaCore {
                         _vlcPlayer = new MediaPlayer(media);
                         var processingCancellationTokenSource = new CancellationTokenSource();
                         _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
+                        _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
                         _vlcPlayer.SetVideoFormat("RV32", _width, _height, Pitch);
                         _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                         _vlcPlayer.Play();
@@ -263,9 +264,7 @@ namespace RoleplayingMediaCore {
         }
 
         private void Display(IntPtr opaque, IntPtr picture) {
-            //if (FrameCounter % 100 == 0) {
             try {
-                //FilesToProcess.Enqueue((CurrentMappedFile, CurrentMappedViewAccessor));
                 using (var image = new Image<Bgra32>((int)(Pitch / BytePerPixel), (int)Lines))
                 using (var sourceStream = CurrentMappedFile.CreateViewStream()) {
                     var mg = image.GetPixelMemoryGroup();
@@ -286,13 +285,6 @@ namespace RoleplayingMediaCore {
             } catch {
 
             }
-            //} else {
-            //    CurrentMappedViewAccessor.Dispose();
-            //    CurrentMappedFile.Dispose();
-            //    CurrentMappedFile = null;
-            //    CurrentMappedViewAccessor = null;
-            //}
-            //FrameCounter++;
         }
 
 
