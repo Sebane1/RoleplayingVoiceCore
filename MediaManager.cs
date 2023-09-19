@@ -15,12 +15,14 @@ namespace RoleplayingMediaCore {
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
         private string _libVLCPath;
+        private Task updateLoop;
         float _mainPlayerVolume = 1.0f;
         float _otherPlayerVolume = 1.0f;
         float _unfocusedPlayerVolume = 1.0f;
         float _sfxVolume = 1.0f;
         private bool notDisposed = true;
         private float _liveStreamVolume = 1;
+        private bool alreadyConfiguringSound;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
@@ -34,14 +36,13 @@ namespace RoleplayingMediaCore {
             _mainPlayer = playerObject;
             _camera = camera;
             _libVLCPath = libVLCPath;
-            Task.Run(() => Update());
+            updateLoop = Task.Run(() => Update());
         }
 
         public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
                 OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
-                bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
                         switch (soundType) {
@@ -53,6 +54,8 @@ namespace RoleplayingMediaCore {
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
+                            case SoundType.MainPlayerCombat:
+                            case SoundType.OtherPlayerCombat:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
@@ -103,35 +106,39 @@ namespace RoleplayingMediaCore {
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0) {
-            bool soundIsPlayingAlready = false;
-            if (sounds.ContainsKey(playerObject.Name)) {
-                if (soundType == SoundType.MainPlayerVoice) {
-                    soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
-                } else if (soundType == SoundType.MainPlayerTts) {
-                    Stopwatch waitTimer = new Stopwatch();
-                    waitTimer.Start();
-                    while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
-                    && waitTimer.ElapsedMilliseconds < 20000) {
-                        Thread.Sleep(100);
+            if (!alreadyConfiguringSound) {
+                alreadyConfiguringSound = true;
+                bool soundIsPlayingAlready = false;
+                if (sounds.ContainsKey(playerObject.Name)) {
+                    if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
+                        soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
+                    } else if (soundType == SoundType.MainPlayerTts) {
+                        Stopwatch waitTimer = new Stopwatch();
+                        waitTimer.Start();
+                        while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
+                        && waitTimer.ElapsedMilliseconds < 20000) {
+                            Thread.Sleep(100);
+                        }
+                        sounds[playerObject.Name].Stop();
+                    } else {
+                        sounds[playerObject.Name].Stop();
                     }
-                    sounds[playerObject.Name].Stop();
-                } else {
-                    sounds[playerObject.Name].Stop();
                 }
-            }
-            if (!soundIsPlayingAlready) {
-                try {
-                    sounds[playerObject.Name] = new MediaObject(this, playerObject, _camera,
-                   soundType,
-                   audioPath,
-                   _libVLCPath);
-                    lock (sounds[playerObject.Name]) {
-                        float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                        sounds[playerObject.Name].Play(audioPath, volume, delay);
-                    }
-                } catch {
+                if (!soundIsPlayingAlready) {
+                    try {
+                        sounds[playerObject.Name] = new MediaObject(this, playerObject, _camera,
+                       soundType,
+                       audioPath,
+                       _libVLCPath);
+                        lock (sounds[playerObject.Name]) {
+                            float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
+                            sounds[playerObject.Name].Play(audioPath, volume, delay);
+                        }
+                    } catch {
 
+                    }
                 }
+                alreadyConfiguringSound = false;
             }
         }
         private async void Update() {
@@ -196,9 +203,11 @@ namespace RoleplayingMediaCore {
                             return _mainPlayerVolume;
                         case SoundType.Emote:
                         case SoundType.MainPlayerVoice:
+                        case SoundType.MainPlayerCombat:
                             return _mainPlayerVolume * 1f;
                         case SoundType.OtherPlayerTts:
                         case SoundType.OtherPlayer:
+                        case SoundType.OtherPlayerCombat:
                             return _unfocusedPlayerVolume;
                         case SoundType.Loop:
                             return _sfxVolume;
@@ -214,6 +223,13 @@ namespace RoleplayingMediaCore {
         public void Dispose() {
             notDisposed = false;
             CleanSounds();
+            try {
+                if (updateLoop != null) {
+                    updateLoop?.Dispose();
+                }
+            } catch {
+
+            }
         }
         public void CleanSounds() {
             foreach (var sound in _textToSpeechSounds) {

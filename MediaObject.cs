@@ -184,6 +184,8 @@ namespace RoleplayingMediaCore {
                         _soundType != SoundType.OtherPlayerTts &&
                         _soundType != SoundType.LoopWhileMoving &&
                         _soundType != SoundType.Livestream &&
+                        _soundType != SoundType.MainPlayerCombat &&
+                        _soundType != SoundType.OtherPlayerCombat &&
                         _player.TotalTime.TotalSeconds > 13) {
                         _soundType = SoundType.Loop;
                     }
@@ -297,6 +299,8 @@ namespace RoleplayingMediaCore {
         Emote,
         Loop,
         LoopWhileMoving,
-        Livestream
+        Livestream,
+        MainPlayerCombat,
+        OtherPlayerCombat
     }
 }
