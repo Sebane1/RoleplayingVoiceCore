@@ -375,17 +375,14 @@ namespace RoleplayingMediaCore {
             string path = "";
             if (_networkedClient != null) {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
-                Vector3 position = new Vector3();
                 Guid id = Guid.NewGuid();
                 string hash = Shai1Hash(sender + identifier);
                 string localPath = Path.Combine(rpVoiceCache + subDirectory, (!ignoreCache ? hash : id) + ".mp3");
                 if (!File.Exists(localPath) || ignoreCache) {
                     data = await _networkedClient.GetFile(hash, rpVoiceCache + subDirectory, id.ToString());
                     path = data.Value;
-                    position = data.Key;
                 } else {
                     path = localPath;
-                    position = await _networkedClient.GetPosition(hash);
                 }
             }
             return path;

@@ -27,11 +27,8 @@ namespace RoleplayingMediaCore {
         private WaveStream _player;
         LibVLC libVLC;
         MediaPlayer _vlcPlayer;
-        private static MemoryMappedFile CurrentMappedFile;
-        private static MemoryMappedViewAccessor CurrentMappedViewAccessor;
-        private static readonly ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)> FilesToProcess = new ConcurrentQueue<(MemoryMappedFile file, MemoryMappedViewAccessor accessor)>();
-        private static long FrameCounter = 0;
-
+        private static MemoryMappedFile _currentMappedFile;
+        private static MemoryMappedViewAccessor _currentMappedViewAccessor;
 
         private const uint _width = 640;
         private const uint _height = 360;
@@ -39,19 +36,19 @@ namespace RoleplayingMediaCore {
         /// <summary>
         /// RGBA is used, so 4 byte per pixel, or 32 bits.
         /// </summary>
-        private const uint BytePerPixel = 4;
+        private const uint _bytePerPixel = 4;
 
         /// <summary>
         /// the number of bytes per "line"
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
-        private uint Pitch;
+        private uint _pitch;
 
         /// <summary>
         /// The number of lines in the buffer.
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
-        private uint Lines;
+        private uint _lines;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -61,16 +58,15 @@ namespace RoleplayingMediaCore {
             _libVLCPath = libVLCPath;
             _parent = parent;
             this._soundType = soundType;
-            Pitch = Align(_width * BytePerPixel);
-            Lines = Align(_height);
+            _pitch = Align(_width * _bytePerPixel);
+            _lines = Align(_height);
+        }
 
-            uint Align(uint size) {
-                if (size % 32 == 0) {
-                    return size;
-                }
-
-                return ((size / 32) + 1) * 32;// Align on the next multiple of 32
+        private static uint Align(uint size) {
+            if (size % 32 == 0) {
+                return size;
             }
+            return ((size / 32) + 1) * 32; // Align on the next multiple of 32
         }
 
         private void SoundLoopCheck(WaveOutEvent waveOutEvent) {
@@ -80,11 +76,11 @@ namespace RoleplayingMediaCore {
                     lastPosition = _playerObject.Position;
                     Thread.Sleep(500);
                     while (true) {
-                        if (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
+                        if (_playerObject != null && waveOutEvent != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
                           (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                _waveOutEvent.Stop();
+                                waveOutEvent.Stop();
                                 break;
                             }
                         }
@@ -162,6 +158,8 @@ namespace RoleplayingMediaCore {
             }
         }
 
+        public IGameObject Camera { get => _camera; set => _camera = value; }
+
         public void Stop() {
             if (_waveOutEvent != null) {
                 try {
@@ -191,9 +189,7 @@ namespace RoleplayingMediaCore {
                     }
                     float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
                     float newVolume = volume * ((20 - distance) / 20);
-                    if (_waveOutEvent == null) {
-                        _waveOutEvent = new WaveOutEvent();
-                    }
+                    _waveOutEvent ??= new WaveOutEvent();
                     if (delay > 0) {
                         Thread.Sleep(delay);
                     }
@@ -218,7 +214,7 @@ namespace RoleplayingMediaCore {
                     }
                 } else {
                     try {
-                        _parent.LastFrame = new byte[0];
+                        _parent.LastFrame = Array.Empty<byte>();
                         string location = _libVLCPath + @"\libvlc\win-x64";
                         //VideoView videoView = new VideoView();
                         Core.Initialize(location);
@@ -229,22 +225,13 @@ namespace RoleplayingMediaCore {
                         var processingCancellationTokenSource = new CancellationTokenSource();
                         _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
                         _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
-                        _vlcPlayer.SetVideoFormat("RV32", _width, _height, Pitch);
+                        _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
                         _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                         _vlcPlayer.Play();
                     } catch {
 
                     }
                 }
-            }
-        }
-
-        private static string AssemblyDirectory {
-            get {
-                string codeBase = Assembly.GetExecutingAssembly().CodeBase;
-                UriBuilder uri = new UriBuilder(codeBase);
-                string path = Uri.UnescapeDataString(uri.Path);
-                return Path.GetDirectoryName(path);
             }
         }
 
@@ -256,9 +243,9 @@ namespace RoleplayingMediaCore {
 
         private IntPtr Lock(IntPtr opaque, IntPtr planes) {
             try {
-                CurrentMappedFile = MemoryMappedFile.CreateNew(null, Pitch * Lines);
-                CurrentMappedViewAccessor = CurrentMappedFile.CreateViewAccessor();
-                Marshal.WriteIntPtr(planes, CurrentMappedViewAccessor.SafeMemoryMappedViewHandle.DangerousGetHandle());
+                _currentMappedFile = MemoryMappedFile.CreateNew(null, _pitch * _lines);
+                _currentMappedViewAccessor = _currentMappedFile.CreateViewAccessor();
+                Marshal.WriteIntPtr(planes, _currentMappedViewAccessor.SafeMemoryMappedViewHandle.DangerousGetHandle());
                 return IntPtr.Zero;
             } catch {
                 return IntPtr.Zero;
@@ -267,8 +254,8 @@ namespace RoleplayingMediaCore {
 
         private void Display(IntPtr opaque, IntPtr picture) {
             try {
-                using (var image = new Image<Bgra32>((int)(Pitch / BytePerPixel), (int)Lines))
-                using (var sourceStream = CurrentMappedFile.CreateViewStream()) {
+                using (var image = new Image<Bgra32>((int)(_pitch / _bytePerPixel), (int)_lines))
+                using (var sourceStream = _currentMappedFile.CreateViewStream()) {
                     var mg = image.GetPixelMemoryGroup();
                     for (int i = 0; i < mg.Count; i++) {
                         sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
@@ -280,10 +267,10 @@ namespace RoleplayingMediaCore {
                         _parent.LastFrame = stream.ToArray();
                     }
                 }
-                CurrentMappedViewAccessor.Dispose();
-                CurrentMappedFile.Dispose();
-                CurrentMappedFile = null;
-                CurrentMappedViewAccessor = null;
+                _currentMappedViewAccessor.Dispose();
+                _currentMappedFile.Dispose();
+                _currentMappedFile = null;
+                _currentMappedViewAccessor = null;
             } catch {
 
             }
