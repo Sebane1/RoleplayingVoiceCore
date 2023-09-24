@@ -51,9 +51,10 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     using (BinaryWriter writer = new(sendingClient.GetStream())) {
                         writer.Write(sendID);
                         writer.Write(0);
-                        writer.Write(position.X);
-                        writer.Write(position.Y);
-                        writer.Write(position.Z);
+                        // Todo: Deprecate positional data server side on the next major patch downtime.
+                        writer.Write(0);
+                        writer.Write(0);
+                        writer.Write(0);
                         writer.Write(fileStream.Length);
 
                         CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
@@ -80,7 +81,15 @@ namespace FFXIVLooseTextureCompiler.Networking {
             connectionAttempts = 0;
             return false;
         }
-
+        private void AuditPathContents(string path) {
+            if (Directory.Exists(path)) {
+                foreach (string file in Directory.GetFiles(path)) {
+                    if (!file.EndsWith(".mp3") && !file.EndsWith(".ogg")) {
+                        File.Delete(file);
+                    }
+                }
+            }
+        }
         public async Task<bool> SendZip(string sendID, string path) {
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
@@ -89,6 +98,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 if (File.Exists(zipPath)) {
                     File.Delete(zipPath);
                 }
+                AuditPathContents(path);
                 ZipFile.CreateFromDirectory(path, zipPath);
                 using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
                     using (BinaryWriter writer = new(sendingClient.GetStream())) {
@@ -204,6 +214,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                         File.Delete(zipDirectory);
                     }
                     ZipFile.ExtractToDirectory(path, zipDirectory);
+                    AuditPathContents(zipDirectory);
                     if (File.Exists(path)) {
                         File.Delete(path);
                     }
