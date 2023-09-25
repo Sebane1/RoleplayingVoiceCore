@@ -82,6 +82,12 @@ namespace RoleplayingMediaCore {
                 }
             });
         }
+        public async void StopStream() {
+            foreach (var sound in _playbackStreams) {
+                sound.Value.Stop();
+            }
+            _playbackStreams.Clear();
+        }
 
         public bool IsAllowedToStartStream(IGameObject playerObject) {
             if (_playbackStreams.ContainsKey(playerObject.Name)) {
