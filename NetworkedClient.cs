@@ -43,7 +43,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public void UpdateIPAddress(string ipAddress) {
             _ipAddress = ipAddress;
         }
-        public async Task<bool> SendFile(string sendID, string path, Vector3 position) {
+        public async Task<bool> SendFile(string sendID, string path) {
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -51,14 +51,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     using (BinaryWriter writer = new(sendingClient.GetStream())) {
                         writer.Write(sendID);
                         writer.Write(0);
-                        // Todo: Deprecate positional data server side on the next major patch downtime.
-                        writer.Write(0);
-                        writer.Write(0);
-                        writer.Write(0);
                         writer.Write(fileStream.Length);
 
                         CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
 
+                        writer.Write(30000);
                         writer.Flush();
                         fileStream.Dispose();
                         Close(sendingClient);
@@ -72,7 +69,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
                 connectionAttempts++;
                 if (connectionAttempts < 20) {
-                    return await SendFile(sendID, path, position);
+                    return await SendFile(sendID, path);
                 } else {
                     OnSendFailed?.Invoke(this, EventArgs.Empty);
                     connectionAttempts = 0;
@@ -103,7 +100,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
                     using (BinaryWriter writer = new(sendingClient.GetStream())) {
                         writer.Write(sendID);
-                        writer.Write(4);
+                        writer.Write(0);
                         writer.Write(fileStream.Length);
 
                         CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
