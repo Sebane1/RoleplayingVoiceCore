@@ -179,7 +179,7 @@ namespace RoleplayingMediaCore {
                             }
                         }
                         if (useSync) {
-                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath, position));
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                     } else {
@@ -196,7 +196,7 @@ namespace RoleplayingMediaCore {
         public async Task<bool> SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
             string hash = Shai1Hash(sender + identifier);
             bool sendState = false;
-            await Task.Run(async () => { sendState = await _networkedClient.SendFile(hash, soundOnDisk, position); });
+            await Task.Run(async () => { sendState = await _networkedClient.SendFile(hash, soundOnDisk); });
             return sendState;
         }
 
