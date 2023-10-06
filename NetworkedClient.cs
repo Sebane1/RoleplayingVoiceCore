@@ -108,11 +108,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
                         writer.Write(3600000);
                         writer.Flush();
                         fileStream.Dispose();
-                        Close(sendingClient);
-                        File.Delete(zipPath);
-                        return true;
+                        Task.Run(() => Close(sendingClient));
                     }
                 }
+                File.Delete(zipPath);
+                return true;
             } catch {
                 portCycle++;
                 if (portCycle > maxPortCycle) {
@@ -238,42 +238,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
             }
             connectionAttempts = 0;
             return zipDirectory;
-        }
-
-        public async Task<Vector3> GetPosition(string sendID) {
-            Vector3 position = new Vector3(-1, -1, -1);
-            try {
-                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                Start(sendingClient);
-                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
-                BinaryReader reader = new BinaryReader(sendingClient.GetStream());
-                writer.Write(sendID);
-                writer.Write(2);
-                byte value = reader.ReadByte();
-                if (value == 1) {
-                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-                }
-                Close(sendingClient);
-                return position;
-            } catch {
-                try {
-                    portCycle++;
-                    if (portCycle < maxPortCycle) {
-                        portCycle = 0;
-                    }
-                    connectionAttempts++;
-                    if (connectionAttempts < 20) {
-                        return await GetPosition(sendID);
-                    } else {
-                        connectionAttempts = 0;
-                        connected = false;
-                    }
-                } catch {
-                    connected = false;
-                }
-            }
-            connectionAttempts = 0;
-            return position;
         }
         protected virtual bool IsFileLocked(string path) {
             try {

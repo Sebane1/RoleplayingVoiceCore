@@ -247,7 +247,8 @@ namespace RoleplayingMediaCore {
                     }
                     if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
                         SoundLoopCheck(_waveOutEvent);
-                        desiredStream = new LoopStream(_player) { EnableLooping = true };
+                        _loopStream = new LoopStream(_player) { EnableLooping = true };
+                        desiredStream = _loopStream;
                     }
                     _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                     _volumeSampleProvider.Volume = newVolume;

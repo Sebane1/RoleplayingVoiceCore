@@ -44,8 +44,7 @@ namespace RoleplayingMediaCore {
                     }
                     if (characterVoices != null) {
                         _characterVoices = characterVoices;
-                    }
-
+                    }   
                 });
             }
         }

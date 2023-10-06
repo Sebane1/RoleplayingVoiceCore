@@ -154,9 +154,17 @@ namespace RoleplayingMediaCore {
                         && waitTimer.ElapsedMilliseconds < 20000) {
                             Thread.Sleep(100);
                         }
-                        sounds[playerObject.Name].Stop();
+                        try {
+                            sounds[playerObject.Name]?.Stop();
+                        } catch {
+
+                        }
                     } else {
-                        sounds[playerObject.Name].Stop();
+                        try {
+                            sounds[playerObject.Name]?.Stop();
+                        } catch {
+
+                        }
                     }
                 }
                 if (!soundIsPlayingAlready) {
