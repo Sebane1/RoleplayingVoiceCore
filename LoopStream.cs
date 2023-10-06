@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 namespace RoleplayingMediaCore {
     public class LoopStream : WaveStream {
         WaveStream sourceStream;
+        private bool _LoopEarly;
 
         /// <summary>
         /// Creates a new Loop stream
@@ -51,17 +52,22 @@ namespace RoleplayingMediaCore {
 
             while (totalBytesRead < count) {
                 int bytesRead = sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
-                if (bytesRead == 0) {
+                if (bytesRead == 0 || _LoopEarly) {
                     if (sourceStream.Position == 0 || !EnableLooping) {
                         // something wrong with the source stream
                         break;
                     }
                     // loop
                     sourceStream.Position = 0;
+                    _LoopEarly = false;
                 }
                 totalBytesRead += bytesRead;
             }
             return totalBytesRead;
+        }
+
+        internal void LoopEarly() {
+            _LoopEarly = true;
         }
     }
 }

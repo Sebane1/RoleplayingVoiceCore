@@ -191,7 +191,6 @@ namespace FFXIVLooseTextureCompiler.Networking {
             Random random = new Random();
             string path = Path.Combine(tempPath, sendID + ".zip");
             string zipDirectory = tempPath + @"\" + sendID;
-            Vector3 position = new Vector3(-1, -1, -1);
             try {
                 TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
                 Start(sendingClient);
@@ -201,16 +200,19 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 writer.Write(1);
                 byte value = reader.ReadByte();
                 if (value != 0) {
-                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     long length = reader.ReadInt64();
                     using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
                         CopyStream(reader.BaseStream, fileStream, (int)length);
                     }
                     Directory.CreateDirectory(tempPath);
-                    if (File.Exists(zipDirectory)) {
-                        File.Delete(zipDirectory);
+                    try {
+                        if (File.Exists(zipDirectory)) {
+                            File.Delete(zipDirectory);
+                        }
+                    } catch {
+
                     }
-                    ZipFile.ExtractToDirectory(path, zipDirectory);
+                    ZipFile.ExtractToDirectory(path, zipDirectory, true);
                     AuditPathContents(zipDirectory);
                     if (File.Exists(path)) {
                         File.Delete(path);

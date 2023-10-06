@@ -11,6 +11,7 @@ namespace RoleplayingMediaCore {
         byte[] _lastFrame;
         ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
@@ -40,8 +41,7 @@ namespace RoleplayingMediaCore {
         }
 
         public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            Task.Run(() => {
+            _ = Task.Run(() => {
                 OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
@@ -64,8 +64,25 @@ namespace RoleplayingMediaCore {
                     }
                 }
             });
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
         }
+
+        public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType, int delay = 0) {
+            try {
+                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    _nativeGameAudio[playerObject.Name].Stop();
+                }
+                _nativeGameAudio[playerObject.Name] = new MediaObject(
+                    this, playerObject, _camera,
+                    soundType, "", _libVLCPath);
+                lock (_nativeGameAudio[playerObject.Name]) {
+                    float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
+                    _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
+                }
+            } catch {
+
+            }
+        }
+
         public async void PlayStream(IGameObject playerObject, string audioPath, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
@@ -74,7 +91,7 @@ namespace RoleplayingMediaCore {
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if (audioPath.StartsWith("http")) {
                         foreach (var sound in _playbackStreams) {
-                            sound.Value.Stop();
+                            sound.Value?.Stop();
                         }
                         _playbackStreams.Clear();
                         ConfigureAudio(playerObject, audioPath, SoundType.Livestream, _playbackStreams, delay);
@@ -84,7 +101,7 @@ namespace RoleplayingMediaCore {
         }
         public async void StopStream() {
             foreach (var sound in _playbackStreams) {
-                sound.Value.Stop();
+                sound.Value?.Stop();
             }
             _playbackStreams.Clear();
         }
@@ -109,6 +126,18 @@ namespace RoleplayingMediaCore {
             if (_voicePackSounds.ContainsKey(playerObject.Name)) {
                 _voicePackSounds[playerObject.Name].Stop();
             }
+            if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                _nativeGameAudio[playerObject.Name].Stop();
+            }
+        }
+
+        public void LoopEarly(IGameObject playerObject) {
+            if (_voicePackSounds.ContainsKey(playerObject.Name)) {
+                _voicePackSounds[playerObject.Name].LoopEarly();
+            }
+            if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                _nativeGameAudio[playerObject.Name].LoopEarly();
+            }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0) {
@@ -132,10 +161,9 @@ namespace RoleplayingMediaCore {
                 }
                 if (!soundIsPlayingAlready) {
                     try {
-                        sounds[playerObject.Name] = new MediaObject(this, playerObject, _camera,
-                       soundType,
-                       audioPath,
-                       _libVLCPath);
+                        sounds[playerObject.Name] = new MediaObject(
+                            this, playerObject, _camera,
+                            soundType, audioPath, _libVLCPath);
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
                             sounds[playerObject.Name].Play(audioPath, volume, delay);
@@ -152,6 +180,7 @@ namespace RoleplayingMediaCore {
                 UpdateVolumes(_textToSpeechSounds);
                 UpdateVolumes(_voicePackSounds);
                 UpdateVolumes(_playbackStreams);
+                UpdateVolumes(_nativeGameAudio);
                 Thread.Sleep(100);
             }
         }
@@ -239,18 +268,22 @@ namespace RoleplayingMediaCore {
         }
         public void CleanSounds() {
             foreach (var sound in _textToSpeechSounds) {
-                sound.Value.Stop();
+                sound.Value?.Stop();
             }
             foreach (var sound in _voicePackSounds) {
-                sound.Value.Stop();
+                sound.Value?.Stop();
             }
             foreach (var sound in _playbackStreams) {
-                sound.Value.Stop();
+                sound.Value?.Stop();
+            }
+            foreach (var sound in _nativeGameAudio) {
+                sound.Value?.Stop();
             }
             _lastFrame = null;
-            _textToSpeechSounds.Clear();
-            _voicePackSounds.Clear();
-            _playbackStreams.Clear();
+            _textToSpeechSounds?.Clear();
+            _voicePackSounds?.Clear();
+            _playbackStreams?.Clear();
+            _nativeGameAudio?.Clear();
         }
     }
 }

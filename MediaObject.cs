@@ -49,6 +49,9 @@ namespace RoleplayingMediaCore {
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
         private uint _lines;
+        private WasapiOut _wasapiOut;
+        private float offsetVolume = 1;
+        private LoopStream _loopStream;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -106,7 +109,7 @@ namespace RoleplayingMediaCore {
             }
             set {
                 if (_volumeSampleProvider != null) {
-                    _volumeSampleProvider.Volume = value;
+                    _volumeSampleProvider.Volume = value * offsetVolume;
                 }
                 if (_vlcPlayer != null) {
                     try {
@@ -131,6 +134,12 @@ namespace RoleplayingMediaCore {
                 } else if (_vlcPlayer != null) {
                     try {
                         return _vlcPlayer.IsPlaying ? PlaybackState.Playing : PlaybackState.Stopped;
+                    } catch {
+                        return PlaybackState.Stopped;
+                    }
+                } else if (_wasapiOut != null) {
+                    try {
+                        return _wasapiOut.PlaybackState;
                     } catch {
                         return PlaybackState.Stopped;
                     }
@@ -172,6 +181,49 @@ namespace RoleplayingMediaCore {
                 } catch { }
             }
         }
+        public void LoopEarly() {
+            _loopStream?.LoopEarly();
+        }
+        public async void Play(WaveStream soundPath, float volume, int delay) {
+            if (PlaybackState == PlaybackState.Stopped) {
+                _player = soundPath;
+                WaveStream desiredStream = _player;
+                if (_soundType != SoundType.MainPlayerTts &&
+                    _soundType != SoundType.OtherPlayerTts &&
+                    _soundType != SoundType.LoopWhileMoving &&
+                    _soundType != SoundType.Livestream &&
+                    _soundType != SoundType.MainPlayerCombat &&
+                    _soundType != SoundType.OtherPlayerCombat &&
+                    _player.TotalTime.TotalSeconds > 13) {
+                    _soundType = SoundType.Loop;
+                }
+                offsetVolume = 0.7f;
+                float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                float newVolume = volume * ((20 - distance) / 20) * offsetVolume;
+                if (delay > 0) {
+                    Thread.Sleep(delay);
+                }
+                if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                    SoundLoopCheck(_waveOutEvent);
+                    _loopStream = new LoopStream(_player) { EnableLooping = true };
+                    desiredStream = _loopStream;
+                }
+                _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                _volumeSampleProvider.Volume = newVolume;
+                _panningSampleProvider =
+                new PanningSampleProvider(_volumeSampleProvider.ToMono());
+                Vector3 dir = PlayerObject.Position - _camera.Position;
+                float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                try {
+                    _waveOutEvent = new WaveOutEvent();
+                    _waveOutEvent?.Init(_panningSampleProvider);
+                    _waveOutEvent?.Play();
+                } catch (Exception e) {
+
+                }
+            }
+        }
         public async void Play(string soundPath, float volume, int delay) {
             if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
                 if (!soundPath.StartsWith("http")) {
@@ -207,6 +259,7 @@ namespace RoleplayingMediaCore {
                     if (_waveOutEvent != null) {
                         try {
                             _waveOutEvent?.Init(_panningSampleProvider);
+                            _waveOutEvent?.Play();
                             _waveOutEvent?.Play();
                         } catch (Exception e) {
 
