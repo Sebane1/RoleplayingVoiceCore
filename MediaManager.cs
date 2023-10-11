@@ -80,7 +80,7 @@ namespace RoleplayingMediaCore {
                     _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
                     _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                 }
-            } catch (Exception e){
+            } catch (Exception e) {
                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
             }
         }
@@ -280,23 +280,24 @@ namespace RoleplayingMediaCore {
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public void CleanSounds() {
-            foreach (var sound in _textToSpeechSounds) {
-                sound.Value?.Stop();
-            }
-            foreach (var sound in _voicePackSounds) {
-                sound.Value?.Stop();
-            }
-            foreach (var sound in _playbackStreams) {
-                sound.Value?.Stop();
-            }
-            foreach (var sound in _nativeGameAudio) {
-                sound.Value?.Stop();
-            }
-            _lastFrame = null;
-            _textToSpeechSounds?.Clear();
-            _voicePackSounds?.Clear();
-            _playbackStreams?.Clear();
-            _nativeGameAudio?.Clear();
+            try {
+                List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
+                cleanupList.AddRange(_textToSpeechSounds);
+                cleanupList.AddRange(_voicePackSounds);
+                cleanupList.AddRange(_playbackStreams);
+                cleanupList.AddRange(_nativeGameAudio);
+                foreach (var sound in cleanupList) {
+                    if (sound.Value != null) {
+                        sound.Value?.Stop();
+                        sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
+                    }
+                }
+                _lastFrame = null;
+                _textToSpeechSounds?.Clear();
+                _voicePackSounds?.Clear();
+                _playbackStreams?.Clear();
+                _nativeGameAudio?.Clear();
+            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
     }
 }
