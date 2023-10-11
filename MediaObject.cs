@@ -2,33 +2,34 @@
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using RoleplayingVoiceCore;
 using SixLabors.ImageSharp.Advanced;
-using System;
-using System.Collections.Concurrent;
 using System.IO.MemoryMappedFiles;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace RoleplayingMediaCore {
     public class MediaObject {
         private IGameObject _playerObject;
+        private IGameObject _camera;
+        private SoundType _soundType;
+
         private VolumeSampleProvider _volumeSampleProvider;
         private PanningSampleProvider _panningSampleProvider;
         private WaveOutEvent _waveOutEvent;
-        private string _soundPath;
-        private IGameObject _camera;
-        private string _libVLCPath;
+        private LibVLC libVLC;
+        private MediaPlayer _vlcPlayer;
         private MediaManager _parent;
-        private SoundType _soundType;
-        private bool stopPlaybackOnMovement;
-        private Vector3 lastPosition;
         private WaveStream _player;
-        LibVLC libVLC;
-        MediaPlayer _vlcPlayer;
+
         private static MemoryMappedFile _currentMappedFile;
         private static MemoryMappedViewAccessor _currentMappedViewAccessor;
+        public event EventHandler<MediaError> OnErrorReceived;
+
+        private string _soundPath;
+        private string _libVLCPath;
+
+        private bool stopPlaybackOnMovement;
+        private Vector3 lastPosition;
 
         private const uint _width = 640;
         private const uint _height = 360;
@@ -49,8 +50,9 @@ namespace RoleplayingMediaCore {
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
         private uint _lines;
-        private WasapiOut _wasapiOut;
         private float offsetVolume = 1;
+
+        private WasapiOut _wasapiOut;
         private LoopStream _loopStream;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
@@ -92,9 +94,7 @@ namespace RoleplayingMediaCore {
                         }
                         Thread.Sleep(200);
                     }
-                } catch {
-
-                }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
         }
 
@@ -117,9 +117,7 @@ namespace RoleplayingMediaCore {
                         if (newValue != _vlcPlayer.Volume) {
                             _vlcPlayer.Volume = newValue;
                         }
-                    } catch {
-
-                    }
+                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
         }
@@ -178,7 +176,7 @@ namespace RoleplayingMediaCore {
             if (_vlcPlayer != null) {
                 try {
                     _vlcPlayer?.Stop();
-                } catch { }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
         public void LoopEarly() {
@@ -219,9 +217,7 @@ namespace RoleplayingMediaCore {
                     _waveOutEvent = new WaveOutEvent();
                     _waveOutEvent?.Init(_panningSampleProvider);
                     _waveOutEvent?.Play();
-                } catch (Exception e) {
-
-                }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
         public async void Play(string soundPath, float volume, int delay) {
@@ -262,15 +258,12 @@ namespace RoleplayingMediaCore {
                             _waveOutEvent?.Init(_panningSampleProvider);
                             _waveOutEvent?.Play();
                             _waveOutEvent?.Play();
-                        } catch (Exception e) {
-
-                        }
+                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }
                 } else {
                     try {
                         _parent.LastFrame = Array.Empty<byte>();
                         string location = _libVLCPath + @"\libvlc\win-x64";
-                        //VideoView videoView = new VideoView();
                         Core.Initialize(location);
                         libVLC = new LibVLC("--vout", "none");
                         var media = new Media(libVLC, soundPath, FromType.FromLocation);
@@ -282,9 +275,7 @@ namespace RoleplayingMediaCore {
                         _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
                         _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                         _vlcPlayer.Play();
-                    } catch {
-
-                    }
+                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
         }
@@ -325,12 +316,8 @@ namespace RoleplayingMediaCore {
                 _currentMappedFile.Dispose();
                 _currentMappedFile = null;
                 _currentMappedViewAccessor = null;
-            } catch {
-
-            }
+            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
-
-
     }
     public enum SoundType {
         MainPlayerTts,

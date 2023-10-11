@@ -13,10 +13,11 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
+        public event EventHandler<MediaError> OnErrorReceived;
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
         private string _libVLCPath;
-        private Task updateLoop;
+        private Task _updateLoop;
         float _mainPlayerVolume = 1.0f;
         float _otherPlayerVolume = 1.0f;
         float _unfocusedPlayerVolume = 1.0f;
@@ -37,7 +38,7 @@ namespace RoleplayingMediaCore {
             _mainPlayer = playerObject;
             _camera = camera;
             _libVLCPath = libVLCPath;
-            updateLoop = Task.Run(() => Update());
+            _updateLoop = Task.Run(() => Update());
         }
 
         public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
@@ -77,10 +78,15 @@ namespace RoleplayingMediaCore {
                 lock (_nativeGameAudio[playerObject.Name]) {
                     float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
                     _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
+                    _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                 }
-            } catch {
-
+            } catch (Exception e){
+                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
             }
+        }
+
+        private void MediaManager_OnErrorReceived(object? sender, MediaError e) {
+            OnErrorReceived?.Invoke(this, new MediaError() { Exception = e.Exception });
         }
 
         public async void PlayStream(IGameObject playerObject, string audioPath, int delay = 0) {
@@ -156,14 +162,14 @@ namespace RoleplayingMediaCore {
                         }
                         try {
                             sounds[playerObject.Name]?.Stop();
-                        } catch {
-
+                        } catch (Exception e) {
+                            OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                         }
                     } else {
                         try {
                             sounds[playerObject.Name]?.Stop();
-                        } catch {
-
+                        } catch (Exception e) {
+                            OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                         }
                     }
                 }
@@ -175,9 +181,10 @@ namespace RoleplayingMediaCore {
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
                             sounds[playerObject.Name].Play(audioPath, volume, delay);
+                            _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                         }
-                    } catch {
-
+                    } catch (Exception e) {
+                        OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                     }
                 }
                 alreadyConfiguringSound = false;
@@ -210,7 +217,7 @@ namespace RoleplayingMediaCore {
                                 sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
-                    } catch { }
+                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
         }
@@ -267,12 +274,10 @@ namespace RoleplayingMediaCore {
             notDisposed = false;
             CleanSounds();
             try {
-                if (updateLoop != null) {
-                    updateLoop?.Dispose();
+                if (_updateLoop != null) {
+                    _updateLoop?.Dispose();
                 }
-            } catch {
-
-            }
+            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public void CleanSounds() {
             foreach (var sound in _textToSpeechSounds) {
