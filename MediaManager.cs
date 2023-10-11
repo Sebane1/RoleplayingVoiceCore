@@ -181,7 +181,7 @@ namespace RoleplayingMediaCore {
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
                             sounds[playerObject.Name].Play(audioPath, volume, delay);
-                            _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                            sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                         }
                     } catch (Exception e) {
                         OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
