@@ -74,18 +74,18 @@ namespace RoleplayingMediaCore {
             return ((size / 32) + 1) * 32; // Align on the next multiple of 32
         }
 
-        private void SoundLoopCheck(WaveOutEvent waveOutEvent) {
+        private void SoundLoopCheck() {
             Task.Run(async () => {
                 try {
                     Thread.Sleep(500);
                     lastPosition = _playerObject.Position;
                     Thread.Sleep(500);
                     while (true) {
-                        if (_playerObject != null && waveOutEvent != null && _volumeSampleProvider != null) {
+                        if (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
                           (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                waveOutEvent.Stop();
+                                _waveOutEvent.Stop();
                                 break;
                             }
                         }
@@ -201,8 +201,9 @@ namespace RoleplayingMediaCore {
                 if (delay > 0) {
                     Thread.Sleep(delay);
                 }
+                _waveOutEvent = new WaveOutEvent();
                 if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                    SoundLoopCheck(_waveOutEvent);
+                    SoundLoopCheck();
                     _loopStream = new LoopStream(_player) { EnableLooping = true };
                     desiredStream = _loopStream;
                 }
@@ -214,7 +215,6 @@ namespace RoleplayingMediaCore {
                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                 _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                 try {
-                    _waveOutEvent = new WaveOutEvent();
                     _waveOutEvent?.Init(_panningSampleProvider);
                     _waveOutEvent?.Play();
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
@@ -242,7 +242,7 @@ namespace RoleplayingMediaCore {
                         Thread.Sleep(delay);
                     }
                     if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                        SoundLoopCheck(_waveOutEvent);
+                        SoundLoopCheck();
                         _loopStream = new LoopStream(_player) { EnableLooping = true };
                         desiredStream = _loopStream;
                     }
