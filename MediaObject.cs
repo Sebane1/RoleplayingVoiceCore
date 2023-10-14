@@ -204,7 +204,7 @@ namespace RoleplayingMediaCore {
                 _waveOutEvent = new WaveOutEvent();
                 if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
                     SoundLoopCheck();
-                    _loopStream = new LoopStream(_player) { EnableLooping = true };
+                    _loopStream = new LoopStream(_player) { EnableLooping = false };
                     desiredStream = _loopStream;
                 }
                 _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
