@@ -41,7 +41,7 @@ namespace RoleplayingMediaCore {
             _updateLoop = Task.Run(() => Update());
         }
 
-        public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0) {
+        public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
             _ = Task.Run(() => {
                 OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 if (!string.IsNullOrEmpty(audioPath)) {
@@ -69,16 +69,18 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType, int delay = 0) {
             try {
-                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                    _nativeGameAudio[playerObject.Name].Stop();
-                }
-                _nativeGameAudio[playerObject.Name] = new MediaObject(
-                    this, playerObject, _camera,
-                    soundType, "", _libVLCPath);
-                lock (_nativeGameAudio[playerObject.Name]) {
-                    float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
-                    _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
-                    _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                if (playerObject != null) {
+                    if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                        _nativeGameAudio[playerObject.Name].Stop();
+                    }
+                    _nativeGameAudio[playerObject.Name] = new MediaObject(
+                        this, playerObject, _camera,
+                        soundType, "", _libVLCPath);
+                    lock (_nativeGameAudio[playerObject.Name]) {
+                        float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
+                        _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
+                    }
                 }
             } catch (Exception e) {
                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -129,24 +131,28 @@ namespace RoleplayingMediaCore {
         }
 
         public void StopAudio(IGameObject playerObject) {
-            if (_voicePackSounds.ContainsKey(playerObject.Name)) {
-                _voicePackSounds[playerObject.Name].Stop();
-            }
-            if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                _nativeGameAudio[playerObject.Name].Stop();
+            if (playerObject != null) {
+                if (_voicePackSounds.ContainsKey(playerObject.Name)) {
+                    _voicePackSounds[playerObject.Name].Stop();
+                }
+                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    _nativeGameAudio[playerObject.Name].Stop();
+                }
             }
         }
 
         public void LoopEarly(IGameObject playerObject) {
-            if (_voicePackSounds.ContainsKey(playerObject.Name)) {
-                _voicePackSounds[playerObject.Name].LoopEarly();
-            }
-            if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                _nativeGameAudio[playerObject.Name].LoopEarly();
+            if (playerObject != null) {
+                if (_voicePackSounds.ContainsKey(playerObject.Name)) {
+                    _voicePackSounds[playerObject.Name].LoopEarly();
+                }
+                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    _nativeGameAudio[playerObject.Name].LoopEarly();
+                }
             }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
-            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0) {
+            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
             if (!alreadyConfiguringSound) {
                 alreadyConfiguringSound = true;
                 bool soundIsPlayingAlready = false;
@@ -180,7 +186,7 @@ namespace RoleplayingMediaCore {
                             soundType, audioPath, _libVLCPath);
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                            sounds[playerObject.Name].Play(audioPath, volume, delay);
+                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead);
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                         }
                     } catch (Exception e) {

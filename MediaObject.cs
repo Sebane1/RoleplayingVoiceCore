@@ -220,7 +220,7 @@ namespace RoleplayingMediaCore {
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
-        public async void Play(string soundPath, float volume, int delay) {
+        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead) {
             if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
                 if (!soundPath.StartsWith("http")) {
                     _player = soundPath.EndsWith(".ogg") ?
@@ -256,7 +256,7 @@ namespace RoleplayingMediaCore {
                     if (_waveOutEvent != null) {
                         try {
                             _waveOutEvent?.Init(_panningSampleProvider);
-                            _waveOutEvent?.Play();
+                            _player.CurrentTime = skipAhead;
                             _waveOutEvent?.Play();
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }
