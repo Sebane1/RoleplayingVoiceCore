@@ -285,6 +285,24 @@ namespace RoleplayingMediaCore {
                 }
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
+        public void CleanNonStreamingSounds() {
+            try {
+                List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
+                cleanupList.AddRange(_textToSpeechSounds);
+                cleanupList.AddRange(_voicePackSounds);
+                cleanupList.AddRange(_nativeGameAudio);
+                foreach (var sound in cleanupList) {
+                    if (sound.Value != null) {
+                        sound.Value?.Stop();
+                        sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
+                    }
+                }
+                _lastFrame = null;
+                _textToSpeechSounds?.Clear();
+                _voicePackSounds?.Clear();
+                _nativeGameAudio?.Clear();
+            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+        }
         public void CleanSounds() {
             try {
                 List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
