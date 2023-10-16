@@ -25,7 +25,7 @@ namespace RoleplayingMediaCore {
         private bool notDisposed = true;
         private float _liveStreamVolume = 1;
         private bool alreadyConfiguringSound;
-
+        Stopwatch combatCooldownTimer = new Stopwatch();
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
@@ -49,9 +49,6 @@ namespace RoleplayingMediaCore {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
-                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay);
-                                break;
-
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
@@ -153,12 +150,16 @@ namespace RoleplayingMediaCore {
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
-            if (!alreadyConfiguringSound) {
+            if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
+                || (soundType == SoundType.MainPlayerCombat && combatCooldownTimer.ElapsedMilliseconds > 200 || !combatCooldownTimer.IsRunning))) {
                 alreadyConfiguringSound = true;
                 bool soundIsPlayingAlready = false;
                 if (sounds.ContainsKey(playerObject.Name)) {
                     if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
                         soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
+                        if (soundType == SoundType.MainPlayerCombat) {
+                            combatCooldownTimer.Restart();
+                        }
                     } else if (soundType == SoundType.MainPlayerTts) {
                         Stopwatch waitTimer = new Stopwatch();
                         waitTimer.Start();
