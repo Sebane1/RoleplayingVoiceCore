@@ -224,7 +224,7 @@ namespace RoleplayingMediaCore {
             if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
                 if (!soundPath.StartsWith("http")) {
                     _player = soundPath.EndsWith(".ogg") ?
-                    new VorbisWaveReader(soundPath) : new AudioFileReader(soundPath);
+                    new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
                     WaveStream desiredStream = _player;
                     if (_soundType != SoundType.MainPlayerTts &&
                         _soundType != SoundType.OtherPlayerTts &&
@@ -238,8 +238,10 @@ namespace RoleplayingMediaCore {
                     float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
                     float newVolume = volume * ((20 - distance) / 20);
                     _waveOutEvent ??= new WaveOutEvent();
-                    if (delay > 0) {
-                        Thread.Sleep(delay);
+                    if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                        if (delay > 0) {
+                            Thread.Sleep(delay);
+                        }
                     }
                     if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
                         if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
@@ -250,8 +252,7 @@ namespace RoleplayingMediaCore {
                     }
                     _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                     _volumeSampleProvider.Volume = newVolume;
-                    _panningSampleProvider =
-                    new PanningSampleProvider(_volumeSampleProvider.ToMono());
+                    _panningSampleProvider = new PanningSampleProvider(_volumeSampleProvider.ToMono());
                     Vector3 dir = PlayerObject.Position - _camera.Position;
                     float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                     _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
