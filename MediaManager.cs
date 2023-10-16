@@ -11,6 +11,7 @@ namespace RoleplayingMediaCore {
         byte[] _lastFrame;
         ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         public event EventHandler<MediaError> OnErrorReceived;
@@ -43,24 +44,28 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
             _ = Task.Run(() => {
-                OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
+                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay);
+                                break;
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
-                            case SoundType.MainPlayerCombat:
-                            case SoundType.OtherPlayerCombat:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
                                 break;
+                            case SoundType.MainPlayerCombat:
+                            case SoundType.OtherPlayerCombat:
+                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay);
+                                break;
                         }
                     }
                 }
+                OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
             });
         }
 
@@ -187,8 +192,11 @@ namespace RoleplayingMediaCore {
                             soundType, audioPath, _libVLCPath);
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead);
+                            if (volume == 0) {
+                                volume = 1;
+                            }
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead);
                         }
                     } catch (Exception e) {
                         OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -203,6 +211,7 @@ namespace RoleplayingMediaCore {
                 UpdateVolumes(_voicePackSounds);
                 UpdateVolumes(_playbackStreams);
                 UpdateVolumes(_nativeGameAudio);
+                UpdateVolumes(_combatVoicePackSounds);
                 Thread.Sleep(100);
             }
         }
@@ -311,6 +320,7 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_voicePackSounds);
                 cleanupList.AddRange(_playbackStreams);
                 cleanupList.AddRange(_nativeGameAudio);
+                cleanupList.AddRange(_combatVoicePackSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
                         sound.Value?.Stop();
@@ -322,6 +332,7 @@ namespace RoleplayingMediaCore {
                 _voicePackSounds?.Clear();
                 _playbackStreams?.Clear();
                 _nativeGameAudio?.Clear();
+                _combatVoicePackSounds?.Clear();
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
     }

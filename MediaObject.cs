@@ -242,7 +242,9 @@ namespace RoleplayingMediaCore {
                         Thread.Sleep(delay);
                     }
                     if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                        SoundLoopCheck();
+                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                            SoundLoopCheck();
+                        }
                         _loopStream = new LoopStream(_player) { EnableLooping = true };
                         desiredStream = _loopStream;
                     }
@@ -256,7 +258,13 @@ namespace RoleplayingMediaCore {
                     if (_waveOutEvent != null) {
                         try {
                             _waveOutEvent?.Init(_panningSampleProvider);
-                            _player.CurrentTime = skipAhead;
+                            if (_soundType == SoundType.Loop ||
+                                _soundType == SoundType.MainPlayerVoice ||
+                                _soundType == SoundType.OtherPlayer) {
+                                _player.CurrentTime = skipAhead;
+                            } else {
+                                _player.Position = 0;
+                            }
                             _waveOutEvent?.Play();
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }
