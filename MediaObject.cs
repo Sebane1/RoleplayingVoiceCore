@@ -252,7 +252,8 @@ namespace RoleplayingMediaCore {
                     }
                     _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                     _volumeSampleProvider.Volume = newVolume;
-                    _panningSampleProvider = new PanningSampleProvider(_volumeSampleProvider.ToMono());
+                    _panningSampleProvider = new PanningSampleProvider(
+                    _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                     Vector3 dir = PlayerObject.Position - _camera.Position;
                     float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                     _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
