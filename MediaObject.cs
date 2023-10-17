@@ -253,7 +253,7 @@ namespace RoleplayingMediaCore {
                         desiredStream = _loopStream;
                     }
                     ISampleProvider sampleProvider = null;
-                    if (!lowPerformanceMode && _soundType == SoundType.MainPlayerCombat) {
+                    if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat) {
                         _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                         _volumeSampleProvider.Volume = volume;
                         _panningSampleProvider = new PanningSampleProvider(
@@ -265,6 +265,7 @@ namespace RoleplayingMediaCore {
                     } else {
                         _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                         _volumeSampleProvider.Volume = volume;
+                        sampleProvider = _volumeSampleProvider;
                     }
                     if (_waveOutEvent != null) {
                         try {
