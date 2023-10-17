@@ -14,6 +14,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
+
         public event EventHandler<MediaError> OnErrorReceived;
         private IGameObject _mainPlayer = null;
         private IGameObject _camera;
@@ -27,12 +28,15 @@ namespace RoleplayingMediaCore {
         private float _liveStreamVolume = 1;
         private bool alreadyConfiguringSound;
         Stopwatch combatCooldownTimer = new Stopwatch();
+        private bool _lowPerformanceMode;
+
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
         public float SFXVolume { get => _sfxVolume; set => _sfxVolume = value; }
         public float LiveStreamVolume { get => _liveStreamVolume; set => _liveStreamVolume = value; }
         public byte[] LastFrame { get => _lastFrame; set => _lastFrame = value; }
+        public bool LowPerformanceMode { get => _lowPerformanceMode; set => _lowPerformanceMode = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
@@ -156,7 +160,7 @@ namespace RoleplayingMediaCore {
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
             if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
-                || (soundType == SoundType.MainPlayerCombat && combatCooldownTimer.ElapsedMilliseconds > 200 || !combatCooldownTimer.IsRunning))) {
+                || (soundType == SoundType.MainPlayerCombat && combatCooldownTimer.ElapsedMilliseconds > 400 || !combatCooldownTimer.IsRunning))) {
                 alreadyConfiguringSound = true;
                 bool soundIsPlayingAlready = false;
                 if (sounds.ContainsKey(playerObject.Name)) {
@@ -192,11 +196,16 @@ namespace RoleplayingMediaCore {
                             soundType, audioPath, _libVLCPath);
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                            if (volume == 0) {
-                                volume = 1;
-                            }
+                            //if (volume == 0) {
+                            volume = 1;
+                            //}
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead);
+                            Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
+                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, _lowPerformanceMode);
+                            if (soundPlaybackTimer.ElapsedMilliseconds > 2000) {
+                                _lowPerformanceMode = true;
+                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
+                            }
                         }
                     } catch (Exception e) {
                         OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -211,8 +220,10 @@ namespace RoleplayingMediaCore {
                 UpdateVolumes(_voicePackSounds);
                 UpdateVolumes(_playbackStreams);
                 UpdateVolumes(_nativeGameAudio);
-                UpdateVolumes(_combatVoicePackSounds);
-                Thread.Sleep(100);
+                if (!_lowPerformanceMode) {
+                    UpdateVolumes(_combatVoicePackSounds);
+                }
+                Thread.Sleep(!_lowPerformanceMode ? 100 : 400);
             }
         }
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {

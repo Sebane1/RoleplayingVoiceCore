@@ -3,6 +3,7 @@ using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using SixLabors.ImageSharp.Advanced;
+using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -220,7 +221,8 @@ namespace RoleplayingMediaCore {
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
-        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead) {
+        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead, bool lowPerformanceMode = false) {
+            Stopwatch latencyTimer = Stopwatch.StartNew();
             if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
                 if (!soundPath.StartsWith("http")) {
                     _player = soundPath.EndsWith(".ogg") ?
@@ -236,7 +238,7 @@ namespace RoleplayingMediaCore {
                         _soundType = SoundType.Loop;
                     }
                     float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
-                    float newVolume = volume * ((20 - distance) / 20);
+                    //float newVolume = volume * ((20 - distance) / 20);
                     _waveOutEvent ??= new WaveOutEvent();
                     if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
                         if (delay > 0) {
@@ -250,22 +252,33 @@ namespace RoleplayingMediaCore {
                         _loopStream = new LoopStream(_player) { EnableLooping = true };
                         desiredStream = _loopStream;
                     }
-                    _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                    _volumeSampleProvider.Volume = newVolume;
-                    _panningSampleProvider = new PanningSampleProvider(
-                    _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                    Vector3 dir = PlayerObject.Position - _camera.Position;
-                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                    _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                    ISampleProvider sampleProvider = null;
+                    if (!lowPerformanceMode && _soundType == SoundType.MainPlayerCombat) {
+                        _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                        _volumeSampleProvider.Volume = volume;
+                        _panningSampleProvider = new PanningSampleProvider(
+                        _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
+                        Vector3 dir = PlayerObject.Position - _camera.Position;
+                        float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                        _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                        sampleProvider = _panningSampleProvider;
+                    } else {
+                        _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                        _volumeSampleProvider.Volume = volume;
+                    }
                     if (_waveOutEvent != null) {
                         try {
-                            _waveOutEvent?.Init(_panningSampleProvider);
+                            _waveOutEvent?.Init(sampleProvider);
                             if (_soundType == SoundType.Loop ||
                                 _soundType == SoundType.MainPlayerVoice ||
                                 _soundType == SoundType.OtherPlayer) {
-                                _player.CurrentTime = skipAhead;
+                                _player.CurrentTime = skipAhead + latencyTimer.Elapsed;
                             } else {
                                 _player.Position = 0;
+                            }
+                            if (_soundType == SoundType.MainPlayerCombat || 
+                                _soundType == SoundType.OtherPlayerCombat) {
+                                _waveOutEvent.DesiredLatency = 50;
                             }
                             _waveOutEvent?.Play();
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }

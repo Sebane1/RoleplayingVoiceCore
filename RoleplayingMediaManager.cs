@@ -44,7 +44,7 @@ namespace RoleplayingMediaCore {
                     }
                     if (characterVoices != null) {
                         _characterVoices = characterVoices;
-                    }   
+                    }
                 });
             }
         }
@@ -209,16 +209,20 @@ namespace RoleplayingMediaCore {
         private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
-            if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
-                CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
-            }
-            if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
-            } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
-                audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-            } else {
-                CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
+            try {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                    CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+                }
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                    audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
+                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                    audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                } else {
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                    audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
+                }
+            } catch {
+
             }
             return audioPath;
         }
@@ -231,24 +235,27 @@ namespace RoleplayingMediaCore {
             string audioPath = "";
             bool foundInHistory = false;
             var history = await _api.HistoryEndpoint.GetHistoryAsync();
-
-            foreach (var item in history) {
-                if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
-                    if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim()
-                        == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
-                        audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
-                        foundInHistory = true;
-                        break;
+            try {
+                foreach (var item in history) {
+                    if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
+                        if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim()
+                            == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
+                            audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
+                            foundInHistory = true;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (!foundInHistory) {
-                audioPath = await _api.TextToSpeechEndpoint
-                    .TextToSpeechAsync(finalText, characterVoice,
-                    defaultVoiceSettings, null, rpVoiceCache);
+                if (!foundInHistory) {
+                    audioPath = await _api.TextToSpeechEndpoint
+                        .TextToSpeechAsync(finalText, characterVoice,
+                        defaultVoiceSettings, null, rpVoiceCache);
+                }
+                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+            } catch {
+
             }
-            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
             return audioPath;
         }
 
@@ -269,8 +276,7 @@ namespace RoleplayingMediaCore {
                 {":3", "." },
                 {"<3", "love" }
             };
-            foreach (var word in wordReplacements)
-            {
+            foreach (var word in wordReplacements) {
                 newText = Regex.Replace(newText, $@"(?<=^|\s){word.Key}(?=\s|$)", word.Value, RegexOptions.IgnoreCase);
             }
             foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray()) {
