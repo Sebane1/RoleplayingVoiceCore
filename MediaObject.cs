@@ -242,8 +242,6 @@ namespace RoleplayingMediaCore {
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
-                        float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
-                        //float newVolume = volume * ((20 - distance) / 20);
                         _waveOutEvent ??= new WaveOutEvent();
                         if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
                             if (delay > 0) {
@@ -270,6 +268,8 @@ namespace RoleplayingMediaCore {
                         } else {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                             _volumeSampleProvider.Volume = volume;
+                            float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                            float newVolume = volume * ((20 - distance) / 20);
                             sampleProvider = _volumeSampleProvider;
                         }
                         if (_waveOutEvent != null) {
