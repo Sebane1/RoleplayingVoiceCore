@@ -233,20 +233,23 @@ namespace RoleplayingMediaCore {
                     try {
                         lock (sounds[playerName]) {
                             if (sounds[playerName].PlayerObject != null) {
-                                float maxDistance = (playerName == _mainPlayer.Name ||
-                                sounds[playerName].SoundType == SoundType.Livestream) ? 100 : 20;
-                                float volume = GetVolume(sounds[playerName].SoundType, sounds[playerName].PlayerObject);
-                                float distance = Vector3.Distance(_camera.Position, sounds[playerName].PlayerObject.Position);
-                                float newVolume = Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f);
                                 Vector3 dir = sounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                sounds[playerName].Volume = newVolume;
+                                sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
                                 sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
+        }
+
+        public float CalculateObjectVolume(string playerName, MediaObject mediaObject) {
+            float maxDistance = (playerName == _mainPlayer.Name ||
+            mediaObject.SoundType == SoundType.Livestream) ? 100 : 20;
+            float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
+            float distance = Vector3.Distance(_camera.Position, mediaObject.PlayerObject.Position);
+            return Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f);
         }
         public float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
