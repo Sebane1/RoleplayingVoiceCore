@@ -196,9 +196,9 @@ namespace RoleplayingMediaCore {
                             soundType, audioPath, _libVLCPath);
                         lock (sounds[playerObject.Name]) {
                             float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                            //if (volume == 0) {
-                            volume = 1;
-                            //}
+                            if (volume == 0) {
+                                volume = 1;
+                            }
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                             Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                             sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, _lowPerformanceMode);
@@ -266,9 +266,11 @@ namespace RoleplayingMediaCore {
                             return _mainPlayerVolume;
                         case SoundType.Emote:
                         case SoundType.MainPlayerVoice:
+                        case SoundType.MainPlayerCombat:
                             return _mainPlayerVolume * 1f;
                         case SoundType.OtherPlayerTts:
                         case SoundType.OtherPlayer:
+                        case SoundType.OtherPlayerCombat:
                             return _otherPlayerVolume;
                         case SoundType.Loop:
                             return _sfxVolume;
