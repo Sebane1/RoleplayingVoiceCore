@@ -278,7 +278,10 @@ namespace RoleplayingMediaCore {
                                 if (_soundType == SoundType.Loop ||
                                     _soundType == SoundType.MainPlayerVoice ||
                                     _soundType == SoundType.OtherPlayer) {
-                                    _player.CurrentTime = skipAhead + latencyTimer.Elapsed;
+                                    _player.CurrentTime = skipAhead;
+                                    if (_player.TotalTime.TotalSeconds > 13) {
+                                        _player.CurrentTime += latencyTimer.Elapsed;
+                                    }
                                 } else {
                                     _player.Position = 0;
                                 }
