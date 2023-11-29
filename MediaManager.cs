@@ -27,7 +27,7 @@ namespace RoleplayingMediaCore {
         private bool notDisposed = true;
         private float _liveStreamVolume = 1;
         private bool alreadyConfiguringSound;
-        Stopwatch combatCooldownTimer = new Stopwatch();
+        Stopwatch mainPlayerCombatCooldownTimer = new Stopwatch();
         private bool _lowPerformanceMode;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
@@ -160,14 +160,14 @@ namespace RoleplayingMediaCore {
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
             if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
-                || (soundType == SoundType.MainPlayerCombat && combatCooldownTimer.ElapsedMilliseconds > 400 || !combatCooldownTimer.IsRunning))) {
+                || (soundType == SoundType.MainPlayerCombat && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
                 alreadyConfiguringSound = true;
                 bool soundIsPlayingAlready = false;
                 if (sounds.ContainsKey(playerObject.Name)) {
                     if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
                         soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
                         if (soundType == SoundType.MainPlayerCombat) {
-                            combatCooldownTimer.Restart();
+                            mainPlayerCombatCooldownTimer.Restart();
                         }
                     } else if (soundType == SoundType.MainPlayerTts) {
                         Stopwatch waitTimer = new Stopwatch();
