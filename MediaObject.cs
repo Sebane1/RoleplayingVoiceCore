@@ -172,11 +172,13 @@ namespace RoleplayingMediaCore {
             if (_waveOutEvent != null) {
                 try {
                     _waveOutEvent?.Stop();
-                } catch { }
+                    _waveOutEvent.Volume = 0;
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             if (_vlcPlayer != null) {
                 try {
                     _vlcPlayer?.Stop();
+                    _vlcPlayer.Volume = 0;
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
