@@ -103,7 +103,7 @@ namespace RoleplayingMediaCore {
                 OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
                 bool cancelOperation = false;
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if (audioPath.StartsWith("http")) {
+                    if (audioPath.StartsWith("http") || audioPath.StartsWith("rtmp")) {
                         foreach (var sound in _playbackStreams) {
                             sound.Value?.Stop();
                         }

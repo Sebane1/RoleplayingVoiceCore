@@ -229,7 +229,7 @@ namespace RoleplayingMediaCore {
             try {
                 Stopwatch latencyTimer = Stopwatch.StartNew();
                 if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
-                    if (!soundPath.StartsWith("http")) {
+                    if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp")) {
                         _player = soundPath.EndsWith(".ogg") ?
                         new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
                         WaveStream desiredStream = _player;

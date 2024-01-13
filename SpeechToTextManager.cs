@@ -8,6 +8,7 @@ namespace RoleplayingVoiceCore {
     public class SpeechToTextManager {
         private Stopwatch _timer = new Stopwatch();
         private WaveInEvent _waveSource;
+        private MemoryStream _recordedAudioStream;
         private WaveFileWriter _waveWriter;
         private string _tempFilename;
         private string _basePath;
@@ -51,7 +52,8 @@ namespace RoleplayingVoiceCore {
 
                     _waveSource.DataAvailable += DataAvailable;
                     _waveSource.RecordingStopped += RecordingStopped;
-                    _waveWriter = new WaveFileWriter(_tempFilename, _waveSource.WaveFormat);
+                    _recordedAudioStream = new MemoryStream();
+                    _waveWriter = new WaveFileWriter(_recordedAudioStream, _waveSource.WaveFormat);
                     break;
                 } catch {
                     _retry++;
@@ -114,7 +116,7 @@ namespace RoleplayingVoiceCore {
 
                 using var fileStream = File.OpenRead(_tempFilename);
                 _finalText = "";
-                await foreach (var result in processor.ProcessAsync(fileStream)) {
+                await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
                     Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
                     _finalText += result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0];
                     break;
