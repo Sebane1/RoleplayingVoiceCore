@@ -169,18 +169,18 @@ namespace RoleplayingMediaCore {
         public IGameObject Camera { get => _camera; set => _camera = value; }
 
         public void Stop() {
+            Volume = 0;
             if (_waveOutEvent != null) {
                 try {
                     _waveOutEvent?.Stop();
-                    _waveOutEvent.Volume = 0;
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             if (_vlcPlayer != null) {
                 try {
                     _vlcPlayer?.Stop();
-                    _vlcPlayer.Volume = 0;
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
+            Volume = 0;
         }
         public void LoopEarly() {
             _loopStream?.LoopEarly();
