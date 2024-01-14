@@ -331,7 +331,11 @@ namespace RoleplayingMediaCore {
                 return IntPtr.Zero;
             }
         }
-
+        public void ResetVolume() {
+            if (_waveOutEvent != null) {
+                _waveOutEvent.Volume = 1;
+            }
+        }
         private void Display(IntPtr opaque, IntPtr picture) {
             try {
                 using (var image = new Image<Bgra32>((int)(_pitch / _bytePerPixel), (int)_lines))

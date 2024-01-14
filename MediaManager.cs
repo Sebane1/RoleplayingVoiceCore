@@ -244,6 +244,21 @@ namespace RoleplayingMediaCore {
             }
         }
 
+        public void VolumeFix() {
+            List<KeyValuePair<string, MediaObject>> fixList = new List<KeyValuePair<string, MediaObject>>();
+            fixList.AddRange(_textToSpeechSounds);
+            fixList.AddRange(_voicePackSounds);
+            fixList.AddRange(_playbackStreams);
+            fixList.AddRange(_nativeGameAudio);
+            fixList.AddRange(_combatVoicePackSounds);
+            foreach (var sound in fixList) {
+                if (sound.Value != null) {
+                    sound.Value.ResetVolume();
+                }
+            }
+            new WaveOutEvent().Volume = 1;
+        }
+
         public float CalculateObjectVolume(string playerName, MediaObject mediaObject) {
             float maxDistance = (playerName == _mainPlayer.Name ||
             mediaObject.SoundType == SoundType.Livestream) ? 100 : 20;
