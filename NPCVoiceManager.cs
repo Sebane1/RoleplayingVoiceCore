@@ -33,7 +33,7 @@ namespace RoleplayingVoiceCore {
                         return result;
                     }
                 } else {
-                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = !gender ? "Beggarly" : "Maiden", Text = text, Model = "quality" };
+                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = !gender ? "Mciv" : "Maiden", Text = text, Model = "quality" };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         //httpClient.DefaultRequestHeaders.Accept.Clear();
