@@ -23,18 +23,20 @@ namespace RoleplayingMediaCore {
         float _unfocusedPlayerVolume = 1.0f;
         float _sfxVolume = 1.0f;
         private bool notDisposed = true;
-        private float _liveStreamVolume = 1;
+        private float _livestreamVolume = 1;
         private bool alreadyConfiguringSound;
         Stopwatch mainPlayerCombatCooldownTimer = new Stopwatch();
         private bool _lowPerformanceMode;
+        private float _npcVolume = 1;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
         public float UnfocusedPlayerVolume { get => _unfocusedPlayerVolume; set => _unfocusedPlayerVolume = value; }
         public float SFXVolume { get => _sfxVolume; set => _sfxVolume = value; }
-        public float LiveStreamVolume { get => _liveStreamVolume; set => _liveStreamVolume = value; }
+        public float LiveStreamVolume { get => _livestreamVolume; set => _livestreamVolume = value; }
         public byte[] LastFrame { get => _lastFrame; set => _lastFrame = value; }
         public bool LowPerformanceMode { get => _lowPerformanceMode; set => _lowPerformanceMode = value; }
+        public float NpcVolume { get => _npcVolume; set => _npcVolume = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
@@ -83,7 +85,7 @@ namespace RoleplayingMediaCore {
                     lock (_nativeGameAudio[playerObject.Name]) {
                         float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
                         _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC) ;
+                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
                     }
                 }
             } catch (Exception e) {
@@ -233,9 +235,7 @@ namespace RoleplayingMediaCore {
                             if (sounds[playerName].PlayerObject != null) {
                                 Vector3 dir = sounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                if (sounds[playerName].SoundType != SoundType.NPC) {
-                                    sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
-                                }
+                                sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
                                 sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
@@ -264,7 +264,8 @@ namespace RoleplayingMediaCore {
             mediaObject.SoundType == SoundType.Livestream) ? 100 : 20;
             float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
             float distance = Vector3.Distance(_camera.Position, mediaObject.PlayerObject.Position);
-            return Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f);
+            return mediaObject.SoundType != SoundType.NPC ?
+            Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f) : volume;
         }
         public float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
@@ -292,7 +293,9 @@ namespace RoleplayingMediaCore {
                         case SoundType.LoopWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:
-                            return _liveStreamVolume;
+                            return _livestreamVolume;
+                        case SoundType.NPC:
+                            return _npcVolume;
                     }
                 } else {
                     switch (soundType) {
@@ -311,7 +314,9 @@ namespace RoleplayingMediaCore {
                         case SoundType.LoopWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:
-                            return _liveStreamVolume;
+                            return _livestreamVolume;
+                        case SoundType.NPC:
+                            return _npcVolume;
                     }
                 }
             }

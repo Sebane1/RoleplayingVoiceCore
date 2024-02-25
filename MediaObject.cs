@@ -109,21 +109,18 @@ namespace RoleplayingMediaCore {
                 }
             }
             set {
-                if (SoundType != SoundType.NPC) {
-                    if (_volumeSampleProvider != null) {
-                        _volumeSampleProvider.Volume = value * offsetVolume;
-                    }
-                    if (_vlcPlayer != null) {
-                        try {
-                            int newValue = (int)(value * 100f);
-                            if (newValue != _vlcPlayer.Volume) {
-                                _vlcPlayer.Volume = newValue;
-                            }
-                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
-                    }
+                if (_volumeSampleProvider != null) {
+                    _volumeSampleProvider.Volume = value * offsetVolume;
+                }
+                if (_vlcPlayer != null) {
+                    try {
+                        int newValue = (int)(value * 100f);
+                        if (newValue != _vlcPlayer.Volume) {
+                            _vlcPlayer.Volume = newValue;
+                        }
+                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
-
         }
         public PlaybackState PlaybackState {
             get {
