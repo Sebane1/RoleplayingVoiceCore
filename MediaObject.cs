@@ -109,18 +109,21 @@ namespace RoleplayingMediaCore {
                 }
             }
             set {
-                if (_volumeSampleProvider != null) {
-                    _volumeSampleProvider.Volume = value * offsetVolume;
-                }
-                if (_vlcPlayer != null) {
-                    try {
-                        int newValue = (int)(value * 100f);
-                        if (newValue != _vlcPlayer.Volume) {
-                            _vlcPlayer.Volume = newValue;
-                        }
-                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                if (SoundType != SoundType.NPC) {
+                    if (_volumeSampleProvider != null) {
+                        _volumeSampleProvider.Volume = value * offsetVolume;
+                    }
+                    if (_vlcPlayer != null) {
+                        try {
+                            int newValue = (int)(value * 100f);
+                            if (newValue != _vlcPlayer.Volume) {
+                                _vlcPlayer.Volume = newValue;
+                            }
+                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                    }
                 }
             }
+
         }
         public PlaybackState PlaybackState {
             get {
@@ -186,7 +189,7 @@ namespace RoleplayingMediaCore {
             _loopStream?.LoopEarly();
         }
 
-        public async void Play(WaveStream soundPath, float volume, int delay) {
+        public async void Play(WaveStream soundPath, float volume, int delay, bool lowPerformanceMode = false) {
             try {
                 if (PlaybackState == PlaybackState.Stopped) {
                     _player = soundPath;
@@ -197,35 +200,66 @@ namespace RoleplayingMediaCore {
                         _soundType != SoundType.Livestream &&
                         _soundType != SoundType.MainPlayerCombat &&
                         _soundType != SoundType.OtherPlayerCombat &&
+                        _soundType != SoundType.NPC &&
                         _player.TotalTime.TotalSeconds > 13) {
                         _soundType = SoundType.Loop;
                     }
                     offsetVolume = 0.7f;
-                    float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
-                    float newVolume = volume * ((20 - distance) / 20) * offsetVolume;
                     if (delay > 0) {
                         Thread.Sleep(delay);
                     }
                     _waveOutEvent = new WaveOutEvent();
                     if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                        SoundLoopCheck();
-                        _loopStream = new LoopStream(_player) { EnableLooping = false };
+                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                            if (delay > 0) {
+                                Thread.Sleep(delay);
+                            }
+                        }
+                    }
+                    if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                            SoundLoopCheck();
+                        }
+                        _loopStream = new LoopStream(_player) { EnableLooping = true };
                         desiredStream = _loopStream;
                     }
-                    _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                    _volumeSampleProvider.Volume = newVolume;
-                    _panningSampleProvider =
-                    new PanningSampleProvider(_volumeSampleProvider.ToMono());
-                    Vector3 dir = PlayerObject.Position - _camera.Position;
-                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                    _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                    try {
-                        _waveOutEvent?.Init(_panningSampleProvider);
-                        _waveOutEvent?.Play();
-                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                    float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                    float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
+                    ISampleProvider sampleProvider = null;
+                    if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
+                        _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                        _volumeSampleProvider.Volume = volume;
+                        _panningSampleProvider = new PanningSampleProvider(
+                        _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
+                        Vector3 dir = PlayerObject.Position - _camera.Position;
+                        float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                        _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                        sampleProvider = _panningSampleProvider;
+                    } else {
+                        _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                        _volumeSampleProvider.Volume = volume;
+                        sampleProvider = _volumeSampleProvider;
+                    }
+                    if (_waveOutEvent != null) {
+                        try {
+                            _waveOutEvent?.Init(sampleProvider);
+                            if (_soundType == SoundType.Loop ||
+                                _soundType == SoundType.MainPlayerVoice ||
+                                _soundType == SoundType.OtherPlayer) {
+                            } else {
+                                _player.Position = 0;
+                            }
+                            if (_soundType == SoundType.MainPlayerCombat ||
+                                _soundType == SoundType.OtherPlayerCombat) {
+                                _waveOutEvent.DesiredLatency = 50;
+                            }
+                            _waveOutEvent?.Play();
+                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                    }
                 }
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
+
 
         public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead, bool lowPerformanceMode = false) {
             try {
@@ -241,6 +275,7 @@ namespace RoleplayingMediaCore {
                             _soundType != SoundType.Livestream &&
                             _soundType != SoundType.MainPlayerCombat &&
                             _soundType != SoundType.OtherPlayerCombat &&
+                             _soundType != SoundType.NPC &&
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
@@ -368,6 +403,7 @@ namespace RoleplayingMediaCore {
         LoopWhileMoving,
         Livestream,
         MainPlayerCombat,
-        OtherPlayerCombat
+        OtherPlayerCombat,
+        NPC
     }
 }

@@ -1,7 +1,4 @@
-﻿using LibVLCSharp.Shared;
-using NAudio.Vorbis;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
+﻿using NAudio.Wave;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
@@ -14,6 +11,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
+        MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
         private IGameObject _mainPlayer = null;
@@ -85,7 +83,7 @@ namespace RoleplayingMediaCore {
                     lock (_nativeGameAudio[playerObject.Name]) {
                         float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
                         _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay);
+                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC) ;
                     }
                 }
             } catch (Exception e) {
@@ -235,7 +233,9 @@ namespace RoleplayingMediaCore {
                             if (sounds[playerName].PlayerObject != null) {
                                 Vector3 dir = sounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
+                                if (sounds[playerName].SoundType != SoundType.NPC) {
+                                    sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
+                                }
                                 sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
@@ -364,6 +364,7 @@ namespace RoleplayingMediaCore {
                 _playbackStreams?.Clear();
                 _nativeGameAudio?.Clear();
                 _combatVoicePackSounds?.Clear();
+                _npcSound = null;
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
     }
