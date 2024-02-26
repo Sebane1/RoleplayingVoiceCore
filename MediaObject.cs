@@ -3,11 +3,11 @@ using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using SixLabors.ImageSharp.Advanced;
-using SoundTouch.Net.NAudioSupport;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using VarispeedDemo.SoundTouch;
 
 namespace RoleplayingMediaCore {
     public class MediaObject {
@@ -233,18 +233,18 @@ namespace RoleplayingMediaCore {
                         float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                         _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                         if (pitch != 1) {
-                            var pitchSample = new SoundTouchWaveProvider(desiredStream);
-                            _volumeSampleProvider = new VolumeSampleProvider(pitchSample.ToSampleProvider());
-                            sampleProvider = pitchSample.ToSampleProvider();
+                            var pitchSample = new VarispeedSampleProvider(_panningSampleProvider, 100, new SoundTouchProfile(false, true) { });
+                            pitchSample.PlaybackRate = pitch;
+                            sampleProvider = pitchSample;
                         } else {
                             sampleProvider = _panningSampleProvider;
                         }
                     } else {
                         if (pitch != 1) {
-                            var pitchSample = new SoundTouchWaveProvider(desiredStream);
-                            _volumeSampleProvider = new VolumeSampleProvider(pitchSample.ToSampleProvider());
+                            var pitchSample = new VarispeedSampleProvider(desiredStream.ToSampleProvider(), 100, new SoundTouchProfile(false, true));
+                            _volumeSampleProvider = new VolumeSampleProvider(pitchSample);
                             _volumeSampleProvider.Volume = volume;
-                            pitchSample.Pitch = pitch;
+                            pitchSample.PlaybackRate = pitch;
                             sampleProvider = _volumeSampleProvider;
                         } else {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
