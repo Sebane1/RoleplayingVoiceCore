@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using ElevenLabs.Voices;
+using Newtonsoft.Json;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -33,7 +34,7 @@ namespace RoleplayingVoiceCore {
                         return new KeyValuePair<Stream, bool>(result, true);
                     }
                 } else {
-                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = !gender ? "Mciv" : "Maiden", Text = text, Model = "quality" };
+                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = PickVoiceBasedOnNameAndGender(character, gender), Text = text, Model = "quality" };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         //httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -49,6 +50,29 @@ namespace RoleplayingVoiceCore {
             } catch {
                 return new KeyValuePair<Stream, bool>(null, false);
             }
+        }
+
+        private string PickVoiceBasedOnNameAndGender(string character, bool gender) {
+            if (!string.IsNullOrEmpty(character)) {
+                Random random = new Random(character.GetHashCode());
+                return !gender ? PickMaleVoice(random.Next(0, 2)) : PickFemaleVoice(random.Next(0, 2));
+            } else {
+                return "Sys";
+            }
+        }
+        public string PickMaleVoice(int voice) {
+            string[] voices = new string[] {
+                "Mciv",
+                "Zin"
+            };
+            return voices[voice];
+        }
+        public string PickFemaleVoice(int voice) {
+            string[] voices = new string[] {
+                "Maiden",
+                "Dla"
+            };
+            return voices[voice];
         }
     }
 }
