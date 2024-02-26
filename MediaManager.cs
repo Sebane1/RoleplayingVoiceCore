@@ -73,7 +73,7 @@ namespace RoleplayingMediaCore {
             });
         }
 
-        public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType, int delay = 0) {
+        public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType, float pitch, int delay = 0) {
             try {
                 if (playerObject != null) {
                     if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
@@ -85,7 +85,7 @@ namespace RoleplayingMediaCore {
                     lock (_nativeGameAudio[playerObject.Name]) {
                         float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
                         _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
+                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay,pitch, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
                     }
                 }
             } catch (Exception e) {

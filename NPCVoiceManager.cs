@@ -10,7 +10,7 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
         }
 
-        public async Task<Stream> GetCharacterAudio(string text, string character, bool gender) {
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string character, bool gender) {
             try {
                 string selectedVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -27,10 +27,10 @@ namespace RoleplayingVoiceCore {
                         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
-                            return null;
+                            return new KeyValuePair<Stream, bool>(null, false);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
-                        return result;
+                        return new KeyValuePair<Stream, bool>(result, true);
                     }
                 } else {
                     ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = !gender ? "Mciv" : "Maiden", Text = text, Model = "quality" };
@@ -40,14 +40,14 @@ namespace RoleplayingVoiceCore {
                         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(elevenLabsRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
-                            return null;
+                            return new KeyValuePair<Stream, bool>(null, false);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
-                        return result;
+                        return new KeyValuePair<Stream, bool>(result, false);
                     }
                 }
             } catch {
-                return null;
+                return new KeyValuePair<Stream, bool>(null, false);
             }
         }
     }
