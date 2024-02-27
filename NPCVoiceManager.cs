@@ -57,7 +57,7 @@ namespace RoleplayingVoiceCore {
                 Random random = new Random(character.GetHashCode());
                 return !gender ? PickMaleVoice(random.Next(0, 2)) : PickFemaleVoice(random.Next(0, 2));
             } else {
-                return "Sys";
+                return "Bella";
             }
         }
         public string PickMaleVoice(int voice) {
