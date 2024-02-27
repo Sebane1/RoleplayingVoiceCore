@@ -11,7 +11,7 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
         }
 
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string character, bool gender, string backupVoice = "") {
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string character, bool gender, string backupVoice = "", bool aggressiveCache = false) {
             try {
                 string selectedVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -21,7 +21,11 @@ namespace RoleplayingVoiceCore {
                     }
                 }
                 if (_characterToVoicePairing.ContainsKey(selectedVoice)) {
-                    ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() { Voice = _characterToVoicePairing[character], Text = text, Model = "quality" };
+                    ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
+                        Voice = _characterToVoicePairing[character],
+                        Text = text, Model = "quality",
+                        AggressiveCache = aggressiveCache
+                    };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         //httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -34,7 +38,11 @@ namespace RoleplayingVoiceCore {
                         return new KeyValuePair<Stream, bool>(result, true);
                     }
                 } else {
-                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() { Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender), Text = text, Model = "quality" };
+                    ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
+                        Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
+                        Text = text, Model = "quality",
+                        AggressiveCache = aggressiveCache
+                    };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         //httpClient.DefaultRequestHeaders.Accept.Clear();
