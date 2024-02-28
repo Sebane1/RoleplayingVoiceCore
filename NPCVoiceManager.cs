@@ -62,11 +62,14 @@ namespace RoleplayingVoiceCore {
 
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {
             if (!string.IsNullOrEmpty(character)) {
-                Random random = new Random(character.GetHashCode());
+                Random random = new Random(GetSimpleHash(character));
                 return !gender ? PickMaleVoice(random.Next(0, 2)) : PickFemaleVoice(random.Next(0, 2));
             } else {
                 return "Bella";
             }
+        }
+        private static int GetSimpleHash(string s) {
+            return s.Select(a => (int)a).Sum();
         }
         public string PickMaleVoice(int voice) {
             string[] voices = new string[] {
