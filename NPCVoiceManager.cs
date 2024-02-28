@@ -22,7 +22,7 @@ namespace RoleplayingVoiceCore {
                 }
                 if (_characterToVoicePairing.ContainsKey(selectedVoice)) {
                     ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
-                        Voice = _characterToVoicePairing[character],
+                        Voice = _characterToVoicePairing[selectedVoice],
                         Text = text, Model = "quality",
                         AggressiveCache = aggressiveCache
                     };
