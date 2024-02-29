@@ -79,17 +79,21 @@ namespace RoleplayingMediaCore {
                 if (playerObject != null) {
                     bool playbackQueued = false;
                     if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                        var mediaObject = _nativeGameAudio[playerObject.Name];
                         if (!queuePlayback) {
-                            _nativeGameAudio[playerObject.Name].Stop();
-                        } else if (_nativeGameAudio[playerObject.Name].PlaybackState == PlaybackState.Playing) {
+                            mediaObject.Stop();
+                        } else if (mediaObject.PlaybackState == PlaybackState.Playing) {
                             EventHandler function = delegate {
-                                PlayAudioStream(playerObject, audioStream, soundType, false, useSmbPitch, pitch, delay, value);
+                                try {
+                                    PlayAudioStream(playerObject, audioStream, soundType, false, useSmbPitch, pitch, delay, value);
+                                } catch { }
                             };
                             EventHandler removalFunction = delegate {
-                                _nativeGameAudio[playerObject.Name].PlaybackStopped -= function;
+                                mediaObject.PlaybackStopped -= function;
+                                mediaObject.Invalidated = true;
                             };
-                            _nativeGameAudio[playerObject.Name].PlaybackStopped += function;
-                            _nativeGameAudio[playerObject.Name].PlaybackStopped += removalFunction;
+                            mediaObject.PlaybackStopped += function;
+                            mediaObject.PlaybackStopped += removalFunction;
                             playbackQueued = true;
                         }
                     }
@@ -97,16 +101,20 @@ namespace RoleplayingMediaCore {
                         _nativeGameAudio[playerObject.Name] = new MediaObject(
                             this, playerObject, _camera,
                             soundType, "", _libVLCPath);
+                        var mediaObject = _nativeGameAudio[playerObject.Name];
                         lock (_nativeGameAudio[playerObject.Name]) {
-                            float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
-                            _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                            _nativeGameAudio[playerObject.Name].PlaybackStopped += value;
-                            _nativeGameAudio[playerObject.Name].PlaybackStopped += delegate {
-                                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                                    _nativeGameAudio[playerObject.Name].PlaybackStopped -= value;
-                                }
+                            float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
+                            mediaObject.OnErrorReceived += MediaManager_OnErrorReceived;
+                            mediaObject.PlaybackStopped += value;
+                            mediaObject.PlaybackStopped += delegate {
+                                string name = playerObject.Name;
+                                try {
+                                    if (_nativeGameAudio.ContainsKey(name)) {
+                                        mediaObject.PlaybackStopped -= value;
+                                    }
+                                } catch { }
                             };
-                            _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, useSmbPitch, pitch, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
+                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, pitch, mediaObject.SoundType == SoundType.NPC);
                         }
                     }
                 }
@@ -171,9 +179,11 @@ namespace RoleplayingMediaCore {
         public void StopAudio(IGameObject playerObject) {
             if (playerObject != null) {
                 if (_voicePackSounds.ContainsKey(playerObject.Name)) {
+                    _voicePackSounds[playerObject.Name].Invalidated = true;
                     _voicePackSounds[playerObject.Name].Stop();
                 }
                 if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    _nativeGameAudio[playerObject.Name].Invalidated = true;
                     _nativeGameAudio[playerObject.Name].Stop();
                 }
             }

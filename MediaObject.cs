@@ -182,6 +182,7 @@ namespace RoleplayingMediaCore {
         }
 
         public IGameObject Camera { get => _camera; set => _camera = value; }
+        public bool Invalidated { get; internal set; }
 
         public void Stop() {
             Volume = 0;
@@ -202,108 +203,110 @@ namespace RoleplayingMediaCore {
         }
 
         public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch, float pitch = 0, bool lowPerformanceMode = false) {
-            try {
-                if (PlaybackState == PlaybackState.Stopped) {
-                    _player = soundPath;
-                    WaveStream desiredStream = _player;
-                    if (_soundType != SoundType.MainPlayerTts &&
-                        _soundType != SoundType.OtherPlayerTts &&
-                        _soundType != SoundType.LoopWhileMoving &&
-                        _soundType != SoundType.Livestream &&
-                        _soundType != SoundType.MainPlayerCombat &&
-                        _soundType != SoundType.OtherPlayerCombat &&
-                        _soundType != SoundType.NPC &&
-                        _player.TotalTime.TotalSeconds > 13) {
-                        _soundType = SoundType.Loop;
-                    }
-                    offsetVolume = 0.7f;
-                    if (delay > 0) {
-                        Thread.Sleep(delay);
-                    }
-                    _waveOutEvent = new WaveOutEvent();
-                    if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
-                            if (delay > 0) {
-                                Thread.Sleep(delay);
+            if (!Invalidated) {
+                try {
+                    if (PlaybackState == PlaybackState.Stopped) {
+                        _player = soundPath;
+                        WaveStream desiredStream = _player;
+                        if (_soundType != SoundType.MainPlayerTts &&
+                            _soundType != SoundType.OtherPlayerTts &&
+                            _soundType != SoundType.LoopWhileMoving &&
+                            _soundType != SoundType.Livestream &&
+                            _soundType != SoundType.MainPlayerCombat &&
+                            _soundType != SoundType.OtherPlayerCombat &&
+                            _soundType != SoundType.NPC &&
+                            _player.TotalTime.TotalSeconds > 13) {
+                            _soundType = SoundType.Loop;
+                        }
+                        offsetVolume = 0.7f;
+                        if (delay > 0) {
+                            Thread.Sleep(delay);
+                        }
+                        _waveOutEvent = new WaveOutEvent();
+                        if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                                if (delay > 0) {
+                                    Thread.Sleep(delay);
+                                }
                             }
                         }
-                    }
-                    if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
-                            SoundLoopCheck();
-                        }
-                        _loopStream = new LoopStream(_player) { EnableLooping = true };
-                        desiredStream = _loopStream;
-                    }
-                    float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
-                    float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
-                    ISampleProvider sampleProvider = null;
-                    if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
-                        _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                        _volumeSampleProvider.Volume = volume;
-                        _panningSampleProvider = new PanningSampleProvider(
-                        _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                        Vector3 dir = PlayerObject.Position - _camera.Position;
-                        float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                        _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                        if (pitch != 1) {
-                            ISampleProvider newSampleProvider = null;
-                            if (!useSmbPitch) {
-                                var pitchSample = new VarispeedSampleProvider(_panningSampleProvider, 100, new SoundTouchProfile(false, true));
-                                pitchSample.PlaybackRate = pitch;
-                                newSampleProvider = pitchSample;
-                            } else {
-                                var pitchSample = new SmbPitchShiftingSampleProvider(_panningSampleProvider);
-                                pitchSample.PitchFactor = pitch;
-                                newSampleProvider = pitchSample;
+                        if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                                SoundLoopCheck();
                             }
-                            sampleProvider = newSampleProvider;
-                        } else {
-                            sampleProvider = _panningSampleProvider;
+                            _loopStream = new LoopStream(_player) { EnableLooping = true };
+                            desiredStream = _loopStream;
                         }
-                    } else {
-                        if (pitch != 1) {
-                            ISampleProvider newSampleProvider = null;
-                            if (!useSmbPitch) {
-                                var pitchSample = new VarispeedSampleProvider(desiredStream.ToSampleProvider(), 100, new SoundTouchProfile(false, true));
-                                pitchSample.PlaybackRate = pitch;
-                                newSampleProvider = pitchSample;
-                            } else {
-                                var pitchSample = new SmbPitchShiftingSampleProvider(desiredStream.ToSampleProvider());
-                                pitchSample.PitchFactor = pitch;
-                                newSampleProvider = pitchSample;
-                            }
-                            _volumeSampleProvider = new VolumeSampleProvider(newSampleProvider);
-                            _volumeSampleProvider.Volume = volume;
-                            sampleProvider = _volumeSampleProvider;
-                        } else {
+                        float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                        float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
+                        ISampleProvider sampleProvider = null;
+                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                             _volumeSampleProvider.Volume = volume;
-                            sampleProvider = _volumeSampleProvider;
+                            _panningSampleProvider = new PanningSampleProvider(
+                            _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
+                            Vector3 dir = PlayerObject.Position - _camera.Position;
+                            float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                            _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                            if (pitch != 1) {
+                                ISampleProvider newSampleProvider = null;
+                                if (!useSmbPitch) {
+                                    var pitchSample = new VarispeedSampleProvider(_panningSampleProvider, 100, new SoundTouchProfile(false, true));
+                                    pitchSample.PlaybackRate = pitch;
+                                    newSampleProvider = pitchSample;
+                                } else {
+                                    var pitchSample = new SmbPitchShiftingSampleProvider(_panningSampleProvider);
+                                    pitchSample.PitchFactor = pitch;
+                                    newSampleProvider = pitchSample;
+                                }
+                                sampleProvider = newSampleProvider;
+                            } else {
+                                sampleProvider = _panningSampleProvider;
+                            }
+                        } else {
+                            if (pitch != 1) {
+                                ISampleProvider newSampleProvider = null;
+                                if (!useSmbPitch) {
+                                    var pitchSample = new VarispeedSampleProvider(desiredStream.ToSampleProvider(), 100, new SoundTouchProfile(false, true));
+                                    pitchSample.PlaybackRate = pitch;
+                                    newSampleProvider = pitchSample;
+                                } else {
+                                    var pitchSample = new SmbPitchShiftingSampleProvider(desiredStream.ToSampleProvider());
+                                    pitchSample.PitchFactor = pitch;
+                                    newSampleProvider = pitchSample;
+                                }
+                                _volumeSampleProvider = new VolumeSampleProvider(newSampleProvider);
+                                _volumeSampleProvider.Volume = volume;
+                                sampleProvider = _volumeSampleProvider;
+                            } else {
+                                _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                                _volumeSampleProvider.Volume = volume;
+                                sampleProvider = _volumeSampleProvider;
+                            }
+                        }
+                        if (_waveOutEvent != null) {
+                            try {
+                                _waveOutEvent?.Init(sampleProvider);
+                                if (_soundType == SoundType.Loop ||
+                                    _soundType == SoundType.MainPlayerVoice ||
+                                    _soundType == SoundType.OtherPlayer) {
+                                } else {
+                                    _player.Position = 0;
+                                }
+                                if (_soundType == SoundType.MainPlayerCombat ||
+                                    _soundType == SoundType.OtherPlayerCombat) {
+                                    _waveOutEvent.DesiredLatency = 50;
+                                }
+                                _waveOutEvent.PlaybackStopped += delegate {
+                                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                };
+                                _waveOutEvent?.Play();
+                                DonePlayingCheck();
+                            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                         }
                     }
-                    if (_waveOutEvent != null) {
-                        try {
-                            _waveOutEvent?.Init(sampleProvider);
-                            if (_soundType == SoundType.Loop ||
-                                _soundType == SoundType.MainPlayerVoice ||
-                                _soundType == SoundType.OtherPlayer) {
-                            } else {
-                                _player.Position = 0;
-                            }
-                            if (_soundType == SoundType.MainPlayerCombat ||
-                                _soundType == SoundType.OtherPlayerCombat) {
-                                _waveOutEvent.DesiredLatency = 50;
-                            }
-                            _waveOutEvent.PlaybackStopped += delegate {
-                                PlaybackStopped?.Invoke(this, EventArgs.Empty);
-                            };
-                            _waveOutEvent?.Play();
-                            DonePlayingCheck();
-                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
-                    }
-                }
-            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            }
         }
 
 
