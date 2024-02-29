@@ -73,13 +73,15 @@ namespace RoleplayingMediaCore {
             });
         }
 
-        public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType, bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, EventHandler value = null) {
+        public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType,
+            bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, EventHandler value = null) {
             try {
                 if (playerObject != null) {
+                    bool playbackQueued = false;
                     if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
                         if (!queuePlayback) {
                             _nativeGameAudio[playerObject.Name].Stop();
-                        } else {
+                        } else if (_nativeGameAudio[playerObject.Name].PlaybackState == PlaybackState.Playing) {
                             EventHandler function = delegate {
                                 PlayAudioStream(playerObject, audioStream, soundType, false, useSmbPitch, pitch, delay, value);
                             };
@@ -88,17 +90,20 @@ namespace RoleplayingMediaCore {
                             };
                             _nativeGameAudio[playerObject.Name].PlaybackStopped += function;
                             _nativeGameAudio[playerObject.Name].PlaybackStopped += removalFunction;
+                            playbackQueued = true;
                         }
                     }
-                    _nativeGameAudio[playerObject.Name] = new MediaObject(
-                        this, playerObject, _camera,
-                        soundType, "", _libVLCPath);
-                    lock (_nativeGameAudio[playerObject.Name]) {
-                        float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
-                        _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                        _nativeGameAudio[playerObject.Name].PlaybackStopped += value;
-                        _nativeGameAudio[playerObject.Name].PlaybackStopped += delegate { _nativeGameAudio[playerObject.Name].PlaybackStopped -= value; };
-                        _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, useSmbPitch, pitch, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
+                    if (!playbackQueued) {
+                        _nativeGameAudio[playerObject.Name] = new MediaObject(
+                            this, playerObject, _camera,
+                            soundType, "", _libVLCPath);
+                        lock (_nativeGameAudio[playerObject.Name]) {
+                            float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
+                            _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                            _nativeGameAudio[playerObject.Name].PlaybackStopped += value;
+                            _nativeGameAudio[playerObject.Name].PlaybackStopped += delegate { _nativeGameAudio[playerObject.Name].PlaybackStopped -= value; };
+                            _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, useSmbPitch, pitch, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
+                        }
                     }
                 }
             } catch (Exception e) {
