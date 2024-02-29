@@ -101,7 +101,11 @@ namespace RoleplayingMediaCore {
                             float volume = GetVolume(_nativeGameAudio[playerObject.Name].SoundType, _nativeGameAudio[playerObject.Name].PlayerObject);
                             _nativeGameAudio[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                             _nativeGameAudio[playerObject.Name].PlaybackStopped += value;
-                            _nativeGameAudio[playerObject.Name].PlaybackStopped += delegate { _nativeGameAudio[playerObject.Name].PlaybackStopped -= value; };
+                            _nativeGameAudio[playerObject.Name].PlaybackStopped += delegate {
+                                if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                                    _nativeGameAudio[playerObject.Name].PlaybackStopped -= value;
+                                }
+                            };
                             _nativeGameAudio[playerObject.Name].Play(audioStream, volume, delay, useSmbPitch, pitch, _nativeGameAudio[playerObject.Name].SoundType == SoundType.NPC);
                         }
                     }
