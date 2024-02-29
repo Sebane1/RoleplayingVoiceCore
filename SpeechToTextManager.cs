@@ -28,10 +28,14 @@ namespace RoleplayingVoiceCore {
             CheckForDependancies();
         }
         public async void CheckForDependancies() {
-            if (!File.Exists(_modelName)) {
-                using var modelStream = await WhisperGgmlDownloader.GetGgmlModelAsync(GgmlType.Base);
-                using var fileWriter = File.OpenWrite(_modelName);
-                await modelStream.CopyToAsync(fileWriter);
+            try {
+                if (!File.Exists(_modelName)) {
+                    using var modelStream = await WhisperGgmlDownloader.GetGgmlModelAsync(GgmlType.Base);
+                    using var fileWriter = File.OpenWrite(_modelName);
+                    await modelStream.CopyToAsync(fileWriter);
+                }
+            } catch {
+
             }
         }
         public event EventHandler RecordingFinished;
@@ -82,7 +86,7 @@ namespace RoleplayingVoiceCore {
                 int threshold = 500;
                 int value = Math.Abs(BitConverter.ToInt16(e.Buffer, (e.BytesRecorded - 2)));
                 if (value < threshold) {
-                    if(!_timer.IsRunning) {
+                    if (!_timer.IsRunning) {
                         _timer.Start();
                     }
                     if (_timer.ElapsedMilliseconds > 1000) {
@@ -105,27 +109,28 @@ namespace RoleplayingVoiceCore {
             _waveSource.RecordingStopped -= RecordingStopped;
             _waveSource?.Dispose();
             _waveWriter?.Dispose();
+            if (File.Exists(_modelName)) {
+                try {
 
-            try {
+                    using var whisperFactory = WhisperFactory.FromPath(_modelName, false, _basePath + @"\runtimes\win-x64\whisper.dll");
 
-                using var whisperFactory = WhisperFactory.FromPath(_modelName, false, _basePath + @"\runtimes\win-x64\whisper.dll");
+                    using var processor = whisperFactory.CreateBuilder()
+                        .WithLanguage("en")
+                        .Build();
 
-                using var processor = whisperFactory.CreateBuilder()
-                    .WithLanguage("en")
-                    .Build();
+                    using var fileStream = File.OpenRead(_tempFilename);
+                    _finalText = "";
+                    await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
+                        Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
+                        _finalText += result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0];
+                        break;
+                    }
+                    _finalText = FinalText.Trim();
+                    /*Send notification that the recording is complete*/
+                    RecordingFinished?.Invoke(this, null);
+                } catch {
 
-                using var fileStream = File.OpenRead(_tempFilename);
-                _finalText = "";
-                await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
-                    Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
-                    _finalText += result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0];
-                    break;
                 }
-                _finalText = FinalText.Trim();
-                /*Send notification that the recording is complete*/
-                RecordingFinished?.Invoke(this, null);
-            } catch {
-
             }
             _timer.Reset();
             _isRecording = false;
