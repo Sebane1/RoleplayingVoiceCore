@@ -11,6 +11,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, Queue<WaveStream>> _nativeAudioQueue = new ConcurrentDictionary<string, Queue<WaveStream>>();
         MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
@@ -83,9 +84,17 @@ namespace RoleplayingMediaCore {
                         if (!queuePlayback) {
                             mediaObject.Stop();
                         } else if (mediaObject.PlaybackState == PlaybackState.Playing) {
+                            if (_nativeAudioQueue.ContainsKey(playerObject.Name)) {
+                                _nativeAudioQueue.TryAdd(playerObject.Name, new Queue<WaveStream>());
+                            }
+                            _nativeAudioQueue[playerObject.Name].Enqueue(audioStream);
+                            string name = playerObject.Name;
+                            var queue = _nativeAudioQueue[name];
                             EventHandler function = delegate {
                                 try {
-                                    PlayAudioStream(playerObject, audioStream, soundType, false, useSmbPitch, pitch, delay, value);
+                                    if (queue.Count > 0) {
+                                        PlayAudioStream(playerObject, queue.Dequeue(), soundType, false, useSmbPitch, pitch, delay, value);
+                                    }
                                 } catch { }
                             };
                             EventHandler removalFunction = delegate {
