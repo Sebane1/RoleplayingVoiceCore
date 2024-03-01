@@ -192,6 +192,7 @@ namespace RoleplayingMediaCore {
                     _voicePackSounds[playerObject.Name].Stop();
                 }
                 if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    _nativeAudioQueue.Clear();
                     _nativeGameAudio[playerObject.Name].Invalidated = true;
                     _nativeGameAudio[playerObject.Name].Stop();
                 }
