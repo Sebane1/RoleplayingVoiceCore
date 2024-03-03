@@ -11,7 +11,7 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
         }
 
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string character, bool gender, string backupVoice = "", bool aggressiveCache = false) {
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string character, bool gender, string backupVoice = "", bool aggressiveCache = false, bool fastSpeed = false) {
             try {
                 string selectedVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -40,7 +40,7 @@ namespace RoleplayingVoiceCore {
                 } else {
                     ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
                         Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
-                        Text = text, Model = "quality",
+                        Text = text, Model = !fastSpeed ? "quality" : "speed",
                         AggressiveCache = aggressiveCache
                     };
                     using (HttpClient httpClient = new HttpClient()) {
