@@ -1,5 +1,8 @@
-﻿using System.IO.Compression;
+﻿using Newtonsoft.Json;
+using RoleplayingVoiceCore;
+using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Numerics;
 
@@ -7,14 +10,12 @@ namespace FFXIVLooseTextureCompiler.Networking {
     public class NetworkedClient : IDisposable {
         private bool disposedValue;
         private bool connected;
-        int portCycle = 0;
         private string id;
         private string _ipAddress;
         private int connectionAttempts;
-        const int maxPortCycle = 50;
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
-        public int Port { get { return 5105 + (portCycle); } }
+        public int Port { get { return 5105; } }
 
         public event EventHandler OnSendFailed;
         public event EventHandler OnConnectionFailed;
@@ -22,58 +23,36 @@ namespace FFXIVLooseTextureCompiler.Networking {
         public NetworkedClient(string ipAddress) {
             _ipAddress = ipAddress;
         }
-        public async void Start(TcpClient sendingClient) {
-            try {
-                sendingClient.LingerState = new LingerOption(false, 0);
-                try {
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
-                } catch {
-                    if (portCycle < maxPortCycle) {
-                        portCycle++;
-                    } else {
-                        portCycle = 0;
-                    }
-                    sendingClient.Connect(new IPEndPoint(IPAddress.Parse(_ipAddress), Port));
-                }
-                connected = true;
-            } catch {
-                connected = false;
-            }
-        }
         public void UpdateIPAddress(string ipAddress) {
             _ipAddress = ipAddress;
         }
         public async Task<bool> SendFile(string sendID, string path) {
             try {
-                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                Start(sendingClient);
-                using (FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    using (BinaryWriter writer = new(sendingClient.GetStream())) {
-                        writer.Write(sendID);
-                        writer.Write(0);
-                        writer.Write(fileStream.Length);
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    using (FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                        using (BinaryWriter writer = new(memory)) {
+                            writer.Write(sendID);
+                            writer.Write(0);
+                            writer.Write(fileStream.Length);
 
-                        CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+                            CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
 
-                        writer.Write(30000);
-                        writer.Flush();
-                        fileStream.Dispose();
-                        Close(sendingClient);
-                        return true;
+                            writer.Write(30000);
+                            writer.Flush();
+                            memory.Position = 0;
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                            if (post.StatusCode != HttpStatusCode.OK) {
+
+                            }
+                            fileStream.Dispose();
+                            return true;
+                        }
                     }
                 }
             } catch {
-                portCycle++;
-                if (portCycle > maxPortCycle) {
-                    portCycle = 0;
-                }
-                connectionAttempts++;
-                if (connectionAttempts < 20) {
-                    return await SendFile(sendID, path);
-                } else {
-                    OnSendFailed?.Invoke(this, EventArgs.Empty);
-                    connectionAttempts = 0;
-                }
+
             }
             connectionAttempts = 0;
             return false;
@@ -89,59 +68,41 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
         public async Task<bool> SendZip(string sendID, string path) {
             try {
-                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                Start(sendingClient);
-                string zipPath = path + ".zip";
-                if (File.Exists(zipPath)) {
-                    File.Delete(zipPath);
-                }
-                AuditPathContents(path);
-                ZipFile.CreateFromDirectory(path, zipPath);
-                using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    using (BinaryWriter writer = new(sendingClient.GetStream())) {
-                        writer.Write(sendID);
-                        writer.Write(0);
-                        writer.Write(fileStream.Length);
-
-                        CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
-
-                        writer.Write(3600000);
-                        writer.Flush();
-                        fileStream.Dispose();
-                        Task.Run(() => Close(sendingClient));
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    string zipPath = path + ".zip";
+                    if (File.Exists(zipPath)) {
+                        File.Delete(zipPath);
                     }
+                    AuditPathContents(path);
+                    ZipFile.CreateFromDirectory(path, zipPath);
+                    using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                        using (BinaryWriter writer = new(memory)) {
+                            writer.Write(sendID);
+                            writer.Write(0);
+                            writer.Write(fileStream.Length);
+
+                            CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+
+                            writer.Write(3600000);
+                            writer.Flush();
+                            memory.Position = 0;
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                            if (post.StatusCode != HttpStatusCode.OK) {
+
+                            }
+                            fileStream.Dispose();
+                        }
+                    }
+                    File.Delete(zipPath);
+                    return true;
                 }
-                File.Delete(zipPath);
-                return true;
             } catch {
-                portCycle++;
-                if (portCycle > maxPortCycle) {
-                    portCycle = 0;
-                }
-                connectionAttempts++;
-                if (connectionAttempts < 20) {
-                    return await SendZip(sendID, path);
-                } else {
-                    OnSendFailed?.Invoke(this, EventArgs.Empty);
-                    connectionAttempts = 0;
-                }
+
             }
             connectionAttempts = 0;
             return false;
-        }
-
-        private void Close(TcpClient sendingClient) {
-            try {
-                if (sendingClient != null) {
-                    sendingClient.Client?.Shutdown(SocketShutdown.Both);
-                    sendingClient.Client?.Disconnect(true);
-                    sendingClient?.Close();
-                    sendingClient?.Dispose();
-                }
-            } catch {
-
-            }
-            connected = false;
         }
 
         public async Task<KeyValuePair<Vector3, string>> GetFile(string sendID, string tempPath, string filename = "") {
@@ -150,38 +111,29 @@ namespace FFXIVLooseTextureCompiler.Networking {
             Vector3 position = new Vector3(-1, -1, -1);
             Directory.CreateDirectory(tempPath);
             try {
-                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                Start(sendingClient);
-                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
-                BinaryReader reader = new BinaryReader(sendingClient.GetStream());
-                writer.Write(sendID);
-                writer.Write(1);
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    BinaryWriter writer = new BinaryWriter(memory);
 
-                byte value = reader.ReadByte();
-                if (value != 0) {
-                    position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-                    long length = reader.ReadInt64();
-                    using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
-                        CopyStream(reader.BaseStream, fileStream, (int)length);
+                    writer.Write(sendID);
+                    writer.Write(1);
+                    memory.Position = 0;
+                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                    if (post.StatusCode == HttpStatusCode.OK) {
+                        BinaryReader reader = new BinaryReader(await post.Content.ReadAsStreamAsync());
+                        byte value = reader.ReadByte();
+                        if (value != 0) {
+                            position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                            long length = reader.ReadInt64();
+                            using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
+                                CopyStream(reader.BaseStream, fileStream, (int)length);
+                            }
+                        }
                     }
                 }
-                Close(sendingClient);
             } catch {
-                try {
-                    portCycle++;
-                    if (portCycle > maxPortCycle) {
-                        portCycle = 0;
-                    }
-                    connectionAttempts++;
-                    if (connectionAttempts < 20) {
-                        return await GetFile(sendID, tempPath);
-                    } else {
-                        connectionAttempts = 0;
-                        connected = false;
-                    }
-                } catch {
-                    connected = false;
-                }
+
             }
             connectionAttempts = 0;
             return new KeyValuePair<Vector3, string>(position, path);
@@ -192,49 +144,42 @@ namespace FFXIVLooseTextureCompiler.Networking {
             string path = Path.Combine(tempPath, sendID + ".zip");
             string zipDirectory = tempPath + @"\" + sendID;
             try {
-                TcpClient sendingClient = new TcpClient(new IPEndPoint(IPAddress.Any, Port));
-                Start(sendingClient);
-                BinaryWriter writer = new BinaryWriter(sendingClient.GetStream());
-                BinaryReader reader = new BinaryReader(sendingClient.GetStream());
-                writer.Write(sendID);
-                writer.Write(1);
-                byte value = reader.ReadByte();
-                if (value != 0) {
-                    long length = reader.ReadInt64();
-                    using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
-                        CopyStream(reader.BaseStream, fileStream, (int)length);
-                    }
-                    Directory.CreateDirectory(tempPath);
-                    try {
-                        if (File.Exists(zipDirectory)) {
-                            File.Delete(zipDirectory);
-                        }
-                    } catch {
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    BinaryWriter writer = new BinaryWriter(memory);
 
-                    }
-                    ZipFile.ExtractToDirectory(path, zipDirectory, true);
-                    AuditPathContents(zipDirectory);
-                    if (File.Exists(path)) {
-                        File.Delete(path);
+
+                    writer.Write(sendID);
+                    writer.Write(1);
+                    memory.Position = 0;
+                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                    if (post.StatusCode == HttpStatusCode.OK) {
+                        BinaryReader reader = new BinaryReader(await post.Content.ReadAsStreamAsync());
+                        byte value = reader.ReadByte();
+                        if (value != 0) {
+                            long length = reader.ReadInt64();
+                            using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
+                                CopyStream(reader.BaseStream, fileStream, (int)length);
+                            }
+                            Directory.CreateDirectory(tempPath);
+                            try {
+                                if (File.Exists(zipDirectory)) {
+                                    File.Delete(zipDirectory);
+                                }
+                            } catch {
+
+                            }
+                            ZipFile.ExtractToDirectory(path, zipDirectory, true);
+                            AuditPathContents(zipDirectory);
+                            if (File.Exists(path)) {
+                                File.Delete(path);
+                            }
+                        }
                     }
                 }
-                Close(sendingClient);
             } catch {
-                try {
-                    portCycle++;
-                    if (portCycle > maxPortCycle) {
-                        portCycle = 0;
-                    }
-                    connectionAttempts++;
-                    if (connectionAttempts < 20) {
-                        return await GetZip(sendID, tempPath);
-                    } else {
-                        connectionAttempts = 0;
-                        connected = false;
-                    }
-                } catch {
-                    connected = false;
-                }
+
             }
             connectionAttempts = 0;
             return zipDirectory;

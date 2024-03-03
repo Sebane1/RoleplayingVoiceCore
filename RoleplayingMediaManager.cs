@@ -1,5 +1,6 @@
 ﻿using ElevenLabs;
 using ElevenLabs.History;
+using ElevenLabs.Models;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
@@ -22,6 +23,7 @@ namespace RoleplayingMediaCore {
         private IReadOnlyList<HistoryItem> _history;
         private bool apiValid;
         private string rpVoiceCache;
+        private IReadOnlyList<Voice> _voices;
 
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
@@ -119,18 +121,9 @@ namespace RoleplayingMediaCore {
                     }
                 }
             }
-            _info = value;
-        }
-
-        public async Task<string> DoVoice(string sender, string text, string voiceType,
-            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
-            string clipPath = "";
-            string hash = Shai1Hash(sender + text);
-            ValidationResult state = new ValidationResult();
-            IReadOnlyList<Voice>? voices = null;
             if (_api != null) {
                 try {
-                    voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                    _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                 } catch (Exception e) {
                     var errorVoiceGen = e.Message.ToString();
                     if (errorVoiceGen.Contains("invalid_api_key")) {
@@ -140,10 +133,32 @@ namespace RoleplayingMediaCore {
                     }
                 }
             }
+            _info = value;
+        }
+
+        public async Task<string> DoVoice(string sender, string text, string voiceType,
+            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+            string clipPath = "";
+            string hash = Shai1Hash(sender + text);
+            ValidationResult state = new ValidationResult();
+            if (_voices == null) {
+                if (_api != null) {
+                    try {
+                        _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                    } catch (Exception e) {
+                        var errorVoiceGen = e.Message.ToString();
+                        if (errorVoiceGen.Contains("invalid_api_key")) {
+                            apiValid = false;
+                            state.ValidationState = 3;
+                            OnApiValidationComplete?.Invoke(this, state);
+                        }
+                    }
+                }
+            }
 
             Voice? characterVoice = null;
-            if (voices != null) {
-                foreach (var voice in voices) {
+            if (_voices != null) {
+                foreach (var voice in _voices) {
                     if (voice.Name.ToLower().Contains(voiceType.ToLower())) {
                         characterVoice = voice;
                         break;
@@ -164,7 +179,6 @@ namespace RoleplayingMediaCore {
                             foreach (string audioClip in audioClips) {
                                 audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
                             }
-                            VoicesUpdated?.Invoke(this, EventArgs.Empty);
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {
                                 using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
@@ -181,6 +195,7 @@ namespace RoleplayingMediaCore {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
+                        VoicesUpdated?.Invoke(this, EventArgs.Empty);
                     } else {
                         return "";
                     }
@@ -234,23 +249,11 @@ namespace RoleplayingMediaCore {
             string finalText = @"""" + numberAdjusted + @"""";
             string audioPath = "";
             bool foundInHistory = false;
-            var history = await _api.HistoryEndpoint.GetHistoryAsync();
             try {
-                foreach (var item in history) {
-                    if (item.VoiceName.ToLower().Contains(voiceType.ToLower())) {
-                        if (item.Text.ToLower().Replace(@"""", null).Replace(".", null).Trim()
-                            == finalText.ToLower().Replace(@"""", null).Replace(".", null).Trim()) {
-                            audioPath = await _api.HistoryEndpoint.GetHistoryAudioAsync(item, rpVoiceCache);
-                            foundInHistory = true;
-                            break;
-                        }
-                    }
-                }
-
                 if (!foundInHistory) {
                     audioPath = await _api.TextToSpeechEndpoint
                         .TextToSpeechAsync(finalText, characterVoice,
-                        defaultVoiceSettings, null, rpVoiceCache);
+                        defaultVoiceSettings, new Model("eleven_turbo_v2"), rpVoiceCache);
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
             } catch {
