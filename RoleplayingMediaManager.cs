@@ -24,6 +24,8 @@ namespace RoleplayingMediaCore {
         private bool apiValid;
         private string rpVoiceCache;
         private IReadOnlyList<Voice> _voices;
+        private Voice _characterVoice;
+        private string _voiceType;
 
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
             rpVoiceCache = cache;
@@ -49,6 +51,7 @@ namespace RoleplayingMediaCore {
                     }
                 });
             }
+            RefreshElevenlabsSubscriptionInfo();
         }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
@@ -136,16 +139,43 @@ namespace RoleplayingMediaCore {
             _info = value;
         }
 
-        public async Task<string> DoVoice(string sender, string text, string voiceType,
+        public async void SetVoice(string voiceType) {
+            _voiceType = voiceType.ToLower();
+            ValidationResult state = new ValidationResult();
+            if (_api != null) {
+                try {
+                    _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                } catch (Exception e) {
+                    var errorVoiceGen = e.Message.ToString();
+                    if (errorVoiceGen.Contains("invalid_api_key")) {
+                        apiValid = false;
+                        state.ValidationState = 3;
+                        OnApiValidationComplete?.Invoke(this, state);
+                    }
+                }
+                if (_voices != null) {
+                    foreach (var voice in _voices) {
+                        if (voice.Name.ToLower().Contains(_voiceType)) {
+                            if (voice != null) {
+                                _characterVoice = voice;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        public async Task<string> DoVoice(string sender, string text,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            ValidationResult state = new ValidationResult();
-            if (_voices == null) {
-                if (_api != null) {
+            if (_characterVoice == null) {
+                if (_voices == null) {
                     try {
                         _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                     } catch (Exception e) {
+                        ValidationResult state = new ValidationResult();
                         var errorVoiceGen = e.Message.ToString();
                         if (errorVoiceGen.Contains("invalid_api_key")) {
                             apiValid = false;
@@ -154,30 +184,30 @@ namespace RoleplayingMediaCore {
                         }
                     }
                 }
-            }
-
-            Voice? characterVoice = null;
-            if (_voices != null) {
-                foreach (var voice in _voices) {
-                    if (voice.Name.ToLower().Contains(voiceType.ToLower())) {
-                        characterVoice = voice;
-                        break;
+                if (_voices != null) {
+                    foreach (var voice in _voices) {
+                        if (voice.Name.ToLower().Contains(_voiceType)) {
+                            if (voice != null) {
+                                _characterVoice = voice;
+                            }
+                            break;
+                        }
                     }
                 }
             }
 
-            if (characterVoice != null) {
+            if (_characterVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
                         Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
-                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", characterVoice + "-" + hash + ".mp3");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _characterVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : AggressiveWordSplicing(trimmedText);
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
-                                audioPaths.Add(await GetVoicePath(voiceType, audioClip, characterVoice));
+                                audioPaths.Add(await GetVoicePath(_characterVoice.Name, audioClip, _characterVoice));
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {

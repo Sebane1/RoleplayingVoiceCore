@@ -12,13 +12,14 @@ namespace FFXIVLooseTextureCompiler.Networking {
         private bool connected;
         private string id;
         private string _ipAddress;
+        int sendAttempt = 0;
         private int connectionAttempts;
         public string Id { get => id; set => id = value; }
         public bool Connected { get => connected; set => connected = value; }
         public int Port { get { return 5105; } }
 
         public event EventHandler OnSendFailed;
-        public event EventHandler OnConnectionFailed;
+        public event EventHandler<FailureMessage> OnConnectionFailed;
 
         public NetworkedClient(string ipAddress) {
             _ipAddress = ipAddress;
@@ -37,22 +38,25 @@ namespace FFXIVLooseTextureCompiler.Networking {
                             writer.Write(0);
                             writer.Write(fileStream.Length);
 
-                            CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
+                            fileStream.CopyTo(writer.BaseStream);
 
-                            writer.Write(30000);
+                            writer.Write(60000);
                             writer.Flush();
                             memory.Position = 0;
                             var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
                             if (post.StatusCode != HttpStatusCode.OK) {
-
+                                OnConnectionFailed.Invoke(this, new FailureMessage() { Message = "Upload failed" });
                             }
-                            fileStream.Dispose();
                             return true;
                         }
                     }
                 }
-            } catch {
-
+            } catch (Exception e) {
+                SendFile(sendID, path);
+                if (sendAttempt > 10) {
+                    sendAttempt++;
+                    OnConnectionFailed.Invoke(this, new FailureMessage() { Message = e.Message });
+                }
             }
             connectionAttempts = 0;
             return false;
@@ -83,8 +87,8 @@ namespace FFXIVLooseTextureCompiler.Networking {
                             writer.Write(0);
                             writer.Write(fileStream.Length);
 
-                            CopyStream(fileStream, writer.BaseStream, (int)fileStream.Length);
-
+                            fileStream.CopyTo(writer.BaseStream);
+                            fileStream.Flush();
                             writer.Write(3600000);
                             writer.Flush();
                             memory.Position = 0;
@@ -127,13 +131,13 @@ namespace FFXIVLooseTextureCompiler.Networking {
                             position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                             long length = reader.ReadInt64();
                             using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write)) {
-                                CopyStream(reader.BaseStream, fileStream, (int)length);
+                                reader.BaseStream.CopyTo(fileStream);
                             }
                         }
                     }
                 }
-            } catch {
-
+            } catch (Exception e) {
+                OnConnectionFailed.Invoke(this, new FailureMessage() { Message = e.Message });
             }
             connectionAttempts = 0;
             return new KeyValuePair<Vector3, string>(position, path);
@@ -229,5 +233,11 @@ namespace FFXIVLooseTextureCompiler.Networking {
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+    }
+
+    public class FailureMessage : EventArgs {
+        string _message;
+
+        public string Message { get => _message; set => _message = value; }
     }
 }
