@@ -126,7 +126,10 @@ namespace RoleplayingMediaCore {
             }
             if (_api != null) {
                 try {
-                    _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                    var newVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                    if (newVoices != null && newVoices.Count > 0) {
+                        _voices = newVoices;
+                    }
                 } catch (Exception e) {
                     var errorVoiceGen = e.Message.ToString();
                     if (errorVoiceGen.Contains("invalid_api_key")) {
