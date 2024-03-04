@@ -33,9 +33,13 @@ namespace RoleplayingMediaCore {
             if (string.IsNullOrWhiteSpace(apiKey)) {
                 apiValid = false;
             } else {
+                _apiKey = apiKey;
+                if (!string.IsNullOrEmpty(apiKey)) {
+                    apiValid = true;
+                    apiValid = true;
+                }
                 // Spin a new thread for this
                 Task.Run(() => {
-                    _apiKey = apiKey;
                     try {
                         _api = new ElevenLabsClient(apiKey);
                         var test = _api.UserEndpoint.GetUserInfoAsync().Result;
@@ -46,10 +50,10 @@ namespace RoleplayingMediaCore {
                             apiValid = false;
                         }
                     }
-                    if (characterVoices != null) {
-                        _characterVoices = characterVoices;
-                    }
                 });
+                if (characterVoices != null) {
+                    _characterVoices = characterVoices;
+                }
             }
             RefreshElevenlabsSubscriptionInfo();
         }
