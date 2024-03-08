@@ -9,6 +9,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
+        ConcurrentDictionary<string, MediaObject> _chatSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, Queue<WaveStream>> _nativeAudioQueue = new ConcurrentDictionary<string, Queue<WaveStream>>();
@@ -62,6 +63,9 @@ namespace RoleplayingMediaCore {
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
+                                break;
+                            case SoundType.ChatSound:
+                                ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0);
                                 break;
                             case SoundType.MainPlayerCombat:
                             case SoundType.OtherPlayerCombat:
@@ -356,6 +360,8 @@ namespace RoleplayingMediaCore {
                             return _livestreamVolume;
                         case SoundType.NPC:
                             return _npcVolume;
+                        case SoundType.ChatSound:
+                            return _mainPlayerVolume;
                     }
                 } else {
                     switch (soundType) {
@@ -377,6 +383,8 @@ namespace RoleplayingMediaCore {
                             return _livestreamVolume;
                         case SoundType.NPC:
                             return _npcVolume;
+                        case SoundType.ChatSound:
+                            return _otherPlayerVolume;
                     }
                 }
             }
@@ -397,6 +405,8 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_textToSpeechSounds);
                 cleanupList.AddRange(_voicePackSounds);
                 cleanupList.AddRange(_nativeGameAudio);
+                cleanupList.AddRange(_chatSounds);
+                cleanupList.AddRange(_combatVoicePackSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
                         sound.Value?.Stop();
@@ -407,6 +417,8 @@ namespace RoleplayingMediaCore {
                 _textToSpeechSounds?.Clear();
                 _voicePackSounds?.Clear();
                 _nativeGameAudio?.Clear();
+                _chatSounds?.Clear();
+                _combatVoicePackSounds?.Clear();
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public void CleanSounds() {
@@ -416,6 +428,7 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_voicePackSounds);
                 cleanupList.AddRange(_playbackStreams);
                 cleanupList.AddRange(_nativeGameAudio);
+                cleanupList.AddRange(_chatSounds);
                 cleanupList.AddRange(_combatVoicePackSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
@@ -428,6 +441,7 @@ namespace RoleplayingMediaCore {
                 _voicePackSounds?.Clear();
                 _playbackStreams?.Clear();
                 _nativeGameAudio?.Clear();
+                _chatSounds?.Clear();
                 _combatVoicePackSounds?.Clear();
                 _npcSound = null;
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }

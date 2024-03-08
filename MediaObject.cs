@@ -335,7 +335,7 @@ namespace RoleplayingMediaCore {
                             }
                         }
                         if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat && _soundType != SoundType.ChatSound) {
                                 SoundLoopCheck();
                             }
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
@@ -344,7 +344,7 @@ namespace RoleplayingMediaCore {
                         float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
                         float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
                         ISampleProvider sampleProvider = null;
-                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts) {
+                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                             _volumeSampleProvider.Volume = volume;
                             _panningSampleProvider = new PanningSampleProvider(
@@ -356,6 +356,7 @@ namespace RoleplayingMediaCore {
                         } else {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
                             _volumeSampleProvider.Volume = volume;
+                            Pan = 0;
                             sampleProvider = _volumeSampleProvider;
                         }
                         if (_waveOutEvent != null) {
@@ -456,6 +457,7 @@ namespace RoleplayingMediaCore {
         Livestream,
         MainPlayerCombat,
         OtherPlayerCombat,
-        NPC
+        NPC,
+        ChatSound
     }
 }
