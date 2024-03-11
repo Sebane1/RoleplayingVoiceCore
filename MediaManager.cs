@@ -65,6 +65,7 @@ namespace RoleplayingMediaCore {
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
                                 break;
                             case SoundType.ChatSound:
+                            case SoundType.MountLoop:
                                 ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0);
                                 break;
                             case SoundType.MainPlayerCombat:
@@ -195,6 +196,14 @@ namespace RoleplayingMediaCore {
                     if (_voicePackSounds.ContainsKey(playerObject.Name)) {
                         _voicePackSounds[playerObject.Name].Invalidated = true;
                         _voicePackSounds[playerObject.Name].Stop();
+                    }
+                } catch {
+
+                }
+                try {
+                    if (_chatSounds.ContainsKey(playerObject.Name)) {
+                        _chatSounds[playerObject.Name].Invalidated = true;
+                        _chatSounds[playerObject.Name].Stop();
                     }
                 } catch {
 
@@ -376,7 +385,7 @@ namespace RoleplayingMediaCore {
                         case SoundType.OtherPlayerCombat:
                             return _unfocusedPlayerVolume;
                         case SoundType.Loop:
-                            return _sfxVolume;
+                        case SoundType.MountLoop:
                         case SoundType.LoopWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:

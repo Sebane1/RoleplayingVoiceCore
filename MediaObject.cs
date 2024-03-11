@@ -188,7 +188,12 @@ namespace RoleplayingMediaCore {
             Volume = 0;
             if (_waveOutEvent != null) {
                 try {
+                    if (_loopStream != null) {
+                        _loopStream.EnableLooping = false;
+                        _loopStream?.Dispose();
+                    }
                     _waveOutEvent?.Stop();
+                    _waveOutEvent?.Dispose();
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             if (_vlcPlayer != null) {
@@ -324,7 +329,8 @@ namespace RoleplayingMediaCore {
                             _soundType != SoundType.Livestream &&
                             _soundType != SoundType.MainPlayerCombat &&
                             _soundType != SoundType.OtherPlayerCombat &&
-                             _soundType != SoundType.NPC &&
+                            _soundType != SoundType.NPC &&
+                            _soundType != SoundType.MountLoop &&
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
@@ -338,6 +344,9 @@ namespace RoleplayingMediaCore {
                             if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat && _soundType != SoundType.ChatSound) {
                                 SoundLoopCheck();
                             }
+                            _loopStream = new LoopStream(_player) { EnableLooping = true };
+                            desiredStream = _loopStream;
+                        } else if (_soundType == SoundType.MountLoop) {
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
                             desiredStream = _loopStream;
                         }
@@ -458,6 +467,7 @@ namespace RoleplayingMediaCore {
         MainPlayerCombat,
         OtherPlayerCombat,
         NPC,
-        ChatSound
+        ChatSound,
+        MountLoop
     }
 }
