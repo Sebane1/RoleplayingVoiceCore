@@ -2,6 +2,7 @@
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.Advanced;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
@@ -37,6 +38,8 @@ namespace RoleplayingMediaCore {
         private const uint _width = 640;
         private const uint _height = 360;
 
+        //private int _volumeOffset = 1;
+
         /// <summary>
         /// RGBA is used, so 4 byte per pixel, or 32 bits.
         /// </summary>
@@ -57,6 +60,7 @@ namespace RoleplayingMediaCore {
 
         private WasapiOut _wasapiOut;
         private LoopStream _loopStream;
+        private float _baseVolume = 1;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -100,6 +104,30 @@ namespace RoleplayingMediaCore {
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
         }
+        private void MountLoopCheck() {
+            Task.Run(async () => {
+                try {
+                    Thread.Sleep(500);
+                    lastPosition = _playerObject.Position;
+                    Thread.Sleep(500);
+                    while (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
+                        if (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
+                            float distance = Vector3.Distance(lastPosition, _playerObject.Position);
+                            if ((distance > 0.01f && _soundType == SoundType.MountLoop)) {
+                                offsetVolume = Math.Clamp(offsetVolume + 0.1f, 0, 0.8f);
+                            } else {
+                                offsetVolume = Math.Clamp(offsetVolume - 0.1f, 0.2f, 0.8f);
+                            }
+                        }
+                        if (_volumeSampleProvider != null) {
+                            _volumeSampleProvider.Volume = _baseVolume * offsetVolume;
+                        }
+                        lastPosition = _playerObject.Position;
+                        Thread.Sleep(200);
+                    }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            });
+        }
         private void DonePlayingCheck() {
             Task.Run(async () => {
                 try {
@@ -125,6 +153,7 @@ namespace RoleplayingMediaCore {
             }
             set {
                 if (_volumeSampleProvider != null) {
+                    _baseVolume = value;
                     _volumeSampleProvider.Volume = value * offsetVolume;
                 }
                 if (_vlcPlayer != null) {
@@ -355,7 +384,13 @@ namespace RoleplayingMediaCore {
                         ISampleProvider sampleProvider = null;
                         if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                            _volumeSampleProvider.Volume = volume;
+                            _baseVolume = volume;
+                            if (_soundType != SoundType.MountLoop) {
+                                _volumeSampleProvider.Volume = volume;
+                            } else {
+                                offsetVolume = 0;
+                                _volumeSampleProvider.Volume = 0;
+                            }
                             _panningSampleProvider = new PanningSampleProvider(
                             _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                             Vector3 dir = PlayerObject.Position - _camera.Position;
@@ -364,7 +399,13 @@ namespace RoleplayingMediaCore {
                             sampleProvider = _panningSampleProvider;
                         } else {
                             _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                            _volumeSampleProvider.Volume = volume;
+                            _baseVolume = volume;
+                            if (_soundType != SoundType.MountLoop) {
+                                _volumeSampleProvider.Volume = volume;
+                            } else {
+                                offsetVolume = 0;
+                                _volumeSampleProvider.Volume = 0;
+                            }
                             Pan = 0;
                             sampleProvider = _volumeSampleProvider;
                         }
@@ -389,6 +430,9 @@ namespace RoleplayingMediaCore {
                                     PlaybackStopped?.Invoke(this, EventArgs.Empty);
                                 };
                                 _waveOutEvent?.Play();
+                                if (_soundType == SoundType.MountLoop) {
+                                    MountLoopCheck();
+                                }
                             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                         }
                     } else {
