@@ -46,23 +46,16 @@ namespace RoleplayingVoiceCore {
         /// <param name="seconds">Duration in seconds</param>
         /// <param name="filename">Output file name</param>
         public void RecordAudio() {
-            while (true) {
-                try {
-                    _tempFilename = Path.Combine(_basePath, _retry + "record.wav");
+            _tempFilename = Path.Combine(_basePath, _retry + "record.wav");
 
-                    _waveSource = new WaveInEvent {
-                        WaveFormat = new WaveFormat(16000, 1),
-                    };
+            _waveSource = new WaveInEvent {
+                WaveFormat = new WaveFormat(16000, 1),
+            };
 
-                    _waveSource.DataAvailable += DataAvailable;
-                    _waveSource.RecordingStopped += RecordingStopped;
-                    _recordedAudioStream = new MemoryStream();
-                    _waveWriter = new WaveFileWriter(_recordedAudioStream, _waveSource.WaveFormat);
-                    break;
-                } catch {
-                    _retry++;
-                }
-            }
+            _waveSource.DataAvailable += DataAvailable;
+            _waveSource.RecordingStopped += RecordingStopped;
+            _recordedAudioStream = new MemoryStream();
+            _waveWriter = new WaveFileWriter(_recordedAudioStream, _waveSource.WaveFormat);
             _waveSource.StartRecording();
             ///*Start the timer that will mark the recording end*/
             ///*We multiply by 1000 because the Timer object works with milliseconds*/
@@ -82,7 +75,6 @@ namespace RoleplayingVoiceCore {
         private void DataAvailable(object sender, WaveInEventArgs e) {
             if (_waveWriter != null) {
                 _waveWriter.Write(e.Buffer, 0, e.BytesRecorded);
-                _waveWriter.Flush();
                 int threshold = 500;
                 int value = Math.Abs(BitConverter.ToInt16(e.Buffer, (e.BytesRecorded - 2)));
                 if (value < threshold) {
@@ -103,12 +95,11 @@ namespace RoleplayingVoiceCore {
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private async void StopRecording() {
-            /*Stop the audio recording*/
-            _waveSource.StopRecording();
+            _waveSource?.StopRecording();
+            _waveWriter.Flush();
             _waveSource.DataAvailable -= DataAvailable;
             _waveSource.RecordingStopped -= RecordingStopped;
-            _waveSource?.Dispose();
-            _waveWriter?.Dispose();
+            /*Stop the audio recording*/
             if (File.Exists(_modelName)) {
                 try {
 
@@ -118,8 +109,8 @@ namespace RoleplayingVoiceCore {
                         .WithLanguage("en")
                         .Build();
 
-                    using var fileStream = File.OpenRead(_tempFilename);
                     _finalText = "";
+                    _recordedAudioStream.Position = 0;
                     await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
                         Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
                         _finalText += result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0];
@@ -132,6 +123,10 @@ namespace RoleplayingVoiceCore {
 
                 }
             }
+            try {
+                _waveSource?.Dispose();
+                _waveWriter?.Dispose();
+            } catch { }
             _timer.Reset();
             _isRecording = false;
         }
