@@ -13,6 +13,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, Queue<WaveStream>> _nativeAudioQueue = new ConcurrentDictionary<string, Queue<WaveStream>>();
+        private ConcurrentDictionary<string, MediaObject> _mountLoopSounds = new ConcurrentDictionary<string, MediaObject>();
         MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
@@ -64,8 +65,10 @@ namespace RoleplayingMediaCore {
                             case SoundType.LoopWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
                                 break;
-                            case SoundType.ChatSound:
                             case SoundType.MountLoop:
+                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay);
+                                break;
+                            case SoundType.ChatSound:
                                 ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0);
                                 break;
                             case SoundType.MainPlayerCombat:
@@ -209,6 +212,14 @@ namespace RoleplayingMediaCore {
 
                 }
                 try {
+                    if (_mountLoopSounds.ContainsKey(playerObject.Name)) {
+                        _mountLoopSounds[playerObject.Name].Invalidated = true;
+                        _mountLoopSounds[playerObject.Name].Stop();
+                    }
+                } catch {
+
+                }
+                try {
                     if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
                         _nativeAudioQueue.Clear();
                         _nativeGameAudio[playerObject.Name].Invalidated = true;
@@ -275,7 +286,7 @@ namespace RoleplayingMediaCore {
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                             Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                             sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, _lowPerformanceMode);
-                            if (soundPlaybackTimer.ElapsedMilliseconds > 2000) {
+                            if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
                                 _lowPerformanceMode = true;
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
                             }
@@ -293,6 +304,7 @@ namespace RoleplayingMediaCore {
                 UpdateVolumes(_voicePackSounds);
                 UpdateVolumes(_playbackStreams);
                 UpdateVolumes(_nativeGameAudio);
+                UpdateVolumes(_mountLoopSounds);
                 if (!_lowPerformanceMode) {
                     UpdateVolumes(_combatVoicePackSounds);
                 }
@@ -324,6 +336,8 @@ namespace RoleplayingMediaCore {
             fixList.AddRange(_playbackStreams);
             fixList.AddRange(_nativeGameAudio);
             fixList.AddRange(_combatVoicePackSounds);
+            fixList.AddRange(_mountLoopSounds);
+            fixList.AddRange(_chatSounds);
             foreach (var sound in fixList) {
                 if (sound.Value != null) {
                     sound.Value.ResetVolume();
@@ -362,8 +376,8 @@ namespace RoleplayingMediaCore {
                         case SoundType.OtherPlayerCombat:
                             return _otherPlayerVolume;
                         case SoundType.Loop:
-                            return _sfxVolume;
                         case SoundType.LoopWhileMoving:
+                        case SoundType.MountLoop:
                             return _sfxVolume;
                         case SoundType.Livestream:
                             return _livestreamVolume;
@@ -439,6 +453,7 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_nativeGameAudio);
                 cleanupList.AddRange(_chatSounds);
                 cleanupList.AddRange(_combatVoicePackSounds);
+                cleanupList.AddRange(_mountLoopSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
                         sound.Value?.Stop();
@@ -452,6 +467,7 @@ namespace RoleplayingMediaCore {
                 _nativeGameAudio?.Clear();
                 _chatSounds?.Clear();
                 _combatVoicePackSounds?.Clear();
+                _mountLoopSounds?.Clear();
                 _npcSound = null;
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
