@@ -1,8 +1,10 @@
 ﻿using LibVLCSharp.Shared;
+using NAudio.CoreAudioApi;
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using Newtonsoft.Json.Linq;
+using RoleplayingVoiceCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
@@ -20,7 +22,7 @@ namespace RoleplayingMediaCore {
 
         private VolumeSampleProvider _volumeSampleProvider;
         private PanningSampleProvider _panningSampleProvider;
-        private WaveOutEvent _waveOutEvent;
+        private IWavePlayer _wavePlayer;
         private LibVLC libVLC;
         private MediaPlayer _vlcPlayer;
         private MediaManager _parent;
@@ -60,7 +62,6 @@ namespace RoleplayingMediaCore {
         private uint _lines;
         private float offsetVolume = 1;
 
-        private WasapiOut _wasapiOut;
         private LoopStream _loopStream;
         private float _baseVolume = 1;
 
@@ -90,11 +91,11 @@ namespace RoleplayingMediaCore {
                     lastPosition = _playerObject.Position;
                     Thread.Sleep(500);
                     while (true) {
-                        if (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
+                        if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
                           (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                _waveOutEvent.Stop();
+                                _wavePlayer.Stop();
                                 break;
                             }
                         }
@@ -112,8 +113,8 @@ namespace RoleplayingMediaCore {
                     Thread.Sleep(500);
                     lastPosition = _playerObject.Position;
                     Thread.Sleep(500);
-                    while (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
-                        if (_playerObject != null && _waveOutEvent != null && _volumeSampleProvider != null) {
+                    while (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
+                        if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.MountLoop)) {
                                 offsetVolume = Math.Clamp(offsetVolume + 0.1f, 0, 0.8f);
@@ -136,7 +137,7 @@ namespace RoleplayingMediaCore {
                     Thread.Sleep(1200);
                     while (true) {
                         if (_player.Position >= _player.Length) {
-                            _waveOutEvent.Stop();
+                            _wavePlayer.Stop();
                         }
                         Thread.Sleep(500);
                     }
@@ -170,21 +171,15 @@ namespace RoleplayingMediaCore {
         }
         public PlaybackState PlaybackState {
             get {
-                if (_waveOutEvent != null) {
+                if (_wavePlayer != null) {
                     try {
-                        return _waveOutEvent.PlaybackState;
+                        return _wavePlayer.PlaybackState;
                     } catch {
                         return PlaybackState.Stopped;
                     }
                 } else if (_vlcPlayer != null) {
                     try {
                         return _vlcPlayer.IsPlaying ? PlaybackState.Playing : PlaybackState.Stopped;
-                    } catch {
-                        return PlaybackState.Stopped;
-                    }
-                } else if (_wasapiOut != null) {
-                    try {
-                        return _wasapiOut.PlaybackState;
                     } catch {
                         return PlaybackState.Stopped;
                     }
@@ -217,14 +212,14 @@ namespace RoleplayingMediaCore {
 
         public void Stop() {
             Volume = 0;
-            if (_waveOutEvent != null) {
+            if (_wavePlayer != null) {
                 try {
                     if (_loopStream != null) {
                         _loopStream.EnableLooping = false;
                         _loopStream?.Dispose();
                     }
-                    _waveOutEvent?.Stop();
-                    _waveOutEvent?.Dispose();
+                    _wavePlayer?.Stop();
+                    _wavePlayer?.Dispose();
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             if (_vlcPlayer != null) {
@@ -238,7 +233,8 @@ namespace RoleplayingMediaCore {
             _loopStream?.LoopEarly();
         }
 
-        public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch, float pitch = 0, bool lowPerformanceMode = false) {
+        public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch,
+            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false) {
             if (!Invalidated) {
                 try {
                     if (PlaybackState == PlaybackState.Stopped) {
@@ -258,7 +254,17 @@ namespace RoleplayingMediaCore {
                         if (delay > 0) {
                             Thread.Sleep(delay);
                         }
-                        _waveOutEvent = new WaveOutEvent();
+                        switch (audioPlayerType) {
+                            case AudioOutputType.WaveOut:
+                                _wavePlayer = new WaveOutEvent();
+                                break;
+                            case AudioOutputType.DirectSound:
+                                _wavePlayer = new DirectSoundOut();
+                                break;
+                            case AudioOutputType:
+                                _wavePlayer = new WasapiOut();
+                                break;
+                        }
                         if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
                             if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
                                 if (delay > 0) {
@@ -320,9 +326,9 @@ namespace RoleplayingMediaCore {
                                 sampleProvider = _volumeSampleProvider;
                             }
                         }
-                        if (_waveOutEvent != null) {
+                        if (_wavePlayer != null) {
                             try {
-                                _waveOutEvent?.Init(sampleProvider);
+                                _wavePlayer?.Init(sampleProvider);
                                 if (_soundType == SoundType.Loop ||
                                     _soundType == SoundType.MainPlayerVoice ||
                                     _soundType == SoundType.OtherPlayer) {
@@ -331,12 +337,19 @@ namespace RoleplayingMediaCore {
                                 }
                                 if (_soundType == SoundType.MainPlayerCombat ||
                                     _soundType == SoundType.OtherPlayerCombat) {
-                                    _waveOutEvent.DesiredLatency = 50;
+                                    try {
+                                        var waveOutEvent = _wavePlayer as WaveOutEvent;
+                                        if (waveOutEvent != null) {
+                                            waveOutEvent.DesiredLatency = 50;
+                                        }
+                                    } catch {
+
+                                    }
                                 }
-                                _waveOutEvent.PlaybackStopped += delegate {
+                                _wavePlayer.PlaybackStopped += delegate {
                                     PlaybackStopped?.Invoke(this, EventArgs.Empty);
                                 };
-                                _waveOutEvent?.Play();
+                                _wavePlayer?.Play();
                                 DonePlayingCheck();
                             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                         }
@@ -346,7 +359,8 @@ namespace RoleplayingMediaCore {
         }
 
 
-        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead, bool lowPerformanceMode = false) {
+        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
+            AudioOutputType audioPlayerType, bool lowPerformanceMode = false) {
             try {
                 Stopwatch latencyTimer = Stopwatch.StartNew();
                 if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
@@ -365,7 +379,17 @@ namespace RoleplayingMediaCore {
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
-                        _waveOutEvent ??= new WaveOutEvent();
+                        switch (audioPlayerType) {
+                            case AudioOutputType.WaveOut:
+                                _wavePlayer = new WaveOutEvent();
+                                break;
+                            case AudioOutputType.DirectSound:
+                                _wavePlayer = new DirectSoundOut();
+                                break;
+                            case AudioOutputType:
+                                _wavePlayer = new WasapiOut();
+                                break;
+                        }
                         if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
                             if (delay > 0) {
                                 Thread.Sleep(delay);
@@ -411,9 +435,12 @@ namespace RoleplayingMediaCore {
                             Pan = 0;
                             sampleProvider = _volumeSampleProvider;
                         }
-                        if (_waveOutEvent != null) {
+                        if (_wavePlayer != null) {
                             try {
-                                _waveOutEvent?.Init(sampleProvider);
+                                try {
+                                    _wavePlayer?.Init(sampleProvider);
+                                } catch {
+                                }
                                 if (_soundType == SoundType.Loop ||
                                     _soundType == SoundType.MainPlayerVoice ||
                                     _soundType == SoundType.OtherPlayer) {
@@ -426,12 +453,19 @@ namespace RoleplayingMediaCore {
                                 }
                                 if (_soundType == SoundType.MainPlayerCombat ||
                                     _soundType == SoundType.OtherPlayerCombat) {
-                                    _waveOutEvent.DesiredLatency = 50;
+                                    try {
+                                        var waveOutEvent = _wavePlayer as WaveOutEvent;
+                                        if (waveOutEvent != null) {
+                                            waveOutEvent.DesiredLatency = 50;
+                                        }
+                                    } catch {
+
+                                    }
                                 }
-                                _waveOutEvent.PlaybackStopped += delegate {
+                                _wavePlayer.PlaybackStopped += delegate {
                                     PlaybackStopped?.Invoke(this, EventArgs.Empty);
                                 };
-                                _waveOutEvent?.Play();
+                                _wavePlayer?.Play();
                                 if (_soundType == SoundType.MountLoop) {
                                     MountLoopCheck();
                                 }
@@ -475,8 +509,8 @@ namespace RoleplayingMediaCore {
             }
         }
         public void ResetVolume() {
-            if (_waveOutEvent != null) {
-                _waveOutEvent.Volume = 1;
+            if (_wavePlayer != null) {
+                _wavePlayer.Volume = 1;
             }
         }
         private void Display(IntPtr opaque, IntPtr picture) {

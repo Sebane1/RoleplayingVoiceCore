@@ -1,10 +1,12 @@
 ﻿using NAudio.Wave;
+using RoleplayingVoiceCore;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 
 namespace RoleplayingMediaCore {
     public class MediaManager : IDisposable {
+        AudioOutputType audioPlayerType = AudioOutputType.WaveOut;
         byte[] _lastFrame;
         ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
@@ -40,6 +42,7 @@ namespace RoleplayingMediaCore {
         public byte[] LastFrame { get => _lastFrame; set => _lastFrame = value; }
         public bool LowPerformanceMode { get => _lowPerformanceMode; set => _lowPerformanceMode = value; }
         public float NpcVolume { get => _npcVolume; set => _npcVolume = value; }
+        public AudioOutputType AudioPlayerType { get => audioPlayerType; set => audioPlayerType = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
@@ -131,7 +134,7 @@ namespace RoleplayingMediaCore {
                                     }
                                 } catch { }
                             };
-                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, pitch, mediaObject.SoundType == SoundType.NPC);
+                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, mediaObject.SoundType == SoundType.NPC);
                         }
                     }
                 }
@@ -285,7 +288,7 @@ namespace RoleplayingMediaCore {
                             }
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
                             Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
-                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, _lowPerformanceMode);
+                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
                             if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
                                 _lowPerformanceMode = true;
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
