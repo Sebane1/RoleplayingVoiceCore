@@ -10,7 +10,6 @@ namespace RoleplayingVoiceCore {
         private WaveInEvent _waveSource;
         private MemoryStream _recordedAudioStream;
         private WaveFileWriter _waveWriter;
-        private string _tempFilename;
         private string _basePath;
         private string _modelName;
         private string _finalText;
@@ -46,9 +45,7 @@ namespace RoleplayingVoiceCore {
         /// <param name="seconds">Duration in seconds</param>
         /// <param name="filename">Output file name</param>
         public void RecordAudio() {
-            _tempFilename = Path.Combine(_basePath, _retry + "record.wav");
-
-            _waveSource = new WaveInEvent {
+            _waveSource = new WaveInEvent { 
                 WaveFormat = new WaveFormat(16000, 1),
             };
 
@@ -57,14 +54,6 @@ namespace RoleplayingVoiceCore {
             _recordedAudioStream = new MemoryStream();
             _waveWriter = new WaveFileWriter(_recordedAudioStream, _waveSource.WaveFormat);
             _waveSource.StartRecording();
-            ///*Start the timer that will mark the recording end*/
-            ///*We multiply by 1000 because the Timer object works with milliseconds*/
-            //Task.Run(delegate {
-            //    Thread.Sleep(10 * 1000);
-            //    if (_isRecording) {
-            //        StopRecording();
-            //    }
-            //});
             _isRecording = true;
         }
         /// <summary>

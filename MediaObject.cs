@@ -148,11 +148,13 @@ namespace RoleplayingMediaCore {
         public IGameObject PlayerObject { get => _playerObject; set => _playerObject = value; }
         public float Volume {
             get {
-                if (_volumeSampleProvider == null) {
-                    return 0;
-                } else {
+                if (_volumeSampleProvider != null) {
                     return _volumeSampleProvider.Volume;
                 }
+                if (_vlcPlayer != null) {
+                    return _vlcPlayer.Volume;
+                }
+                return 0;
             }
             set {
                 if (_volumeSampleProvider != null) {
@@ -163,7 +165,8 @@ namespace RoleplayingMediaCore {
                     try {
                         int newValue = (int)(value * 100f);
                         if (newValue != _vlcPlayer.Volume) {
-                            _vlcPlayer.Volume = newValue;
+                            _baseVolume = newValue;
+                            _vlcPlayer.Volume = (int)((float)newValue * offsetVolume);
                         }
                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
@@ -261,7 +264,7 @@ namespace RoleplayingMediaCore {
                             case AudioOutputType.DirectSound:
                                 _wavePlayer = new DirectSoundOut();
                                 break;
-                            case AudioOutputType:
+                            case AudioOutputType.Wasapi:
                                 _wavePlayer = new WasapiOut();
                                 break;
                         }
@@ -364,7 +367,8 @@ namespace RoleplayingMediaCore {
             try {
                 Stopwatch latencyTimer = Stopwatch.StartNew();
                 if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
-                    if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp")) {
+                    if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp") &&
+                        (audioPlayerType != AudioOutputType.VLCExperimental || _soundType != SoundType.NPC)) {
                         _player = soundPath.EndsWith(".ogg") ?
                         new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
                         WaveStream desiredStream = _player;
@@ -380,13 +384,14 @@ namespace RoleplayingMediaCore {
                             _soundType = SoundType.Loop;
                         }
                         switch (audioPlayerType) {
+                            case AudioOutputType.VLCExperimental:
                             case AudioOutputType.WaveOut:
                                 _wavePlayer = new WaveOutEvent();
                                 break;
                             case AudioOutputType.DirectSound:
                                 _wavePlayer = new DirectSoundOut();
                                 break;
-                            case AudioOutputType:
+                            case AudioOutputType.Wasapi:
                                 _wavePlayer = new WasapiOut();
                                 break;
                         }
@@ -477,14 +482,20 @@ namespace RoleplayingMediaCore {
                             string location = _libVLCPath + @"\libvlc\win-x64";
                             Core.Initialize(location);
                             libVLC = new LibVLC("--vout", "none");
-                            var media = new Media(libVLC, soundPath, FromType.FromLocation);
-                            await media.Parse(MediaParseOptions.ParseNetwork);
+                            var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                ? FromType.FromLocation : FromType.FromPath);
+                            await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
                             _vlcPlayer = new MediaPlayer(media);
                             var processingCancellationTokenSource = new CancellationTokenSource();
                             _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
                             _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
-                            _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
-                            _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
+                            if (soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")) {
+                                _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
+                                _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
+                            }
+                            _baseVolume = volume;
+                            Volume = volume;
                             _vlcPlayer.Play();
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }

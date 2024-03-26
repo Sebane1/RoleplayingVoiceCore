@@ -19,6 +19,7 @@ namespace RoleplayingMediaCore {
         SubscriptionInfo _info = new SubscriptionInfo();
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
+        public event EventHandler<VoiceFailure>? OnVoiceFailed;
 
         private IReadOnlyList<HistoryItem> _history;
         private bool apiValid;
@@ -56,6 +57,7 @@ namespace RoleplayingMediaCore {
                 }
             }
             RefreshElevenlabsSubscriptionInfo();
+            GetVoiceList();
         }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
@@ -90,60 +92,58 @@ namespace RoleplayingMediaCore {
         public async Task<string[]> GetVoiceList() {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
-            IReadOnlyList<Voice>? voices = null;
             if (_api != null) {
-                try {
-                    voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                } catch (Exception e) {
-                    var errorVoiceList = e.Message.ToString();
-                    if (errorVoiceList.Contains("invalid_api_key")) {
-                        apiValid = false;
-                        state.ValidationState = 3;
-                        OnApiValidationComplete?.Invoke(this, state);
+                int failure = 0;
+                while (failure < 10) {
+                    try {
+                        _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                        break;
+                    } catch (Exception e) {
+                        var errorVoiceList = e.Message.ToString();
+                        if (errorVoiceList.Contains("invalid_api_key")) {
+                            apiValid = false;
+                            state.ValidationState = 3;
+                            OnApiValidationComplete?.Invoke(this, state);
+                        } else {
+                            failure++;
+                        }
                     }
                 }
             }
             voicesNames.Add("None");
-            if (voices != null) {
-                foreach (var voice in voices) {
+            if (_voices != null) {
+                foreach (var voice in _voices) {
                     voicesNames.Add(voice.Name);
                 }
             }
             return voicesNames.ToArray();
         }
 
-        public async void RefreshElevenlabsSubscriptionInfo() {
-            ValidationResult state = new ValidationResult();
-            _info = null;
-            SubscriptionInfo? value = null;
-            if (_api != null) {
-                try {
-                    value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
-                } catch (Exception e) {
-                    var errorSubInfo = e.Message.ToString();
-                    if (errorSubInfo.Contains("invalid_api_key")) {
-                        apiValid = false;
-                        state.ValidationState = 3;
-                        OnApiValidationComplete?.Invoke(this, state);
+        public void RefreshElevenlabsSubscriptionInfo() {
+            Task.Run(async delegate {
+                ValidationResult state = new ValidationResult();
+                SubscriptionInfo? value = null;
+                if (_api != null) {
+                    int failure = 0;
+                    while (failure < 10) {
+                        try {
+                            value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
+                            break;
+                        } catch (Exception e) {
+                            var errorSubInfo = e.Message.ToString();
+                            if (errorSubInfo.Contains("invalid_api_key")) {
+                                apiValid = false;
+                                state.ValidationState = 3;
+                                OnApiValidationComplete?.Invoke(this, state);
+                            } else {
+                                failure++;
+                            }
+                        }
                     }
                 }
+                _info = value;
             }
-            if (_api != null) {
-                try {
-                    var newVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                    if (newVoices != null && newVoices.Count > 0) {
-                        _voices = newVoices;
-                    }
-                } catch (Exception e) {
-                    var errorVoiceGen = e.Message.ToString();
-                    if (errorVoiceGen.Contains("invalid_api_key")) {
-                        apiValid = false;
-                        state.ValidationState = 3;
-                        OnApiValidationComplete?.Invoke(this, state);
-                    }
-                }
-            }
-            _info = value;
+            );
         }
 
         public async void SetVoice(string voiceType) {
@@ -211,7 +211,7 @@ namespace RoleplayingMediaCore {
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
-                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : AggressiveWordSplicing(trimmedText);
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new string[] { trimmedText });
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
                                 audioPaths.Add(await GetVoicePath(_characterVoice.Name, audioClip, _characterVoice));
@@ -225,7 +225,7 @@ namespace RoleplayingMediaCore {
                                     stitchedStream.Close();
                                 }
                             } catch (Exception e) {
-                                var error = e.Message;
+                                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
                         if (useSync) {
@@ -273,8 +273,8 @@ namespace RoleplayingMediaCore {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
                 }
-            } catch {
-
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
@@ -447,5 +447,12 @@ namespace RoleplayingMediaCore {
         // Meaning somehow an invalid key slipped by the validation, or it got invalidated by outside sources
         // Right now the plugin isn't set up to actually make use of it, and this needs to be thought through
         public int ValidationState { get; set; }
+    }
+    public class VoiceFailure : EventArgs {
+        string _failureMessage;
+        Exception _exception;
+
+        public string FailureMessage { get => _failureMessage; set => _failureMessage = value; }
+        public Exception Exception { get => _exception; set => _exception = value; }
     }
 }
