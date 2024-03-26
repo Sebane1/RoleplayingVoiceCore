@@ -179,17 +179,7 @@ namespace RoleplayingMediaCore {
             string hash = Shai1Hash(sender + text);
             if (_characterVoice == null) {
                 if (_voices == null) {
-                    try {
-                        _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                    } catch (Exception e) {
-                        ValidationResult state = new ValidationResult();
-                        var errorVoiceGen = e.Message.ToString();
-                        if (errorVoiceGen.Contains("invalid_api_key")) {
-                            apiValid = false;
-                            state.ValidationState = 3;
-                            OnApiValidationComplete?.Invoke(this, state);
-                        }
-                    }
+                    await GetVoiceList();
                 }
                 if (_voices != null) {
                     foreach (var voice in _voices) {
