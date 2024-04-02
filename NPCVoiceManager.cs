@@ -11,7 +11,8 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
         }
 
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character, bool gender, string backupVoice = "", bool aggressiveCache = false, bool fastSpeed = false, string extraJson = "") {
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character, 
+            bool gender, string backupVoice = "", bool aggressiveCache = false, bool fastSpeed = false, string extraJson = "", bool redoLine = false) {
             try {
                 string selectedVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -28,6 +29,7 @@ namespace RoleplayingVoiceCore {
                         Model = "quality",
                         Character = character,
                         AggressiveCache = aggressiveCache,
+                        RedoLine = redoLine,
                         ExtraJsonData = extraJson,
                     };
                     using (HttpClient httpClient = new HttpClient()) {
@@ -47,6 +49,7 @@ namespace RoleplayingVoiceCore {
                         UnfilteredText = originalValue,
                         Character = character,
                         AggressiveCache = aggressiveCache,
+                        RedoLine = redoLine,
                         ExtraJsonData = extraJson,
                     };
                     using (HttpClient httpClient = new HttpClient()) {

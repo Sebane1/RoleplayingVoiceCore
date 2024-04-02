@@ -7,7 +7,7 @@
         string _model;
         string extraJsonData;
         bool _aggressiveCache;
-
+        bool _redoLine;
         public string Voice { get => _voice; set => _voice = value; }
         public string Text { get => _text; set => _text = value; }
 
@@ -16,5 +16,6 @@
         public string Character { get => _character; set => _character = value; }
         public string ExtraJsonData { get => extraJsonData; set => extraJsonData = value; }
         public string UnfilteredText { get => _unfilteredtext; set => _unfilteredtext = value; }
+        public bool RedoLine { get => _redoLine; set => _redoLine = value; }
     }
 }
