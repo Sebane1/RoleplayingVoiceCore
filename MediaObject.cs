@@ -369,7 +369,7 @@ namespace RoleplayingMediaCore {
         }
 
         private void _meteringSampleProvider_StreamVolume(object? sender, StreamVolumeEventArgs e) {
-            StreamVolumeChanged.Invoke(sender, e);
+            StreamVolumeChanged?.Invoke(sender, e);
         }
 
         public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
@@ -424,7 +424,9 @@ namespace RoleplayingMediaCore {
                         float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
                         ISampleProvider sampleProvider = null;
                         if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
-                            _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                             _baseVolume = volume;
                             if (_soundType != SoundType.MountLoop) {
                                 _volumeSampleProvider.Volume = volume;
@@ -439,7 +441,9 @@ namespace RoleplayingMediaCore {
                             _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                             sampleProvider = _panningSampleProvider;
                         } else {
-                            _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                             _baseVolume = volume;
                             if (_soundType != SoundType.MountLoop) {
                                 _volumeSampleProvider.Volume = volume;
