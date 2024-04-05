@@ -52,31 +52,32 @@ namespace RoleplayingMediaCore {
             _updateLoop = Task.Run(() => Update());
         }
 
-        public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
+        public async void PlayAudio(IGameObject playerObject, string audioPath, SoundType soundType,
+            int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler onPlaybackStopped = null) {
             _ = Task.Run(() => {
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
-                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay, default, onPlaybackStopped);
                                 break;
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
-                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay, default, onPlaybackStopped);
                                 break;
                             case SoundType.MountLoop:
-                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay, default, onPlaybackStopped);
                                 break;
                             case SoundType.ChatSound:
-                                ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0);
+                                ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0, default, onPlaybackStopped);
                                 break;
                             case SoundType.MainPlayerCombat:
                             case SoundType.OtherPlayerCombat:
-                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay);
+                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay, default, onPlaybackStopped);
                                 break;
                         }
                     }
@@ -274,7 +275,7 @@ namespace RoleplayingMediaCore {
             }
         }
         public async void ConfigureAudio(IGameObject playerObject, string audioPath,
-            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan()) {
+            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds, int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler value = null) {
             if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
                 || (soundType == SoundType.MainPlayerCombat && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
                 alreadyConfiguringSound = true;
@@ -316,6 +317,9 @@ namespace RoleplayingMediaCore {
                                 volume = 1;
                             }
                             sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                            if (value != null) {
+                                sounds[playerObject.Name].PlaybackStopped += value;
+                            }
                             Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                             sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
                             if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
