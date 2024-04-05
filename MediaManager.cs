@@ -1,4 +1,5 @@
 ﻿using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using RoleplayingVoiceCore;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -85,38 +86,10 @@ namespace RoleplayingMediaCore {
                 OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
             });
         }
-        public async void PlayAudioStreamNoInterrupt(IGameObject playerObject, WaveStream audioStream, SoundType soundType,
-      bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false, EventHandler value = null) {
-            try {
-                if (playerObject != null) {
-                    bool playbackQueued = false;
-                    if (!playbackQueued) {
-                        _nativeGameAudio[playerObject.Name] = new MediaObject(
-                            this, playerObject, _camera,
-                            soundType, "", _libVLCPath);
-                        var mediaObject = _nativeGameAudio[playerObject.Name];
-                        lock (_nativeGameAudio[playerObject.Name]) {
-                            float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
-                            mediaObject.OnErrorReceived += MediaManager_OnErrorReceived;
-                            mediaObject.PlaybackStopped += value;
-                            mediaObject.PlaybackStopped += delegate {
-                                string name = playerObject.Name;
-                                try {
-                                    if (_nativeGameAudio.ContainsKey(name)) {
-                                        mediaObject.PlaybackStopped -= value;
-                                    }
-                                } catch { }
-                            };
-                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, forceLowLatency);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
-            }
-        }
+
         public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType,
-            bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false, EventHandler value = null) {
+            bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false,
+            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null) {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
@@ -134,7 +107,8 @@ namespace RoleplayingMediaCore {
                             EventHandler function = delegate {
                                 try {
                                     if (queue.Count > 0) {
-                                        PlayAudioStream(playerObject, queue.Dequeue(), soundType, false, useSmbPitch, pitch, delay, forceLowLatency, value);
+                                        PlayAudioStream(playerObject, queue.Dequeue(), soundType,
+                                        false, useSmbPitch, pitch, delay, forceLowLatency, onStopped, streamVolumeChanged);
                                     }
                                 } catch { }
                             };
@@ -155,12 +129,14 @@ namespace RoleplayingMediaCore {
                         lock (_nativeGameAudio[playerObject.Name]) {
                             float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
                             mediaObject.OnErrorReceived += MediaManager_OnErrorReceived;
-                            mediaObject.PlaybackStopped += value;
+                            mediaObject.PlaybackStopped += onStopped;
+                            mediaObject.StreamVolumeChanged += streamVolumeChanged;
                             mediaObject.PlaybackStopped += delegate {
                                 string name = playerObject.Name;
                                 try {
                                     if (_nativeGameAudio.ContainsKey(name)) {
-                                        mediaObject.PlaybackStopped -= value;
+                                        mediaObject.PlaybackStopped -= onStopped;
+                                        mediaObject.StreamVolumeChanged -= streamVolumeChanged;
                                     }
                                 } catch { }
                             };

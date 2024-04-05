@@ -32,6 +32,7 @@ namespace RoleplayingMediaCore {
         private static MemoryMappedViewAccessor _currentMappedViewAccessor;
         public event EventHandler<MediaError> OnErrorReceived;
         public event EventHandler PlaybackStopped;
+        public event EventHandler<StreamVolumeEventArgs> StreamVolumeChanged;
 
         private string _soundPath;
         private string _libVLCPath;
@@ -64,6 +65,7 @@ namespace RoleplayingMediaCore {
 
         private LoopStream _loopStream;
         private float _baseVolume = 1;
+        private MeteringSampleProvider _meteringSampleProvider;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -285,8 +287,11 @@ namespace RoleplayingMediaCore {
                         float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
                         float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
                         ISampleProvider sampleProvider = null;
-                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
-                            _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType
+                            != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
+                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                             _volumeSampleProvider.Volume = volume;
                             _panningSampleProvider = new PanningSampleProvider(
                             _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
@@ -309,14 +314,16 @@ namespace RoleplayingMediaCore {
                                 sampleProvider = _panningSampleProvider;
                             }
                         } else {
+                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
                             if (pitch != 1) {
                                 ISampleProvider newSampleProvider = null;
                                 if (!useSmbPitch) {
-                                    var pitchSample = new VarispeedSampleProvider(desiredStream.ToSampleProvider(), 100, new SoundTouchProfile(false, true));
+                                    var pitchSample = new VarispeedSampleProvider(_meteringSampleProvider, 100, new SoundTouchProfile(false, true));
                                     pitchSample.PlaybackRate = pitch;
                                     newSampleProvider = pitchSample;
                                 } else {
-                                    var pitchSample = new SmbPitchShiftingSampleProvider(desiredStream.ToSampleProvider());
+                                    var pitchSample = new SmbPitchShiftingSampleProvider(_meteringSampleProvider);
                                     pitchSample.PitchFactor = pitch;
                                     newSampleProvider = pitchSample;
                                 }
@@ -361,6 +368,9 @@ namespace RoleplayingMediaCore {
             }
         }
 
+        private void _meteringSampleProvider_StreamVolume(object? sender, StreamVolumeEventArgs e) {
+            StreamVolumeChanged.Invoke(sender, e);
+        }
 
         public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
             AudioOutputType audioPlayerType, bool lowPerformanceMode = false) {
