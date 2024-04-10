@@ -40,8 +40,8 @@ namespace RoleplayingMediaCore {
         private bool stopPlaybackOnMovement;
         private Vector3 lastPosition;
 
-        private const uint _width = 1920;
-        private const uint _height = 1080;
+        private const uint _width = 1280;
+        private const uint _height = 720;
 
         //private int _volumeOffset = 1;
 
