@@ -40,8 +40,8 @@ namespace RoleplayingMediaCore {
         private bool stopPlaybackOnMovement;
         private Vector3 lastPosition;
 
-        private const uint _width = 640;
-        private const uint _height = 360;
+        private const uint _width = 1920;
+        private const uint _height = 1080;
 
         //private int _volumeOffset = 1;
 
@@ -516,7 +516,14 @@ namespace RoleplayingMediaCore {
                 }
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
-
+        public async void ChangeVideoStream(string soundPath, float width) {
+            var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                             ? FromType.FromLocation : FromType.FromPath);
+            await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
+            _vlcPlayer.Media = media;
+            _vlcPlayer.Play();
+        }
         public static float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
             float dir = Vector3.Dot(perp, up);
@@ -539,25 +546,29 @@ namespace RoleplayingMediaCore {
             }
         }
         private void Display(IntPtr opaque, IntPtr picture) {
-            try {
-                using (var image = new Image<Bgra32>((int)(_pitch / _bytePerPixel), (int)_lines))
-                using (var sourceStream = _currentMappedFile.CreateViewStream()) {
-                    var mg = image.GetPixelMemoryGroup();
-                    for (int i = 0; i < mg.Count; i++) {
-                        sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
+            if (!Invalidated) {
+                try {
+                    using (var image = new Image<Bgra32>((int)(_pitch / _bytePerPixel), (int)_lines))
+                    using (var sourceStream = _currentMappedFile.CreateViewStream()) {
+                        var mg = image.GetPixelMemoryGroup();
+                        for (int i = 0; i < mg.Count; i++) {
+                            sourceStream.Read(MemoryMarshal.AsBytes(mg[i].Span));
+                        }
+                        lock (_parent.LastFrame) {
+                            MemoryStream stream = new MemoryStream();
+                            image.SaveAsJpeg(stream);
+                            stream.Flush();
+                            _parent.LastFrame = stream.ToArray();
+                        }
                     }
-                    lock (_parent.LastFrame) {
-                        MemoryStream stream = new MemoryStream();
-                        image.SaveAsJpeg(stream);
-                        stream.Flush();
-                        _parent.LastFrame = stream.ToArray();
-                    }
-                }
-                _currentMappedViewAccessor.Dispose();
-                _currentMappedFile.Dispose();
-                _currentMappedFile = null;
-                _currentMappedViewAccessor = null;
-            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                    _currentMappedViewAccessor.Dispose();
+                    _currentMappedFile.Dispose();
+                    _currentMappedFile = null;
+                    _currentMappedViewAccessor = null;
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            } else {
+                _vlcPlayer.Stop();
+            }
         }
     }
     public enum SoundType {

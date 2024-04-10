@@ -169,16 +169,39 @@ namespace RoleplayingMediaCore {
         public async void PlayStream(IGameObject playerObject, string audioPath, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
-                OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
-                bool cancelOperation = false;
-                if (!string.IsNullOrEmpty(audioPath)) {
-                    if (audioPath.StartsWith("http") || audioPath.StartsWith("rtmp")) {
-                        foreach (var sound in _playbackStreams) {
-                            sound.Value?.Stop();
+                try {
+                    OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
+                    bool cancelOperation = false;
+                    if (!string.IsNullOrEmpty(audioPath)) {
+                        if (audioPath.StartsWith("http") || audioPath.StartsWith("rtmp")) {
+                            foreach (var sound in _playbackStreams) {
+                                sound.Value.Invalidated = true;
+                                sound.Value?.Stop();
+                            }
+                            _playbackStreams.Clear();
+                            ConfigureAudio(playerObject, audioPath, SoundType.Livestream, _playbackStreams, delay);
                         }
-                        _playbackStreams.Clear();
-                        ConfigureAudio(playerObject, audioPath, SoundType.Livestream, _playbackStreams, delay);
                     }
+                } catch (Exception e) {
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                }
+            });
+        }
+        public async void ChangeStream(IGameObject playerObject, string audioPath, float width) {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            Task.Run(() => {
+                try {
+                    OnNewMediaTriggered?.Invoke(this, EventArgs.Empty);
+                    bool cancelOperation = false;
+                    if (!string.IsNullOrEmpty(audioPath)) {
+                        if (audioPath.StartsWith("http") || audioPath.StartsWith("rtmp")) {
+                            if (_playbackStreams.ContainsKey(playerObject.Name)) {
+                                _playbackStreams[playerObject.Name].ChangeVideoStream(audioPath, width);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                 }
             });
         }
@@ -257,65 +280,67 @@ namespace RoleplayingMediaCore {
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler value = null,
             EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null) {
-            if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
-                || (soundType == SoundType.MainPlayerCombat && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
-                alreadyConfiguringSound = true;
-                bool soundIsPlayingAlready = false;
-                if (sounds.ContainsKey(playerObject.Name)) {
-                    if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
-                        soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
-                        if (soundType == SoundType.MainPlayerCombat) {
-                            mainPlayerCombatCooldownTimer.Restart();
+            if (playerObject != null) {
+                if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
+                    || (soundType == SoundType.MainPlayerCombat && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
+                    alreadyConfiguringSound = true;
+                    bool soundIsPlayingAlready = false;
+                    if (sounds.ContainsKey(playerObject.Name)) {
+                        if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
+                            soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
+                            if (soundType == SoundType.MainPlayerCombat) {
+                                mainPlayerCombatCooldownTimer.Restart();
+                            }
+                        } else if (soundType == SoundType.MainPlayerTts) {
+                            Stopwatch waitTimer = new Stopwatch();
+                            waitTimer.Start();
+                            while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
+                            && waitTimer.ElapsedMilliseconds < 20000) {
+                                Thread.Sleep(100);
+                            }
+                            try {
+                                sounds[playerObject.Name]?.Stop();
+                            } catch (Exception e) {
+                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                            }
+                        } else {
+                            try {
+                                sounds[playerObject.Name]?.Stop();
+                            } catch (Exception e) {
+                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                            }
                         }
-                    } else if (soundType == SoundType.MainPlayerTts) {
-                        Stopwatch waitTimer = new Stopwatch();
-                        waitTimer.Start();
-                        while (sounds[playerObject.Name].PlaybackState == PlaybackState.Playing
-                        && waitTimer.ElapsedMilliseconds < 20000) {
-                            Thread.Sleep(100);
-                        }
+                    }
+                    if (!soundIsPlayingAlready) {
                         try {
-                            sounds[playerObject.Name]?.Stop();
-                        } catch (Exception e) {
-                            OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
-                        }
-                    } else {
-                        try {
-                            sounds[playerObject.Name]?.Stop();
+                            sounds[playerObject.Name] = new MediaObject(
+                                this, playerObject, _camera,
+                                soundType, audioPath, _libVLCPath);
+                            lock (sounds[playerObject.Name]) {
+                                float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
+                                if (volume == 0) {
+                                    volume = 1;
+                                }
+                                sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
+                                if (streamVolumeEvent != null) {
+                                    sounds[playerObject.Name].StreamVolumeChanged += streamVolumeEvent;
+                                }
+                                if (value != null) {
+                                    sounds[playerObject.Name].PlaybackStopped += value;
+                                }
+                                Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
+                                sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
+                                if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
+                                    _lowPerformanceMode = true;
+                                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
+                                }
+                            }
                         } catch (Exception e) {
                             OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                         }
                     }
+                    alreadyConfiguringSound = false;
                 }
-                if (!soundIsPlayingAlready) {
-                    try {
-                        sounds[playerObject.Name] = new MediaObject(
-                            this, playerObject, _camera,
-                            soundType, audioPath, _libVLCPath);
-                        lock (sounds[playerObject.Name]) {
-                            float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
-                            if (volume == 0) {
-                                volume = 1;
-                            }
-                            sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
-                            if (streamVolumeEvent != null) {
-                                sounds[playerObject.Name].StreamVolumeChanged += streamVolumeEvent;
-                            }
-                            if (value != null) {
-                                sounds[playerObject.Name].PlaybackStopped += value;
-                            }
-                            Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
-                            sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
-                            if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
-                                _lowPerformanceMode = true;
-                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
-                            }
-                        }
-                    } catch (Exception e) {
-                        OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
-                    }
-                }
-                alreadyConfiguringSound = false;
             }
         }
         private async void Update() {
