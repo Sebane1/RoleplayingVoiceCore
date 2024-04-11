@@ -90,7 +90,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudioStream(IGameObject playerObject, WaveStream audioStream, SoundType soundType,
             bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false,
-            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null) {
+            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1) {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
@@ -143,7 +143,7 @@ namespace RoleplayingMediaCore {
                                     }
                                 } catch { }
                             };
-                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, forceLowLatency);
+                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, forceLowLatency, speed);
                         }
                     }
                 }

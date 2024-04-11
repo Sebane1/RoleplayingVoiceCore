@@ -239,7 +239,7 @@ namespace RoleplayingMediaCore {
         }
 
         public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch,
-            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false) {
+            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false, float speed = 1) {
             if (!Invalidated) {
                 try {
                     if (PlaybackState == PlaybackState.Stopped) {
@@ -335,6 +335,11 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider.Volume = volume;
                                 sampleProvider = _volumeSampleProvider;
                             }
+                        }
+                        if (Math.Abs(speed) > 0.0001f) {
+                            var playbackSpeed = new VarispeedSampleProvider(sampleProvider, 100, new SoundTouchProfile(true, true));
+                            playbackSpeed.PlaybackRate = speed;
+                            sampleProvider = playbackSpeed;
                         }
                         if (_wavePlayer != null) {
                             try {
