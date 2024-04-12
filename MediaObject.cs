@@ -66,6 +66,7 @@ namespace RoleplayingMediaCore {
         private LoopStream _loopStream;
         private float _baseVolume = 1;
         private MeteringSampleProvider _meteringSampleProvider;
+        private bool _vlcWasAbleToStart;
 
         public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -516,18 +517,21 @@ namespace RoleplayingMediaCore {
                             _baseVolume = volume;
                             Volume = volume;
                             _vlcPlayer.Play();
+                            _vlcWasAbleToStart = true;
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }
                 }
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public async void ChangeVideoStream(string soundPath, float width) {
-            var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                             ? FromType.FromLocation : FromType.FromPath);
-            await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
-            _vlcPlayer.Media = media;
-            _vlcPlayer.Play();
+            if (_vlcWasAbleToStart) {
+                var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                 ? FromType.FromLocation : FromType.FromPath);
+                await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                    ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
+                _vlcPlayer.Media = media;
+                _vlcPlayer.Play();
+            }
         }
         public static float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
