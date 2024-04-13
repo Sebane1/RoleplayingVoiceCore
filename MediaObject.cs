@@ -154,9 +154,11 @@ namespace RoleplayingMediaCore {
                 if (_volumeSampleProvider != null) {
                     return _volumeSampleProvider.Volume;
                 }
-                if (_vlcPlayer != null) {
-                    return _vlcPlayer.Volume;
-                }
+                try {
+                    if (_vlcPlayer != null) {
+                        return _vlcPlayer.Volume;
+                    }
+                } catch { }
                 return 0;
             }
             set {

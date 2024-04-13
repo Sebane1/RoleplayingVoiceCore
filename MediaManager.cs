@@ -365,7 +365,11 @@ namespace RoleplayingMediaCore {
                             if (sounds[playerName].PlayerObject != null) {
                                 Vector3 dir = sounds[playerName].PlayerObject.Position - _camera.Position;
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
+                                try {
+                                    sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
+                                } catch {
+
+                                }
                                 sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
