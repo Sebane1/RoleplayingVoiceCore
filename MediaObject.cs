@@ -148,7 +148,7 @@ namespace RoleplayingMediaCore {
             });
         }
 
-        public IGameObject PlayerObject { get => _playerObject; set => _playerObject = value; }
+        public IGameObject CharacterObject { get => _playerObject; set => _playerObject = value; }
         public float Volume {
             get {
                 if (_volumeSampleProvider != null) {
@@ -287,7 +287,7 @@ namespace RoleplayingMediaCore {
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
                             desiredStream = _loopStream;
                         }
-                        float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                        float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
                         float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
                         ISampleProvider sampleProvider = null;
                         if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType
@@ -298,7 +298,7 @@ namespace RoleplayingMediaCore {
                             _volumeSampleProvider.Volume = volume;
                             _panningSampleProvider = new PanningSampleProvider(
                             _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                            Vector3 dir = PlayerObject.Position - _camera.Position;
+                            Vector3 dir = CharacterObject.Position - _camera.Position;
                             float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                             _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                             if (pitch != 1) {
@@ -428,7 +428,7 @@ namespace RoleplayingMediaCore {
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
                             desiredStream = _loopStream;
                         }
-                        float distance = Vector3.Distance(_camera.Position, PlayerObject.Position);
+                        float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
                         float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
                         ISampleProvider sampleProvider = null;
                         if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
@@ -444,7 +444,7 @@ namespace RoleplayingMediaCore {
                             }
                             _panningSampleProvider = new PanningSampleProvider(
                             _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                            Vector3 dir = PlayerObject.Position - _camera.Position;
+                            Vector3 dir = CharacterObject.Position - _camera.Position;
                             float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                             _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
                             sampleProvider = _panningSampleProvider;

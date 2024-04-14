@@ -34,6 +34,7 @@ namespace RoleplayingMediaCore {
         Stopwatch mainPlayerCombatCooldownTimer = new Stopwatch();
         private bool _lowPerformanceMode;
         private float _npcVolume = 1;
+        private float _cameraAndPlayerPositionSlider;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
@@ -44,6 +45,7 @@ namespace RoleplayingMediaCore {
         public bool LowPerformanceMode { get => _lowPerformanceMode; set => _lowPerformanceMode = value; }
         public float NpcVolume { get => _npcVolume; set => _npcVolume = value; }
         public AudioOutputType AudioPlayerType { get => audioPlayerType; set => audioPlayerType = value; }
+        public float CameraAndPlayerPositionSlider { get => _cameraAndPlayerPositionSlider; set => _cameraAndPlayerPositionSlider = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
@@ -128,7 +130,7 @@ namespace RoleplayingMediaCore {
                             soundType, "", _libVLCPath);
                         var mediaObject = _nativeGameAudio[playerObject.Name];
                         lock (_nativeGameAudio[playerObject.Name]) {
-                            float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
+                            float volume = GetVolume(mediaObject.SoundType, mediaObject.CharacterObject);
                             mediaObject.OnErrorReceived += MediaManager_OnErrorReceived;
                             mediaObject.PlaybackStopped += onStopped;
                             if (streamVolumeChanged != null) {
@@ -317,7 +319,7 @@ namespace RoleplayingMediaCore {
                                 this, playerObject, _camera,
                                 soundType, audioPath, _libVLCPath);
                             lock (sounds[playerObject.Name]) {
-                                float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].PlayerObject);
+                                float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].CharacterObject);
                                 if (volume == 0) {
                                     volume = 1;
                                 }
@@ -358,19 +360,17 @@ namespace RoleplayingMediaCore {
         }
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
             for (int i = 0; i < sounds.Count; i++) {
-                string playerName = sounds.Keys.ElementAt<string>(i);
-                if (sounds.ContainsKey(playerName)) {
+                string characterObjectName = sounds.Keys.ElementAt<string>(i);
+                if (sounds.ContainsKey(characterObjectName)) {
                     try {
-                        lock (sounds[playerName]) {
-                            if (sounds[playerName].PlayerObject != null) {
-                                Vector3 dir = sounds[playerName].PlayerObject.Position - _camera.Position;
+                        lock (sounds[characterObjectName]) {
+                            if (sounds[characterObjectName].CharacterObject != null) {
+                                Vector3 dir = sounds[characterObjectName].CharacterObject.Position - Vector3.Lerp(_camera.Position, _mainPlayer.Position, _cameraAndPlayerPositionSlider);
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                                 try {
-                                    sounds[playerName].Volume = CalculateObjectVolume(playerName, sounds[playerName]);
-                                } catch {
-
-                                }
-                                sounds[playerName].Pan = Math.Clamp(direction / 3, -1, 1);
+                                    sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
+                                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                sounds[characterObjectName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
@@ -398,8 +398,8 @@ namespace RoleplayingMediaCore {
         public float CalculateObjectVolume(string playerName, MediaObject mediaObject) {
             float maxDistance = (playerName == _mainPlayer.Name ||
             mediaObject.SoundType == SoundType.Livestream) ? 100 : 20;
-            float volume = GetVolume(mediaObject.SoundType, mediaObject.PlayerObject);
-            float distance = Vector3.Distance(_camera.Position, mediaObject.PlayerObject.Position);
+            float volume = GetVolume(mediaObject.SoundType, mediaObject.CharacterObject);
+            float distance = Vector3.Distance(_camera.Position, mediaObject.CharacterObject.Position);
             return mediaObject.SoundType != SoundType.NPC ?
             Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f) : volume;
         }
