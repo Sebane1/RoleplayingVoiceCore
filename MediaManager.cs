@@ -408,11 +408,11 @@ namespace RoleplayingMediaCore {
             float dir = Vector3.Dot(perp, up);
             return dir;
         }
-        public float GetVolume(SoundType soundType, IGameObject playerObject) {
-            if (playerObject != null) {
+        public float GetVolume(SoundType soundType, IGameObject characterObject) {
+            if (characterObject != null) {
                 if (_mainPlayer.FocusedPlayerObject == null ||
-                    playerObject.Name == _mainPlayer.Name ||
-                    _mainPlayer.FocusedPlayerObject == playerObject.Name) {
+                    characterObject.Name == _mainPlayer.Name ||
+                    _mainPlayer.FocusedPlayerObject == characterObject.Name) {
                     switch (soundType) {
                         case SoundType.MainPlayerTts:
                             return _mainPlayerVolume;
