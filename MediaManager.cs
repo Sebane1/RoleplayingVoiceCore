@@ -73,7 +73,7 @@ namespace RoleplayingMediaCore {
                             case SoundType.LoopWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
                                 break;
-                            case SoundType.MountLoop:
+                            case SoundType.LoopUntilStopped:
                                 ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
                                 break;
                             case SoundType.ChatSound:
@@ -426,7 +426,7 @@ namespace RoleplayingMediaCore {
                             return _otherPlayerVolume;
                         case SoundType.Loop:
                         case SoundType.LoopWhileMoving:
-                        case SoundType.MountLoop:
+                        case SoundType.LoopUntilStopped:
                             return _sfxVolume;
                         case SoundType.Livestream:
                             return _livestreamVolume;
@@ -448,7 +448,7 @@ namespace RoleplayingMediaCore {
                         case SoundType.OtherPlayerCombat:
                             return _unfocusedPlayerVolume;
                         case SoundType.Loop:
-                        case SoundType.MountLoop:
+                        case SoundType.LoopUntilStopped:
                         case SoundType.LoopWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:

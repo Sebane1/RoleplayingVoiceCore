@@ -119,7 +119,7 @@ namespace RoleplayingMediaCore {
                     while (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                         if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
-                            if ((distance > 0.01f && _soundType == SoundType.MountLoop)) {
+                            if ((distance > 0.01f && _soundType == SoundType.LoopUntilStopped)) {
                                 offsetVolume = Math.Clamp(offsetVolume + 0.1f, 0, 0.8f);
                             } else {
                                 offsetVolume = Math.Clamp(offsetVolume - 0.1f, 0.2f, 0.8f);
@@ -399,7 +399,7 @@ namespace RoleplayingMediaCore {
                             _soundType != SoundType.MainPlayerCombat &&
                             _soundType != SoundType.OtherPlayerCombat &&
                             _soundType != SoundType.NPC &&
-                            _soundType != SoundType.MountLoop &&
+                            _soundType != SoundType.LoopUntilStopped &&
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
@@ -426,7 +426,7 @@ namespace RoleplayingMediaCore {
                             }
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
                             desiredStream = _loopStream;
-                        } else if (_soundType == SoundType.MountLoop) {
+                        } else if (_soundType == SoundType.LoopUntilStopped) {
                             _loopStream = new LoopStream(_player) { EnableLooping = true };
                             desiredStream = _loopStream;
                         }
@@ -438,7 +438,7 @@ namespace RoleplayingMediaCore {
                             _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
                             _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                             _baseVolume = volume;
-                            if (_soundType != SoundType.MountLoop) {
+                            if (_soundType != SoundType.LoopUntilStopped) {
                                 _volumeSampleProvider.Volume = volume;
                             } else {
                                 offsetVolume = 0;
@@ -455,7 +455,7 @@ namespace RoleplayingMediaCore {
                             _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
                             _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                             _baseVolume = volume;
-                            if (_soundType != SoundType.MountLoop) {
+                            if (_soundType != SoundType.LoopUntilStopped) {
                                 _volumeSampleProvider.Volume = volume;
                             } else {
                                 offsetVolume = 0;
@@ -495,7 +495,7 @@ namespace RoleplayingMediaCore {
                                     PlaybackStopped?.Invoke(this, EventArgs.Empty);
                                 };
                                 _wavePlayer?.Play();
-                                if (_soundType == SoundType.MountLoop) {
+                                if (_soundType == SoundType.LoopUntilStopped) {
                                     MountLoopCheck();
                                 }
                             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
@@ -597,6 +597,6 @@ namespace RoleplayingMediaCore {
         OtherPlayerCombat,
         NPC,
         ChatSound,
-        MountLoop
+        LoopUntilStopped
     }
 }
