@@ -226,8 +226,10 @@ namespace RoleplayingMediaCore {
                         _loopStream.EnableLooping = false;
                         _loopStream?.Dispose();
                     }
-                    _wavePlayer?.Stop();
-                    _wavePlayer?.Dispose();
+                    if (_wavePlayer != null) {
+                        _wavePlayer?.Stop();
+                        _wavePlayer?.Dispose();
+                    }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             if (_vlcPlayer != null) {
@@ -344,7 +346,7 @@ namespace RoleplayingMediaCore {
                             playbackSpeed.PlaybackRate = speed;
                             sampleProvider = playbackSpeed;
                         }
-                        if (_wavePlayer != null) {
+                        if (_wavePlayer != null && sampleProvider != null) {
                             try {
                                 _wavePlayer?.Init(sampleProvider);
                                 if (_soundType == SoundType.Loop ||
