@@ -375,7 +375,11 @@ namespace RoleplayingMediaCore {
                                     }
                                 }
                                 _wavePlayer.PlaybackStopped += delegate {
-                                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                    if (PlaybackStopped != null) {
+                                        try {
+                                            PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                    }
                                 };
                                 _wavePlayer?.Play();
                                 DonePlayingCheck();
