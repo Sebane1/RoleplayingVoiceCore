@@ -77,7 +77,7 @@ namespace RoleplayingMediaCore {
                     }
                 }
             }
-            if (string.IsNullOrWhiteSpace(key) || !key.All(c => char.IsAsciiLetterOrDigit(c))) {
+            if (string.IsNullOrWhiteSpace(key)) {
                 apiValid = false;
             }
             ValidationResult validationResult = new ValidationResult();
