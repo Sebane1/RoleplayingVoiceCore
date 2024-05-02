@@ -140,7 +140,7 @@ namespace RoleplayingMediaCore {
                     Thread.Sleep(1200);
                     while (true) {
                         if (_player.Position >= _player.Length) {
-                            Thread.Sleep(5000);
+                            Thread.Sleep(500);
                             _wavePlayer.Stop();
                         }
                         Thread.Sleep(500);
