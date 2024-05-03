@@ -5,6 +5,7 @@ using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using RoleplayingMediaCore.AudioRecycler;
+using System.ComponentModel.DataAnnotations;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -40,16 +41,7 @@ namespace RoleplayingMediaCore {
                 }
                 // Spin a new thread for this
                 Task.Run(() => {
-                    _api = new ElevenLabsClient(apiKey);
-                    apiValid = true;
-                    try {
-                        var test = _api.UserEndpoint.GetUserInfoAsync().Result;
-                    } catch (Exception e) {
-                        var errorMain = e.Message.ToString();
-                        if (errorMain.Contains("invalid_api_key")) {
-                            apiValid = false;
-                        }
-                    }
+                    SetAPI(apiKey);
                 });
                 if (characterVoices != null) {
                     _characterVoices = characterVoices;
@@ -128,6 +120,9 @@ namespace RoleplayingMediaCore {
                     apiValid = false;
                 }
             }
+            ValidationResult validationResult = new ValidationResult();
+            validationResult.ValidationSuceeded = apiValid;
+            OnApiValidationComplete?.Invoke(this, validationResult);
         }
         public void RefreshElevenlabsSubscriptionInfo() {
             Task.Run(async delegate {
