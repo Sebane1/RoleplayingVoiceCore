@@ -110,16 +110,8 @@ namespace RoleplayingMediaCore {
             return voicesNames.ToArray();
         }
         public void SetAPI(string apiKey) {
-            try {
-                _api = new ElevenLabsClient(apiKey);
-                var test = _api.UserEndpoint.GetUserInfoAsync().Result;
-                apiValid = true;
-            } catch (Exception e) {
-                var errorMain = e.Message.ToString();
-                if (errorMain.Contains("invalid_api_key")) {
-                    apiValid = false;
-                }
-            }
+            _api = new ElevenLabsClient(apiKey);
+            apiValid = true;
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
