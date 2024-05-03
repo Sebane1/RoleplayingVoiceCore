@@ -37,14 +37,13 @@ namespace RoleplayingMediaCore {
                 _apiKey = apiKey;
                 if (!string.IsNullOrEmpty(apiKey)) {
                     apiValid = true;
-                    apiValid = true;
                 }
                 // Spin a new thread for this
                 Task.Run(() => {
+                    _api = new ElevenLabsClient(apiKey);
+                    apiValid = true;
                     try {
-                        _api = new ElevenLabsClient(apiKey);
                         var test = _api.UserEndpoint.GetUserInfoAsync().Result;
-                        apiValid = true;
                     } catch (Exception e) {
                         var errorMain = e.Message.ToString();
                         if (errorMain.Contains("invalid_api_key")) {
@@ -66,10 +65,10 @@ namespace RoleplayingMediaCore {
 
         public async Task<bool> ApiValidation(string key) {
             if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
+                var api = new ElevenLabsClient(key);
+                apiValid = true;
                 try {
-                    var api = new ElevenLabsClient(key);
                     await api.UserEndpoint.GetUserInfoAsync();
-                    apiValid = true;
                 } catch (Exception e) {
                     var errorMain = e.Message.ToString();
                     if (errorMain.Contains("invalid_api_key")) {
@@ -118,7 +117,18 @@ namespace RoleplayingMediaCore {
             }
             return voicesNames.ToArray();
         }
-
+        public void SetAPI(string apiKey) {
+            try {
+                _api = new ElevenLabsClient(apiKey);
+                var test = _api.UserEndpoint.GetUserInfoAsync().Result;
+                apiValid = true;
+            } catch (Exception e) {
+                var errorMain = e.Message.ToString();
+                if (errorMain.Contains("invalid_api_key")) {
+                    apiValid = false;
+                }
+            }
+        }
         public void RefreshElevenlabsSubscriptionInfo() {
             Task.Run(async delegate {
                 ValidationResult state = new ValidationResult();
