@@ -143,7 +143,7 @@ namespace RoleplayingMediaCore {
                             Thread.Sleep(500);
                             _wavePlayer.Stop();
                         }
-                        Thread.Sleep(500);
+                        Thread.Sleep(250);
                     }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
