@@ -397,148 +397,150 @@ namespace RoleplayingMediaCore {
 
         public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
             AudioOutputType audioPlayerType, bool lowPerformanceMode = false) {
-            try {
-                Stopwatch latencyTimer = Stopwatch.StartNew();
-                if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
-                    if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp") &&
-                        (audioPlayerType != AudioOutputType.VLCExperimental || _soundType != SoundType.NPC)) {
-                        _player = soundPath.EndsWith(".ogg") ?
-                        new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
-                        WaveStream desiredStream = _player;
-                        if (_soundType != SoundType.MainPlayerTts &&
-                            _soundType != SoundType.OtherPlayerTts &&
-                            _soundType != SoundType.LoopWhileMoving &&
-                            _soundType != SoundType.Livestream &&
-                            _soundType != SoundType.MainPlayerCombat &&
-                            _soundType != SoundType.OtherPlayerCombat &&
-                            _soundType != SoundType.NPC &&
-                            _soundType != SoundType.LoopUntilStopped &&
-                            _player.TotalTime.TotalSeconds > 13) {
-                            _soundType = SoundType.Loop;
-                        }
-                        switch (audioPlayerType) {
-                            case AudioOutputType.VLCExperimental:
-                            case AudioOutputType.WaveOut:
-                                _wavePlayer = new WaveOutEvent();
-                                break;
-                            case AudioOutputType.DirectSound:
-                                _wavePlayer = new DirectSoundOut();
-                                break;
-                            case AudioOutputType.Wasapi:
-                                _wavePlayer = new WasapiOut();
-                                break;
-                        }
-                        if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
-                            if (delay > 0) {
-                                Thread.Sleep(delay);
+            await Task.Run(async delegate {
+                try {
+                    Stopwatch latencyTimer = Stopwatch.StartNew();
+                    if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
+                        if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp") &&
+                            (audioPlayerType != AudioOutputType.VLCExperimental || _soundType != SoundType.NPC)) {
+                            _player = soundPath.EndsWith(".ogg") ?
+                            new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
+                            WaveStream desiredStream = _player;
+                            if (_soundType != SoundType.MainPlayerTts &&
+                                _soundType != SoundType.OtherPlayerTts &&
+                                _soundType != SoundType.LoopWhileMoving &&
+                                _soundType != SoundType.Livestream &&
+                                _soundType != SoundType.MainPlayerCombat &&
+                                _soundType != SoundType.OtherPlayerCombat &&
+                                _soundType != SoundType.NPC &&
+                                _soundType != SoundType.LoopUntilStopped &&
+                                _player.TotalTime.TotalSeconds > 13) {
+                                _soundType = SoundType.Loop;
                             }
-                        }
-                        if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
-                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat && _soundType != SoundType.ChatSound) {
-                                SoundLoopCheck();
+                            switch (audioPlayerType) {
+                                case AudioOutputType.VLCExperimental:
+                                case AudioOutputType.WaveOut:
+                                    _wavePlayer = new WaveOutEvent();
+                                    break;
+                                case AudioOutputType.DirectSound:
+                                    _wavePlayer = new DirectSoundOut();
+                                    break;
+                                case AudioOutputType.Wasapi:
+                                    _wavePlayer = new WasapiOut();
+                                    break;
                             }
-                            _loopStream = new LoopStream(_player) { EnableLooping = true };
-                            desiredStream = _loopStream;
-                        } else if (_soundType == SoundType.LoopUntilStopped) {
-                            _loopStream = new LoopStream(_player) { EnableLooping = true };
-                            desiredStream = _loopStream;
-                        }
-                        float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
-                        float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
-                        ISampleProvider sampleProvider = null;
-                        if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
-                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
-                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
-                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
-                            _baseVolume = volume;
-                            if (_soundType != SoundType.LoopUntilStopped) {
-                                _volumeSampleProvider.Volume = volume;
-                            } else {
-                                offsetVolume = 0;
-                                _volumeSampleProvider.Volume = 0;
-                            }
-                            _panningSampleProvider = new PanningSampleProvider(
-                            _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                            Vector3 dir = CharacterObject.Position - _camera.Position;
-                            float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                            _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                            sampleProvider = _panningSampleProvider;
-                        } else {
-                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
-                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
-                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
-                            _baseVolume = volume;
-                            if (_soundType != SoundType.LoopUntilStopped) {
-                                _volumeSampleProvider.Volume = volume;
-                            } else {
-                                offsetVolume = 0;
-                                _volumeSampleProvider.Volume = 0;
-                            }
-                            Pan = 0;
-                            sampleProvider = _volumeSampleProvider;
-                        }
-                        if (_wavePlayer != null) {
-                            try {
-                                try {
-                                    _wavePlayer?.Init(sampleProvider);
-                                } catch {
+                            if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
+                                if (delay > 0) {
+                                    Thread.Sleep(delay);
                                 }
-                                if (_soundType == SoundType.Loop ||
-                                    _soundType == SoundType.MainPlayerVoice ||
-                                    _soundType == SoundType.OtherPlayer) {
-                                    _player.CurrentTime = skipAhead;
-                                    if (_player.TotalTime.TotalSeconds > 13) {
-                                        _player.CurrentTime += latencyTimer.Elapsed;
-                                    }
+                            }
+                            if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                                if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat && _soundType != SoundType.ChatSound) {
+                                    SoundLoopCheck();
+                                }
+                                _loopStream = new LoopStream(_player) { EnableLooping = true };
+                                desiredStream = _loopStream;
+                            } else if (_soundType == SoundType.LoopUntilStopped) {
+                                _loopStream = new LoopStream(_player) { EnableLooping = true };
+                                desiredStream = _loopStream;
+                            }
+                            float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
+                            float newVolume = _parent.CalculateObjectVolume(_playerObject.Name, this);
+                            ISampleProvider sampleProvider = null;
+                            if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType != SoundType.MainPlayerTts && _soundType != SoundType.ChatSound) {
+                                _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                                _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                                _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
+                                _baseVolume = volume;
+                                if (_soundType != SoundType.LoopUntilStopped) {
+                                    _volumeSampleProvider.Volume = volume;
                                 } else {
-                                    _player.Position = 0;
+                                    offsetVolume = 0;
+                                    _volumeSampleProvider.Volume = 0;
                                 }
-                                if (_soundType == SoundType.MainPlayerCombat ||
-                                    _soundType == SoundType.OtherPlayerCombat) {
+                                _panningSampleProvider = new PanningSampleProvider(
+                                _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
+                                Vector3 dir = CharacterObject.Position - _camera.Position;
+                                float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                                sampleProvider = _panningSampleProvider;
+                            } else {
+                                _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                                _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                                _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
+                                _baseVolume = volume;
+                                if (_soundType != SoundType.LoopUntilStopped) {
+                                    _volumeSampleProvider.Volume = volume;
+                                } else {
+                                    offsetVolume = 0;
+                                    _volumeSampleProvider.Volume = 0;
+                                }
+                                Pan = 0;
+                                sampleProvider = _volumeSampleProvider;
+                            }
+                            if (_wavePlayer != null) {
+                                try {
                                     try {
-                                        var waveOutEvent = _wavePlayer as WaveOutEvent;
-                                        if (waveOutEvent != null) {
-                                            waveOutEvent.DesiredLatency = 50;
-                                        }
+                                        _wavePlayer?.Init(sampleProvider);
                                     } catch {
-
                                     }
+                                    if (_soundType == SoundType.Loop ||
+                                        _soundType == SoundType.MainPlayerVoice ||
+                                        _soundType == SoundType.OtherPlayer) {
+                                        _player.CurrentTime = skipAhead;
+                                        if (_player.TotalTime.TotalSeconds > 13) {
+                                            _player.CurrentTime += latencyTimer.Elapsed;
+                                        }
+                                    } else {
+                                        _player.Position = 0;
+                                    }
+                                    if (_soundType == SoundType.MainPlayerCombat ||
+                                        _soundType == SoundType.OtherPlayerCombat) {
+                                        try {
+                                            var waveOutEvent = _wavePlayer as WaveOutEvent;
+                                            if (waveOutEvent != null) {
+                                                waveOutEvent.DesiredLatency = 50;
+                                            }
+                                        } catch {
+
+                                        }
+                                    }
+                                    _wavePlayer.PlaybackStopped += delegate {
+                                        PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                    };
+                                    _wavePlayer?.Play();
+                                    if (_soundType == SoundType.LoopUntilStopped) {
+                                        MountLoopCheck();
+                                    }
+                                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                            }
+                        } else {
+                            try {
+                                _parent.LastFrame = Array.Empty<byte>();
+                                string location = _libVLCPath + @"\libvlc\win-x64";
+                                Core.Initialize(location);
+                                libVLC = new LibVLC("--vout", "none");
+                                var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                    ? FromType.FromLocation : FromType.FromPath);
+                                await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                    ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
+                                _vlcPlayer = new MediaPlayer(media);
+                                var processingCancellationTokenSource = new CancellationTokenSource();
+                                _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
+                                _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
+                                if (soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")) {
+                                    _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
+                                    _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                                 }
-                                _wavePlayer.PlaybackStopped += delegate {
-                                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
-                                };
-                                _wavePlayer?.Play();
-                                if (_soundType == SoundType.LoopUntilStopped) {
-                                    MountLoopCheck();
-                                }
+                                _baseVolume = volume;
+                                Volume = volume;
+                                _vlcPlayer.Play();
+                                _vlcWasAbleToStart = true;
                             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                         }
-                    } else {
-                        try {
-                            _parent.LastFrame = Array.Empty<byte>();
-                            string location = _libVLCPath + @"\libvlc\win-x64";
-                            Core.Initialize(location);
-                            libVLC = new LibVLC("--vout", "none");
-                            var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                                ? FromType.FromLocation : FromType.FromPath);
-                            await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                                ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
-                            _vlcPlayer = new MediaPlayer(media);
-                            var processingCancellationTokenSource = new CancellationTokenSource();
-                            _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
-                            _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
-                            if (soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")) {
-                                _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
-                                _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
-                            }
-                            _baseVolume = volume;
-                            Volume = volume;
-                            _vlcPlayer.Play();
-                            _vlcWasAbleToStart = true;
-                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                     }
-                }
-            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            });
         }
         public async void ChangeVideoStream(string soundPath, float width) {
             if (_vlcWasAbleToStart) {
