@@ -110,6 +110,8 @@ namespace FFXIVLooseTextureCompiler.Networking {
 
                 }
                 alreadySendingFiles = false;
+            } else {
+                alreadySendingFiles = false;
             }
             connectionAttempts = 0;
             return false;

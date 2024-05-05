@@ -357,7 +357,7 @@ namespace RoleplayingMediaCore {
                 if (!_lowPerformanceMode) {
                     UpdateVolumes(_combatVoicePackSounds);
                 }
-                Thread.Sleep(!_lowPerformanceMode ? 100 : 400);
+                Thread.Sleep(100);
             }
         }
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
@@ -367,19 +367,27 @@ namespace RoleplayingMediaCore {
                     try {
                         lock (sounds[characterObjectName]) {
                             if (sounds[characterObjectName].CharacterObject != null) {
-                                Vector3 dir = sounds[characterObjectName].CharacterObject.Position - Vector3.Lerp(_camera.Position, _mainPlayer.Position, _cameraAndPlayerPositionSlider);
+                                Vector3 dir = new Vector3();
+                                if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
+                                    dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
+                                } else {
+                                    dir = _mainPlayer.Position - GetListeningPosition();
+                                }
                                 float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                float pan = Math.Clamp(direction / 3, -1, 1);
                                 try {
+                                    sounds[characterObjectName].Pan = pan;
                                     sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
                                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
-                                sounds[characterObjectName].Pan = Math.Clamp(direction / 3, -1, 1);
                             }
                         }
                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
         }
-
+        Vector3 GetListeningPosition() {
+            return Vector3.Lerp(new Vector3(_camera.Position.X, _mainPlayer.Position.Y, _camera.Position.Z), _mainPlayer.Position, _cameraAndPlayerPositionSlider);
+        }
         public void VolumeFix() {
             List<KeyValuePair<string, MediaObject>> fixList = new List<KeyValuePair<string, MediaObject>>();
             fixList.AddRange(_textToSpeechSounds);
@@ -401,7 +409,7 @@ namespace RoleplayingMediaCore {
             float maxDistance = (playerName == _mainPlayer.Name ||
             mediaObject.SoundType == SoundType.Livestream) ? 100 : 20;
             float volume = GetVolume(mediaObject.SoundType, mediaObject.CharacterObject);
-            float distance = Vector3.Distance(_camera.Position, mediaObject.CharacterObject.Position);
+            float distance = Vector3.Distance(GetListeningPosition(), mediaObject.CharacterObject.Position);
             return mediaObject.SoundType != SoundType.NPC ?
             Math.Clamp(volume * ((maxDistance - distance) / maxDistance), 0f, 1f) : volume;
         }
