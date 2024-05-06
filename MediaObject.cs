@@ -543,14 +543,16 @@ namespace RoleplayingMediaCore {
             });
         }
         public async void ChangeVideoStream(string soundPath, float width) {
-            if (_vlcWasAbleToStart) {
-                var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                                 ? FromType.FromLocation : FromType.FromPath);
-                await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
-                    ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
-                _vlcPlayer.Media = media;
-                _vlcPlayer.Play();
-            }
+            try {
+                if (_vlcWasAbleToStart) {
+                    var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                     ? FromType.FromLocation : FromType.FromPath);
+                    await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                        ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
+                    _vlcPlayer.Media = media;
+                    _vlcPlayer.Play();
+                }
+            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public static float AngleDir(Vector3 fwd, Vector3 targetDir, Vector3 up) {
             Vector3 perp = Vector3.Cross(fwd, targetDir);
@@ -595,7 +597,9 @@ namespace RoleplayingMediaCore {
                     _currentMappedViewAccessor = null;
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             } else {
-                _vlcPlayer.Stop();
+                try {
+                    _vlcPlayer.Stop();
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
     }

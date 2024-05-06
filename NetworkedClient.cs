@@ -72,6 +72,63 @@ namespace FFXIVLooseTextureCompiler.Networking {
                 }
             }
         }
+        public async Task<ushort> GetShort(string sendID) {
+            try {
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    BinaryWriter writer = new BinaryWriter(memory);
+                    writer.Write(sendID);
+                    writer.Write(1);
+                    memory.Position = 0;
+                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                    if (post.StatusCode == HttpStatusCode.OK) {
+                        BinaryReader reader = new BinaryReader(await post.Content.ReadAsStreamAsync());
+                        byte value = reader.ReadByte();
+                        if (value != 0) {
+                            long length = reader.ReadInt64();
+                            return reader.ReadUInt16();
+                        }
+                    }
+                }
+            } catch {
+
+            }
+            return 0;
+        }
+        public async Task<bool> SendShort(string sendID, ushort shortValue) {
+            try {
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    MemoryStream memory = new MemoryStream();
+                    MemoryStream fileStream = new MemoryStream();
+                    BinaryWriter shortWriter = new(fileStream);
+                    shortWriter.Write(shortValue);
+                    shortWriter.Flush();
+                    fileStream.Position = 0;
+                    using (BinaryWriter writer = new(memory)) {
+                        writer.Write(sendID);
+                        writer.Write(0);
+                        writer.Write(fileStream.Length);
+                        fileStream.CopyTo(writer.BaseStream);
+                        writer.Write(5000);
+                        writer.Flush();
+                        fileStream.Flush();
+                        memory.Position = 0;
+                        var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                        if (post.StatusCode != HttpStatusCode.OK) {
+
+                        }
+                    }
+                }
+                return true;
+            } catch {
+
+            }
+            connectionAttempts = 0;
+            return false;
+        }
+
         public async Task<bool> SendZip(string sendID, string path) {
             if (!alreadySendingFiles) {
                 alreadySendingFiles = true;

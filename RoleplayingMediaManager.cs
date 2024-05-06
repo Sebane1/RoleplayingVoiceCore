@@ -245,6 +245,20 @@ namespace RoleplayingMediaCore {
             return sendState;
         }
 
+        public async Task<bool> SendShort(string sender, ushort shortvalue) {
+            string hash = Shai1Hash(sender);
+            bool sendState = false;
+            await Task.Run(async () => { sendState = await _networkedClient.SendShort(hash, shortvalue); });
+            return sendState;
+        }
+        public async Task<ushort> GetShort(string sender) {
+            if (_networkedClient != null) {
+                string hash = Shai1Hash(sender);
+                return await _networkedClient.GetShort(hash);
+            }
+            return 0;
+        }
+
         private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
