@@ -303,29 +303,31 @@ namespace RoleplayingMediaCore {
                         ISampleProvider sampleProvider = null;
                         if (!lowPerformanceMode || _soundType != SoundType.MainPlayerCombat && _soundType
                             != SoundType.MainPlayerTts && _soundType != SoundType.NPC) {
-                            _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
-                            _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
-                            _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
-                            _volumeSampleProvider.Volume = volume;
-                            _panningSampleProvider = new PanningSampleProvider(
-                            _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
-                            Vector3 dir = CharacterObject.Position - _camera.Position;
-                            float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                            _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
-                            if (pitch != 1) {
-                                ISampleProvider newSampleProvider = null;
-                                if (!useSmbPitch) {
-                                    var pitchSample = new VarispeedSampleProvider(_panningSampleProvider, 100, new SoundTouchProfile(false, true));
-                                    pitchSample.PlaybackRate = pitch;
-                                    newSampleProvider = pitchSample;
+                            if (desiredStream != null) {
+                                _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
+                                _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
+                                _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
+                                _volumeSampleProvider.Volume = volume;
+                                _panningSampleProvider = new PanningSampleProvider(
+                                _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
+                                Vector3 dir = CharacterObject.Position - _camera.Position;
+                                float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                                if (pitch != 1) {
+                                    ISampleProvider newSampleProvider = null;
+                                    if (!useSmbPitch) {
+                                        var pitchSample = new VarispeedSampleProvider(_panningSampleProvider, 100, new SoundTouchProfile(false, true));
+                                        pitchSample.PlaybackRate = pitch;
+                                        newSampleProvider = pitchSample;
+                                    } else {
+                                        var pitchSample = new SmbPitchShiftingSampleProvider(_panningSampleProvider);
+                                        pitchSample.PitchFactor = pitch;
+                                        newSampleProvider = pitchSample;
+                                    }
+                                    sampleProvider = newSampleProvider;
                                 } else {
-                                    var pitchSample = new SmbPitchShiftingSampleProvider(_panningSampleProvider);
-                                    pitchSample.PitchFactor = pitch;
-                                    newSampleProvider = pitchSample;
+                                    sampleProvider = _panningSampleProvider;
                                 }
-                                sampleProvider = newSampleProvider;
-                            } else {
-                                sampleProvider = _panningSampleProvider;
                             }
                         } else {
                             _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
@@ -366,13 +368,15 @@ namespace RoleplayingMediaCore {
                                 }
                                 if (_soundType == SoundType.MainPlayerCombat ||
                                     _soundType == SoundType.OtherPlayerCombat) {
-                                    try {
-                                        var waveOutEvent = _wavePlayer as WaveOutEvent;
-                                        if (waveOutEvent != null) {
-                                            waveOutEvent.DesiredLatency = 50;
-                                        }
-                                    } catch {
+                                    if (_wavePlayer != null) {
+                                        try {
+                                            var waveOutEvent = _wavePlayer as WaveOutEvent;
+                                            if (waveOutEvent != null) {
+                                                waveOutEvent.DesiredLatency = 50;
+                                            }
+                                        } catch {
 
+                                        }
                                     }
                                 }
                                 _wavePlayer.PlaybackStopped += delegate {

@@ -362,26 +362,28 @@ namespace RoleplayingMediaCore {
         }
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
             for (int i = 0; i < sounds.Count; i++) {
-                string characterObjectName = sounds.Keys.ElementAt<string>(i);
-                if (sounds.ContainsKey(characterObjectName)) {
-                    try {
-                        lock (sounds[characterObjectName]) {
-                            if (sounds[characterObjectName].CharacterObject != null) {
-                                Vector3 dir = new Vector3();
-                                if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
-                                    dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
-                                } else {
-                                    dir = _mainPlayer.Position - GetListeningPosition();
+                lock (sounds) {
+                    string characterObjectName = sounds.Keys.ElementAt<string>(i);
+                    if (sounds.ContainsKey(characterObjectName)) {
+                        try {
+                            lock (sounds[characterObjectName]) {
+                                if (sounds[characterObjectName].CharacterObject != null) {
+                                    Vector3 dir = new Vector3();
+                                    if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
+                                        dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
+                                    } else {
+                                        dir = _mainPlayer.Position - GetListeningPosition();
+                                    }
+                                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                    float pan = Math.Clamp(direction / 3, -1, 1);
+                                    try {
+                                        sounds[characterObjectName].Pan = pan;
+                                        sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
+                                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                                 }
-                                float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                float pan = Math.Clamp(direction / 3, -1, 1);
-                                try {
-                                    sounds[characterObjectName].Pan = pan;
-                                    sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
-                                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                             }
-                        }
-                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                    }
                 }
             }
         }
