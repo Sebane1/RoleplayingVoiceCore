@@ -35,6 +35,7 @@ namespace RoleplayingMediaCore {
         private bool _lowPerformanceMode;
         private float _npcVolume = 1;
         private float _cameraAndPlayerPositionSlider;
+        private int _spatialAudioAccuracy = 100;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
@@ -46,6 +47,7 @@ namespace RoleplayingMediaCore {
         public float NpcVolume { get => _npcVolume; set => _npcVolume = value; }
         public AudioOutputType AudioPlayerType { get => audioPlayerType; set => audioPlayerType = value; }
         public float CameraAndPlayerPositionSlider { get => _cameraAndPlayerPositionSlider; set => _cameraAndPlayerPositionSlider = value; }
+        public int SpatialAudioAccuracy { get => _spatialAudioAccuracy; set => _spatialAudioAccuracy = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IGameObject playerObject, IGameObject camera, string libVLCPath) {
@@ -333,10 +335,6 @@ namespace RoleplayingMediaCore {
                                     }
                                     Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                                     sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
-                                    if (soundPlaybackTimer.ElapsedMilliseconds > 2500) {
-                                        _lowPerformanceMode = true;
-                                        OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception("Low performance detected, enabling low performance mode.") });
-                                    }
                                 }
                             } catch (Exception e) {
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -347,17 +345,29 @@ namespace RoleplayingMediaCore {
                 }
             });
         }
-        private async void Update() {
+        private void Update() {
             while (notDisposed) {
-                UpdateVolumes(_textToSpeechSounds);
-                UpdateVolumes(_voicePackSounds);
-                UpdateVolumes(_playbackStreams);
-                UpdateVolumes(_nativeGameAudio);
-                UpdateVolumes(_mountLoopSounds);
+                Task.Run(() => {
+                    UpdateVolumes(_textToSpeechSounds);
+                });
+                Task.Run(() => {
+                    UpdateVolumes(_voicePackSounds);
+                });
+                Task.Run(() => {
+                    UpdateVolumes(_playbackStreams);
+                });
+                Task.Run(() => {
+                    UpdateVolumes(_nativeGameAudio);
+                });
+                Task.Run(() => {
+                    UpdateVolumes(_mountLoopSounds);
+                });
                 if (!_lowPerformanceMode) {
-                    UpdateVolumes(_combatVoicePackSounds);
+                    Task.Run(() => {
+                        UpdateVolumes(_combatVoicePackSounds);
+                    });
                 }
-                Thread.Sleep(100);
+                Thread.Sleep(_spatialAudioAccuracy);
             }
         }
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
