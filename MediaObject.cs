@@ -353,9 +353,11 @@ namespace RoleplayingMediaCore {
                             }
                         }
                         if (Math.Abs(speed) > 0.0001f) {
-                            var playbackSpeed = new VarispeedSampleProvider(sampleProvider, 100, new SoundTouchProfile(true, true));
-                            playbackSpeed.PlaybackRate = speed;
-                            sampleProvider = playbackSpeed;
+                            if (sampleProvider != null) {
+                                var playbackSpeed = new VarispeedSampleProvider(sampleProvider, 100, new SoundTouchProfile(true, true));
+                                playbackSpeed.PlaybackRate = speed;
+                                sampleProvider = playbackSpeed;
+                            }
                         }
                         if (_wavePlayer != null && sampleProvider != null) {
                             try {
