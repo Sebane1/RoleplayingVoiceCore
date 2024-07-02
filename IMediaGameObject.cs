@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 
 namespace RoleplayingMediaCore {
-    public interface IGameObject {
+    public interface IMediaGameObject {
         public string Name { get; }
         public Vector3 Position { get; }
         public float Rotation { get; }

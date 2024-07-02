@@ -16,8 +16,8 @@ using VarispeedDemo.SoundTouch;
 
 namespace RoleplayingMediaCore {
     public class MediaObject {
-        private IGameObject _playerObject;
-        private IGameObject _camera;
+        private IMediaGameObject _playerObject;
+        private IMediaGameObject _camera;
         private SoundType _soundType;
 
         private VolumeSampleProvider _volumeSampleProvider;
@@ -68,7 +68,7 @@ namespace RoleplayingMediaCore {
         private MeteringSampleProvider _meteringSampleProvider;
         private bool _vlcWasAbleToStart;
 
-        public MediaObject(MediaManager parent, IGameObject playerObject, IGameObject camera,
+        public MediaObject(MediaManager parent, IMediaGameObject playerObject, IMediaGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
             _playerObject = playerObject;
             _soundPath = soundPath;
@@ -149,7 +149,7 @@ namespace RoleplayingMediaCore {
             });
         }
 
-        public IGameObject CharacterObject { get => _playerObject; set => _playerObject = value; }
+        public IMediaGameObject CharacterObject { get => _playerObject; set => _playerObject = value; }
         public float Volume {
             get {
                 if (_volumeSampleProvider != null) {
@@ -216,7 +216,7 @@ namespace RoleplayingMediaCore {
             }
         }
 
-        public IGameObject Camera { get => _camera; set => _camera = value; }
+        public IMediaGameObject Camera { get => _camera; set => _camera = value; }
         public bool Invalidated { get; internal set; }
 
         public void Stop() {
