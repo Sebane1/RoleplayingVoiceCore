@@ -10,9 +10,13 @@ namespace RoleplayingVoiceCore {
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing) {
             _characterToVoicePairing = characterToVoicePairing;
         }
-
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character, 
-            bool gender, string backupVoice = "", bool aggressiveCache = false, bool fastSpeed = false, string extraJson = "", bool redoLine = false) {
+        public enum VoiceModel {
+            Quality,
+            Speed,
+            Cheap,
+        }
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character,
+            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false) {
             try {
                 string selectedVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -45,7 +49,7 @@ namespace RoleplayingVoiceCore {
                 } else {
                     ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
                         Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
-                        Text = text, Model = !fastSpeed ? "quality" : "speed",
+                        Text = text, Model = voiceModel.ToString().ToLower(),
                         UnfilteredText = originalValue,
                         Character = character,
                         AggressiveCache = aggressiveCache,
