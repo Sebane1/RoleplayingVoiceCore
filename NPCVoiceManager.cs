@@ -45,7 +45,11 @@ namespace RoleplayingVoiceCore {
                             return new KeyValuePair<Stream, bool>(null, false);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
-                        return new KeyValuePair<Stream, bool>(result, true);
+                        MemoryStream memoryStream = new MemoryStream();
+                        await result.CopyToAsync(memoryStream);
+                        await result.FlushAsync();
+                        memoryStream.Position = 0;
+                        return new KeyValuePair<Stream, bool>(memoryStream, true);
                     }
                 } else {
                     ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
@@ -66,7 +70,11 @@ namespace RoleplayingVoiceCore {
                             return new KeyValuePair<Stream, bool>(null, false);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
-                        return new KeyValuePair<Stream, bool>(result, false);
+                        MemoryStream memoryStream = new MemoryStream();
+                        await result.CopyToAsync(memoryStream);
+                        await result.FlushAsync();
+                        memoryStream.Position = 0;
+                        return new KeyValuePair<Stream, bool>(memoryStream, false);
                     }
                 }
             } catch {
