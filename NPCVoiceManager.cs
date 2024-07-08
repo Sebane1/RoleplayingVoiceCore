@@ -39,6 +39,7 @@ namespace RoleplayingVoiceCore {
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        httpClient.Timeout = new TimeSpan(0, 6, 0);
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
                             return new KeyValuePair<Stream, bool>(null, false);
@@ -59,6 +60,7 @@ namespace RoleplayingVoiceCore {
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
                         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        httpClient.Timeout = new TimeSpan(0, 6, 0);
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(elevenLabsRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
                             return new KeyValuePair<Stream, bool>(null, false);
