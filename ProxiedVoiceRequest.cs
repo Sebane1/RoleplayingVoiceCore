@@ -17,5 +17,6 @@
         public string ExtraJsonData { get => extraJsonData; set => extraJsonData = value; }
         public string UnfilteredText { get => _unfilteredtext; set => _unfilteredtext = value; }
         public bool RedoLine { get => _redoLine; set => _redoLine = value; }
+        public bool Override { get; internal set; }
     }
 }
