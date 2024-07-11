@@ -514,7 +514,9 @@ namespace RoleplayingMediaCore {
                                     _wavePlayer.PlaybackStopped += delegate {
                                         PlaybackStopped?.Invoke(this, EventArgs.Empty);
                                     };
-                                    _wavePlayer?.Play();
+                                    if (_wavePlayer != null) {
+                                        _wavePlayer?.Play();
+                                    }
                                     if (_soundType == SoundType.LoopUntilStopped) {
                                         MountLoopCheck();
                                     }

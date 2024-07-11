@@ -1,11 +1,12 @@
-﻿using ElevenLabs;
+﻿using AIDataProxy.XTTS;
+using ElevenLabs;
 using ElevenLabs.History;
 using ElevenLabs.Models;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using RoleplayingMediaCore.AudioRecycler;
-using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -21,15 +22,29 @@ namespace RoleplayingMediaCore {
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
         public event EventHandler<VoiceFailure>? OnVoiceFailed;
-
+        public event EventHandler<string> XTTSStatus;
         private IReadOnlyList<HistoryItem> _history;
         private bool apiValid;
         private string rpVoiceCache;
-        private IReadOnlyList<Voice> _voices;
-        private Voice _characterVoice;
-        private string _voiceType;
+        private IReadOnlyList<Voice> _elevenlabsVoices;
+        private Voice _elevenLabsVoice;
+        private string _xttsVoice;
+        private string _voiceTypeElevenlabs;
+        private string _batchInstall = "call python -m venv venv\r\n" +
+            "call venv\\Scripts\\activate\r\n" +
+            "call pip install xtts-api-server\r\n" +
+            "call pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118\r\n" +
+            "call python -m xtts_api_server --deepspeed";
 
-        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null) {
+        private string _batchLaunch = "call venv\\Scripts\\activate.bat\r\n" +
+            "call python -m xtts_api_server --deepspeed";
+        private string[] _xttsVoices;
+        private string _voiceTypeXTTS;
+        private bool xttsAlreadyEnabled;
+        private bool _xttsReady;
+
+        public event EventHandler<string> InitializationCallbacks;
+        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
             rpVoiceCache = cache;
             _networkedClient = client;
             if (string.IsNullOrWhiteSpace(apiKey)) {
@@ -47,13 +62,96 @@ namespace RoleplayingMediaCore {
                     _characterVoices = characterVoices;
                 }
             }
+            InitializationCallbacks += initializationCallbacks;
             RefreshElevenlabsSubscriptionInfo();
-            GetVoiceList();
+            GetVoiceListElevenlabs();
+        }
+        public void InitializeXTTS() {
+            if (Environment.GetEnvironmentVariable("Path").Contains("Python")) {
+                if (!xttsAlreadyEnabled) {
+                    xttsAlreadyEnabled = true;
+                    if (!XTTSCommunicator.SetSpeakers(Path.Combine(rpVoiceCache, "speakers"))) {
+                        if (!File.Exists(Path.Combine(rpVoiceCache, "venv\\Scripts\\activate.bat"))) {
+                            InstallXTTS(rpVoiceCache);
+                        } else {
+                            LaunchXTTS(rpVoiceCache);
+                        }
+                    } else {
+                        InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
+                        _xttsReady = true;
+                    }
+                }
+            } else {
+                InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Python path variable was not detected. Please install Python 3.10 to install and use local player voice.");
+            }
+        }
+
+        public void InstallXTTS(string cache) {
+            string folder = @"cd /d" + cache + "\r\n" + _batchInstall;
+            string batchFile = Path.Combine(cache, "install.bat");
+            File.WriteAllText(batchFile, folder);
+            var processStart = new ProcessStartInfo(batchFile);
+            processStart.RedirectStandardOutput = true;
+            processStart.RedirectStandardError = true;
+            processStart.WindowStyle = ProcessWindowStyle.Hidden;
+            processStart.UseShellExecute = false;
+            processStart.RedirectStandardInput = true;
+            processStart.CreateNoWindow = true;
+            Process process = new Process();
+            process.StartInfo = processStart;
+            process.OutputDataReceived += Process_OutputDataReceived;
+            process.ErrorDataReceived += Process_ErrorDataReceived;
+            process.EnableRaisingEvents = true;
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependancies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
+        }
+
+        private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e) {
+            XTTSStatus?.Invoke(this, e.Data);
+            if(e.Data.Contains("starts to load")) {
+                InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
+                _xttsReady = true;
+            }
+        }
+
+        private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e) {
+            XTTSStatus?.Invoke(this, e.Data);
+        }
+
+        public void LaunchXTTS(string cache) {
+            UpdateBatch(cache);
+            string folder = @"cd /d" + cache + "\r\n" + _batchLaunch;
+            string batchFile = Path.Combine(cache, "launchXTTS.bat");
+            File.WriteAllText(batchFile, folder);
+            var processStart = new ProcessStartInfo(batchFile);
+            processStart.RedirectStandardOutput = true;
+            processStart.RedirectStandardError = true;
+            processStart.WindowStyle = ProcessWindowStyle.Hidden;
+            processStart.UseShellExecute = false;
+            processStart.RedirectStandardInput = true;
+            processStart.CreateNoWindow = true;
+            Process process = new Process();
+            process.StartInfo = processStart;
+            process.OutputDataReceived += Process_OutputDataReceived;
+            process.ErrorDataReceived += Process_ErrorDataReceived;
+            process.EnableRaisingEvents = true;
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Initializing player voices.");
+        }
+
+        public void UpdateBatch(string cache) {
+            string batch = $"@echo off\r\n\r\nrem This file is UTF-8 encoded, so we need to update the current code page while executing it\r\nfor /f \"tokens=2 delims=:.\" %%a in ('\"%SystemRoot%\\System32\\chcp.com\"') do (\r\n    set _OLD_CODEPAGE=%%a\r\n)\r\nif defined _OLD_CODEPAGE (\r\n    \"%SystemRoot%\\System32\\chcp.com\" 65001 > nul\r\n)\r\n\r\nset VIRTUAL_ENV={Path.Combine(cache, "venv\\")}\r\n\r\nif not defined PROMPT set PROMPT=$P$G\r\n\r\nif defined _OLD_VIRTUAL_PROMPT set PROMPT=%_OLD_VIRTUAL_PROMPT%\r\nif defined _OLD_VIRTUAL_PYTHONHOME set PYTHONHOME=%_OLD_VIRTUAL_PYTHONHOME%\r\n\r\nset _OLD_VIRTUAL_PROMPT=%PROMPT%\r\nset PROMPT=(venv) %PROMPT%\r\n\r\nif defined PYTHONHOME set _OLD_VIRTUAL_PYTHONHOME=%PYTHONHOME%\r\nset PYTHONHOME=\r\n\r\nif defined _OLD_VIRTUAL_PATH set PATH=%_OLD_VIRTUAL_PATH%\r\nif not defined _OLD_VIRTUAL_PATH set _OLD_VIRTUAL_PATH=%PATH%\r\n\r\nset PATH=%VIRTUAL_ENV%\\Scripts;%PATH%\r\nset VIRTUAL_ENV_PROMPT=(venv) \r\n\r\n:END\r\nif defined _OLD_CODEPAGE (\r\n    \"%SystemRoot%\\System32\\chcp.com\" %_OLD_CODEPAGE% > nul\r\n    set _OLD_CODEPAGE=\r\n)\r\n";
+            File.WriteAllText(Path.Combine(cache, "venv\\Scripts\\activate.bat"), batch);
         }
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
         public SubscriptionInfo Info { get => _info; set => _info = value; }
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
+        public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
 
         public async Task<bool> ApiValidation(string key) {
             if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
@@ -80,14 +178,14 @@ namespace RoleplayingMediaCore {
             return false;
         }
 
-        public async Task<string[]> GetVoiceList() {
+        public async Task<string[]> GetVoiceListElevenlabs() {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             if (_api != null) {
                 int failure = 0;
                 while (failure < 10) {
                     try {
-                        _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                        _elevenlabsVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                         break;
                     } catch (Exception e) {
                         var errorVoiceList = e.Message.ToString();
@@ -102,9 +200,21 @@ namespace RoleplayingMediaCore {
                 }
             }
             voicesNames.Add("None");
-            if (_voices != null) {
-                foreach (var voice in _voices) {
+            if (_elevenlabsVoices != null) {
+                foreach (var voice in _elevenlabsVoices) {
                     voicesNames.Add(voice.Name);
+                }
+            }
+            return voicesNames.ToArray();
+        }
+        public async Task<string[]> GetVoiceListXTTS() {
+            ValidationResult state = new ValidationResult();
+            List<string> voicesNames = new List<string>();
+            _xttsVoices = Directory.GetFiles(Path.Combine(rpVoiceCache, "speakers"));
+            voicesNames.Add("None");
+            if (_xttsVoices != null) {
+                foreach (var voice in _xttsVoices) {
+                    voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
                 }
             }
             return voicesNames.ToArray();
@@ -143,12 +253,12 @@ namespace RoleplayingMediaCore {
             );
         }
 
-        public async void SetVoice(string voiceType) {
-            _voiceType = voiceType.ToLower();
+        public async void SetVoiceElevenlabs(string voiceType) {
+            _voiceTypeElevenlabs = voiceType.ToLower();
             ValidationResult state = new ValidationResult();
             if (_api != null) {
                 try {
-                    _voices = await _api.VoicesEndpoint.GetAllVoicesAsync();
+                    _elevenlabsVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                 } catch (Exception e) {
                     var errorVoiceGen = e.Message.ToString();
                     if (errorVoiceGen.Contains("invalid_api_key")) {
@@ -157,11 +267,33 @@ namespace RoleplayingMediaCore {
                         OnApiValidationComplete?.Invoke(this, state);
                     }
                 }
-                if (_voices != null) {
-                    foreach (var voice in _voices) {
-                        if (voice.Name.ToLower().Contains(_voiceType)) {
+                if (_elevenlabsVoices != null) {
+                    foreach (var voice in _elevenlabsVoices) {
+                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs)) {
                             if (voice != null) {
-                                _characterVoice = voice;
+                                _elevenLabsVoice = voice;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        public async void SetVoiceXTTS(string voiceType) {
+            _voiceTypeXTTS = voiceType.ToLower();
+            ValidationResult state = new ValidationResult();
+            if (_api != null) {
+                try {
+                    _xttsVoices = await GetVoiceListXTTS();
+                } catch (Exception e) {
+                    var errorVoiceGen = e.Message.ToString();
+                    OnApiValidationComplete?.Invoke(this, state);
+                }
+                if (_xttsVoices != null) {
+                    foreach (var voice in _xttsVoices) {
+                        if (voice.ToLower().Contains(_voiceTypeXTTS)) {
+                            if (voice != null) {
+                                _xttsVoice = voice;
                             }
                             break;
                         }
@@ -170,19 +302,19 @@ namespace RoleplayingMediaCore {
             }
         }
 
-        public async Task<string> DoVoice(string sender, string text,
+        public async Task<string> DoVoiceElevenlabs(string sender, string text,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_characterVoice == null) {
-                if (_voices == null) {
-                    await GetVoiceList();
+            if (_elevenLabsVoice == null) {
+                if (_elevenlabsVoices == null) {
+                    await GetVoiceListElevenlabs();
                 }
-                if (_voices != null) {
-                    foreach (var voice in _voices) {
-                        if (voice.Name.ToLower().Contains(_voiceType)) {
+                if (_elevenlabsVoices != null) {
+                    foreach (var voice in _elevenlabsVoices) {
+                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs)) {
                             if (voice != null) {
-                                _characterVoice = voice;
+                                _elevenLabsVoice = voice;
                             }
                             break;
                         }
@@ -190,18 +322,79 @@ namespace RoleplayingMediaCore {
                 }
             }
 
-            if (_characterVoice != null) {
+            if (_elevenLabsVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
                         Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
-                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _characterVoice + "-" + hash + ".mp3");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _elevenLabsVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new string[] { trimmedText });
                             List<string> audioPaths = new List<string>();
                             foreach (string audioClip in audioClips) {
-                                audioPaths.Add(await GetVoicePath(_characterVoice.Name, audioClip, _characterVoice));
+                                audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip, _elevenLabsVoice));
+                            }
+                            MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
+                            try {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                                    playbackStream.Position = 0;
+                                    playbackStream.CopyTo(stitchedStream);
+                                    stitchedStream.Flush();
+                                    stitchedStream.Close();
+                                }
+                            } catch (Exception e) {
+                                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+                            }
+                        }
+                        if (useSync) {
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
+                        }
+                        clipPath = stitchedPath;
+                        VoicesUpdated?.Invoke(this, EventArgs.Empty);
+                    } else {
+                        return "";
+                    }
+
+                } catch {
+
+                }
+            }
+            return clipPath;
+        }
+
+        public async Task<string> DoVoiceXTTS(string sender, string text,
+    bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+            string clipPath = "";
+            string hash = Shai1Hash(sender + text);
+            if (_xttsVoice == null) {
+                if (_xttsVoices == null) {
+                    await GetVoiceListXTTS();
+                }
+                if (_xttsVoices != null) {
+                    foreach (var voice in _xttsVoices) {
+                        if (voice.ToLower().Contains(_voiceTypeXTTS)) {
+                            if (voice != null) {
+                                _xttsVoice = voice;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (_xttsVoice != null) {
+                try {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
+                        if (!File.Exists(stitchedPath)) {
+                            string trimmedText = TrimText(text);
+                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new string[] { trimmedText });
+                            List<string> audioPaths = new List<string>();
+                            foreach (string audioClip in audioClips) {
+                                audioPaths.Add(await GetVoicePathXTTS(_xttsVoice, audioClip));
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {
@@ -259,7 +452,7 @@ namespace RoleplayingMediaCore {
             return 0;
         }
 
-        private async Task<string> GetVoicePath(string voiceType, string trimmedText, Voice characterVoice) {
+        private async Task<string> GetVoicePathElevenlabs(string voiceType, string trimmedText, Voice characterVoice) {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
             try {
@@ -279,6 +472,25 @@ namespace RoleplayingMediaCore {
             }
             return audioPath;
         }
+        private async Task<string> GetVoicePathXTTS(string voiceType, string trimmedText) {
+            string audioPath = "";
+            try {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                    CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+                }
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType);
+                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                    audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                } else {
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType);
+                }
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+            }
+            return audioPath;
+        }
 
         private async Task<string> GetVoiceFromElevenLabs(string trimmedText, string voiceType,
             VoiceSettings defaultVoiceSettings, Voice characterVoice) {
@@ -292,6 +504,29 @@ namespace RoleplayingMediaCore {
                     audioPath = await _api.TextToSpeechEndpoint
                         .TextToSpeechAsync(finalText, characterVoice,
                         defaultVoiceSettings, new Model("eleven_turbo_v2"), rpVoiceCache);
+                }
+                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+            } catch {
+
+            }
+            return audioPath;
+        }
+
+        private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType) {
+            string unquotedText = trimmedText.Replace(@"""", null);
+            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+            string finalText = @"""" + numberAdjusted + @"""";
+            string audioPath = "";
+            bool foundInHistory = false;
+            try {
+                byte[] data = null;
+                if (!foundInHistory) {
+                    while (data == null || data.Length == 0) {
+                        data = await XTTSCommunicator.GetAudioAlternate(voiceType, finalText, Path.Combine(rpVoiceCache, "speakers"));
+                        Directory.CreateDirectory(Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\"));
+                        audioPath = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
+                        await File.WriteAllBytesAsync(audioPath, data);
+                    }
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
             } catch {
