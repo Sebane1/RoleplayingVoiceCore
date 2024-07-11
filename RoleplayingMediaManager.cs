@@ -110,7 +110,7 @@ namespace RoleplayingMediaCore {
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e) {
             XTTSStatus?.Invoke(this, e.Data);
-            if(e.Data.Contains("starts to load")) {
+            if(e.Data.Contains("Uvicorn running on")) {
                 InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
                 _xttsReady = true;
             }
