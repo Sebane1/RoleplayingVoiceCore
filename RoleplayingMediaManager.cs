@@ -109,15 +109,29 @@ namespace RoleplayingMediaCore {
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e) {
-            XTTSStatus?.Invoke(this, e.Data);
-            if(e.Data.Contains("Uvicorn running on")) {
-                InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
-                _xttsReady = true;
+            try {
+                if (e != null) {
+                    XTTSStatus?.Invoke(this, e.Data);
+                    if (!string.IsNullOrEmpty(e.Data)) {
+                        if (e.Data.Contains("Uvicorn running on")) {
+                            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
+                            _xttsReady = true;
+                        }
+                    }
+                }
+            } catch {
+
             }
         }
 
         private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e) {
-            XTTSStatus?.Invoke(this, e.Data);
+            try {
+                if (XTTSStatus != null) {
+                    XTTSStatus?.Invoke(this, e.Data);
+                }
+            } catch {
+
+            }
         }
 
         public void LaunchXTTS(string cache) {
