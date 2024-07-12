@@ -5,6 +5,7 @@ using ElevenLabs.Models;
 using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
+using NAudio.Lame;
 using RoleplayingMediaCore.AudioRecycler;
 using System.Diagnostics;
 using System.Numerics;
@@ -42,6 +43,7 @@ namespace RoleplayingMediaCore {
         private string _voiceTypeXTTS;
         private bool xttsAlreadyEnabled;
         private bool _xttsReady;
+        private string _basePath;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -166,6 +168,7 @@ namespace RoleplayingMediaCore {
         public SubscriptionInfo Info { get => _info; set => _info = value; }
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
+        public string BasePath { get => _basePath; set => _basePath = value; }
 
         public async Task<bool> ApiValidation(string key) {
             if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
@@ -536,6 +539,7 @@ namespace RoleplayingMediaCore {
                 byte[] data = null;
                 if (!foundInHistory) {
                     while (data == null || data.Length == 0) {
+                        LameDLL.LoadNativeDLL(_basePath);
                         data = await XTTSCommunicator.GetAudioAlternate(voiceType, finalText, Path.Combine(rpVoiceCache, "speakers"));
                         Directory.CreateDirectory(Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\"));
                         audioPath = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
