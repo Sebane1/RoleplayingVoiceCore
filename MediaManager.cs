@@ -36,6 +36,7 @@ namespace RoleplayingMediaCore {
         private float _npcVolume = 1;
         private float _cameraAndPlayerPositionSlider;
         private int _spatialAudioAccuracy = 100;
+        private bool _ignoreSpatialAudioForTTS;
 
         public float MainPlayerVolume { get => _mainPlayerVolume; set => _mainPlayerVolume = value; }
         public float OtherPlayerVolume { get => _otherPlayerVolume; set => _otherPlayerVolume = value; }
@@ -48,6 +49,7 @@ namespace RoleplayingMediaCore {
         public AudioOutputType AudioPlayerType { get => audioPlayerType; set => audioPlayerType = value; }
         public float CameraAndPlayerPositionSlider { get => _cameraAndPlayerPositionSlider; set => _cameraAndPlayerPositionSlider = value; }
         public int SpatialAudioAccuracy { get => _spatialAudioAccuracy; set => _spatialAudioAccuracy = value; }
+        public bool IgnoreSpatialAudioForTTS { get => _ignoreSpatialAudioForTTS; set => _ignoreSpatialAudioForTTS = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IMediaGameObject playerObject, IMediaGameObject camera, string libVLCPath) {
@@ -347,9 +349,11 @@ namespace RoleplayingMediaCore {
         }
         private void Update() {
             while (notDisposed) {
-                Task.Run(() => {
-                    UpdateVolumes(_textToSpeechSounds);
-                });
+                if (!_ignoreSpatialAudioForTTS) {
+                    Task.Run(() => {
+                        UpdateVolumes(_textToSpeechSounds);
+                    });
+                }
                 Task.Run(() => {
                     UpdateVolumes(_voicePackSounds);
                 });
