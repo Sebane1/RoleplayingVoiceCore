@@ -6,9 +6,11 @@ using System.Net.Http.Headers;
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
         Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
+        private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
 
-        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing) {
+        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType) {
             _characterToVoicePairing = characterToVoicePairing;
+            _characterToCacheType = characterToCacheType;
         }
         public enum VoiceModel {
             Quality,
@@ -18,16 +20,20 @@ namespace RoleplayingVoiceCore {
         public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false) {
             try {
-                string selectedVoice = "none";
+                string currentCharacter = "none";
                 foreach (var pair in _characterToVoicePairing) {
                     if (character.StartsWith(pair.Key) || character.EndsWith(pair.Key)) {
-                        selectedVoice = pair.Key;
+                        currentCharacter = pair.Key;
                         break;
                     }
                 }
-                if (_characterToVoicePairing.ContainsKey(selectedVoice)) {
+                if (_characterToVoicePairing.ContainsKey(currentCharacter)) {
+                    VoiceLinePriority voiceLinePriority = VoiceLinePriority.Elevenlabs;
+                    if (_characterToCacheType.ContainsKey(currentCharacter)) {
+                        voiceLinePriority = _characterToCacheType[currentCharacter];
+                    }
                     ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
-                        Voice = _characterToVoicePairing[selectedVoice],
+                        Voice = _characterToVoicePairing[currentCharacter],
                         Text = text,
                         UnfilteredText = originalValue,
                         Model = "quality",
@@ -35,7 +41,8 @@ namespace RoleplayingVoiceCore {
                         AggressiveCache = aggressiveCache,
                         RedoLine = redoLine,
                         ExtraJsonData = extraJson,
-                        Override = overrideGeneration
+                        Override = overrideGeneration,
+                        VoiceLinePriority = voiceLinePriority,
                     };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
