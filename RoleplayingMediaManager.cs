@@ -31,7 +31,10 @@ namespace RoleplayingMediaCore {
         private Voice _elevenLabsVoice;
         private string _xttsVoice;
         private string _voiceTypeElevenlabs;
-        private string _batchInstall = "call python -m venv venv\r\n" +
+        private string _batchInstall = "call python -m pip install --upgrade pip\r\n" +
+            "call pip3 install --upgrade pip\r\n" +
+            "call pip install --upgrade pip setuptools wheel\r\n" +
+            "call python -m venv venv\r\n" +
             "call venv\\Scripts\\activate\r\n" +
             "call pip install xtts-api-server\r\n" +
             "call pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118\r\n" +
@@ -44,6 +47,7 @@ namespace RoleplayingMediaCore {
         private bool xttsAlreadyEnabled;
         private bool _xttsReady;
         private string _basePath;
+        private string installBatchFile;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -67,6 +71,9 @@ namespace RoleplayingMediaCore {
             InitializationCallbacks += initializationCallbacks;
             RefreshElevenlabsSubscriptionInfo();
             GetVoiceListElevenlabs();
+            string folder = @"cd /d" + cache + "\r\n" + _batchInstall;
+            installBatchFile = Path.Combine(cache, "install.bat");
+            File.WriteAllText(installBatchFile, folder);
         }
         public void InitializeXTTS() {
             if (Environment.GetEnvironmentVariable("Path").Contains("Python")) {
@@ -89,10 +96,7 @@ namespace RoleplayingMediaCore {
         }
 
         public void InstallXTTS(string cache) {
-            string folder = @"cd /d" + cache + "\r\n" + _batchInstall;
-            string batchFile = Path.Combine(cache, "install.bat");
-            File.WriteAllText(batchFile, folder);
-            var processStart = new ProcessStartInfo(batchFile);
+            var processStart = new ProcessStartInfo(installBatchFile);
             processStart.RedirectStandardOutput = true;
             processStart.RedirectStandardError = true;
             processStart.WindowStyle = ProcessWindowStyle.Hidden;
@@ -107,7 +111,7 @@ namespace RoleplayingMediaCore {
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependancies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
+            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependencies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e) {
@@ -117,6 +121,10 @@ namespace RoleplayingMediaCore {
                     if (!string.IsNullOrEmpty(e.Data)) {
                         if (e.Data.Contains("Uvicorn running on")) {
                             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
+                            _xttsReady = true;
+                        }
+                        if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required.")) {
+                            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] XTTS installation failed. Missing Microsoft C++ 14.0 or greater. Install that, and re-launch Artemis.");
                             _xttsReady = true;
                         }
                     }
@@ -130,6 +138,10 @@ namespace RoleplayingMediaCore {
             try {
                 if (XTTSStatus != null) {
                     XTTSStatus?.Invoke(this, e.Data);
+                }
+                if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required.")) {
+                    InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] XTTS installation failed. Missing Microsoft C++ 14.0 or greater. Install that, and re-launch Artemis.");
+                    _xttsReady = true;
                 }
             } catch {
 

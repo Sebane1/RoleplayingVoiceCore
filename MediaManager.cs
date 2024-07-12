@@ -59,31 +59,31 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(),
-            EventHandler onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null) {
+            EventHandler onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
             await Task.Run(() => {
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
-                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
+                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
-                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
+                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.LoopUntilStopped:
-                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
+                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.ChatSound:
                                 ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0, default, onPlaybackStopped, streamVolumeEvent);
                                 break;
                             case SoundType.MainPlayerCombat:
                             case SoundType.OtherPlayerCombat:
-                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent);
+                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                         }
                     }
@@ -94,7 +94,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudioStream(IMediaGameObject playerObject, WaveStream audioStream, SoundType soundType,
             bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false,
-            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1) {
+            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1, float volumeOffset = 0) {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
@@ -113,7 +113,7 @@ namespace RoleplayingMediaCore {
                                 try {
                                     if (queue.Count > 0) {
                                         PlayAudioStream(playerObject, queue.Dequeue(), soundType,
-                                        false, useSmbPitch, pitch, delay, forceLowLatency, onStopped, streamVolumeChanged);
+                                        false, useSmbPitch, pitch, delay, forceLowLatency, onStopped, streamVolumeChanged, volumeOffset);
                                     }
                                 } catch { }
                             };
@@ -147,7 +147,7 @@ namespace RoleplayingMediaCore {
                                     }
                                 } catch { }
                             };
-                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, forceLowLatency, speed);
+                            mediaObject.Play(audioStream, volume, delay, useSmbPitch, audioPlayerType, pitch, forceLowLatency, speed, volumeOffset);
                         }
                     }
                 }
@@ -283,7 +283,7 @@ namespace RoleplayingMediaCore {
         public async void ConfigureAudio(IMediaGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler value = null,
-            EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null) {
+            EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
             await Task.Run(delegate {
                 if (playerObject != null) {
                     if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
@@ -334,7 +334,7 @@ namespace RoleplayingMediaCore {
                                         sounds[playerObject.Name].PlaybackStopped += value;
                                     }
                                     Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
-                                    sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode);
+                                    sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode, volumeOffset);
                                 }
                             } catch (Exception e) {
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });

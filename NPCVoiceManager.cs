@@ -17,7 +17,7 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character,
+        public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             try {
                 string currentCharacter = "none";
@@ -50,16 +50,20 @@ namespace RoleplayingVoiceCore {
                         httpClient.Timeout = new TimeSpan(0, 6, 0);
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
-                            return new KeyValuePair<Stream, bool>(null, false);
+                            return new Tuple<Stream, bool, string>(null, false, post.ReasonPhrase);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
                         MemoryStream memoryStream = new MemoryStream();
                         await result.CopyToAsync(memoryStream);
                         await result.FlushAsync();
                         memoryStream.Position = 0;
-                        return new KeyValuePair<Stream, bool>(memoryStream, true);
+                        return new Tuple<Stream, bool, string>(memoryStream, true, post.ReasonPhrase);
                     }
                 } else {
+                    VoiceLinePriority voiceLinePriority = VoiceLinePriority.AlternativeCache;
+                    if (_characterToCacheType.ContainsKey(currentCharacter)) {
+                        voiceLinePriority = _characterToCacheType[currentCharacter];
+                    }
                     ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
                         Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
                         Text = text, Model = voiceModel.ToString().ToLower(),
@@ -68,7 +72,7 @@ namespace RoleplayingVoiceCore {
                         AggressiveCache = aggressiveCache,
                         RedoLine = redoLine,
                         ExtraJsonData = extraJson,
-                        VoiceLinePriority = overrideVoiceLinePriority
+                        VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                     };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
@@ -76,18 +80,18 @@ namespace RoleplayingVoiceCore {
                         httpClient.Timeout = new TimeSpan(0, 6, 0);
                         var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(elevenLabsRequest)));
                         if (post.StatusCode != HttpStatusCode.OK) {
-                            return new KeyValuePair<Stream, bool>(null, false);
+                            return new Tuple<Stream, bool, string>(null, false, post.ReasonPhrase);
                         }
                         var result = await post.Content.ReadAsStreamAsync();
                         MemoryStream memoryStream = new MemoryStream();
                         await result.CopyToAsync(memoryStream);
                         await result.FlushAsync();
                         memoryStream.Position = 0;
-                        return new KeyValuePair<Stream, bool>(memoryStream, false);
+                        return new Tuple<Stream, bool, string>(memoryStream, true, post.ReasonPhrase);
                     }
                 }
             } catch {
-                return new KeyValuePair<Stream, bool>(null, false);
+                return new Tuple<Stream, bool, string>(null, false, "");
             }
         }
 

@@ -61,12 +61,13 @@ namespace RoleplayingMediaCore {
         /// For performance reasons inside the core of VLC, it must be aligned to multiples of 32.
         /// </summary>
         private uint _lines;
-        private float offsetVolume = 1;
+        private float volumePercentage = 1;
 
         private LoopStream _loopStream;
         private float _baseVolume = 1;
         private MeteringSampleProvider _meteringSampleProvider;
         private bool _vlcWasAbleToStart;
+        private float _volumeOffset;
 
         public MediaObject(MediaManager parent, IMediaGameObject playerObject, IMediaGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath) {
@@ -120,13 +121,13 @@ namespace RoleplayingMediaCore {
                         if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.LoopUntilStopped)) {
-                                offsetVolume = Math.Clamp(offsetVolume + 0.1f, 0, 0.8f);
+                                volumePercentage = Math.Clamp(volumePercentage + 0.1f, 0, 0.8f);
                             } else {
-                                offsetVolume = Math.Clamp(offsetVolume - 0.1f, 0.2f, 0.8f);
+                                volumePercentage = Math.Clamp(volumePercentage - 0.1f, 0.2f, 0.8f);
                             }
                         }
                         if (_volumeSampleProvider != null) {
-                            _volumeSampleProvider.Volume = _baseVolume * offsetVolume;
+                            _volumeSampleProvider.Volume = (_volumeOffset + _baseVolume) * volumePercentage;
                         }
                         lastPosition = _playerObject.Position;
                         Thread.Sleep(200);
@@ -165,14 +166,14 @@ namespace RoleplayingMediaCore {
             set {
                 if (_volumeSampleProvider != null) {
                     _baseVolume = value;
-                    _volumeSampleProvider.Volume = value * offsetVolume;
+                    _volumeSampleProvider.Volume = (_volumeOffset + value) * volumePercentage;
                 }
                 if (_vlcPlayer != null) {
                     try {
                         int newValue = (int)(value * 100f);
                         if (newValue != _vlcPlayer.Volume) {
                             _baseVolume = newValue;
-                            _vlcPlayer.Volume = (int)((float)newValue * offsetVolume);
+                            _vlcPlayer.Volume = (int)((float)newValue * volumePercentage);
                         }
                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
@@ -253,7 +254,8 @@ namespace RoleplayingMediaCore {
         }
 
         public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch,
-            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false, float speed = 1) {
+            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false, float speed = 1, float volumeOffset = 0) {
+            _volumeOffset = volumeOffset;
             if (!Invalidated) {
                 try {
                     if (PlaybackState == PlaybackState.Stopped) {
@@ -269,7 +271,7 @@ namespace RoleplayingMediaCore {
                             _player.TotalTime.TotalSeconds > 13) {
                             _soundType = SoundType.Loop;
                         }
-                        offsetVolume = 0.7f;
+                        volumePercentage = 0.7f;
                         if (delay > 0) {
                             Thread.Sleep(delay);
                         }
@@ -307,7 +309,7 @@ namespace RoleplayingMediaCore {
                                 _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
                                 _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
-                                _volumeSampleProvider.Volume = volume;
+                                _volumeSampleProvider.Volume = _volumeOffset + volume;
                                 _panningSampleProvider = new PanningSampleProvider(
                                 _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                                 Vector3 dir = CharacterObject.Position - _camera.Position;
@@ -344,11 +346,11 @@ namespace RoleplayingMediaCore {
                                     newSampleProvider = pitchSample;
                                 }
                                 _volumeSampleProvider = new VolumeSampleProvider(newSampleProvider);
-                                _volumeSampleProvider.Volume = volume;
+                                _volumeSampleProvider.Volume = _volumeOffset + volume;
                                 sampleProvider = _volumeSampleProvider;
                             } else {
                                 _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                                _volumeSampleProvider.Volume = volume;
+                                _volumeSampleProvider.Volume = _volumeOffset + volume;
                                 sampleProvider = _volumeSampleProvider;
                             }
                         }
@@ -402,7 +404,8 @@ namespace RoleplayingMediaCore {
         }
 
         public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
-            AudioOutputType audioPlayerType, bool lowPerformanceMode = false) {
+            AudioOutputType audioPlayerType, bool lowPerformanceMode = false, int volumeOffset = 0) {
+            _volumeOffset = volumeOffset;
             await Task.Run(async delegate {
                 try {
                     Stopwatch latencyTimer = Stopwatch.StartNew();
@@ -459,9 +462,9 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = volume;
+                                    _volumeSampleProvider.Volume = _volumeOffset + volume;
                                 } else {
-                                    offsetVolume = 0;
+                                    volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
                                 }
                                 _panningSampleProvider = new PanningSampleProvider(
@@ -476,9 +479,9 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = volume;
+                                    _volumeSampleProvider.Volume = _volumeOffset + volume;
                                 } else {
-                                    offsetVolume = 0;
+                                    volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
                                 }
                                 Pan = 0;
