@@ -18,7 +18,7 @@ namespace RoleplayingVoiceCore {
             Cheap,
         }
         public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character,
-            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false) {
+            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             try {
                 string currentCharacter = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -42,7 +42,7 @@ namespace RoleplayingVoiceCore {
                         RedoLine = redoLine,
                         ExtraJsonData = extraJson,
                         Override = overrideGeneration,
-                        VoiceLinePriority = voiceLinePriority,
+                        VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                     };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
@@ -68,6 +68,7 @@ namespace RoleplayingVoiceCore {
                         AggressiveCache = aggressiveCache,
                         RedoLine = redoLine,
                         ExtraJsonData = extraJson,
+                        VoiceLinePriority = overrideVoiceLinePriority
                     };
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
