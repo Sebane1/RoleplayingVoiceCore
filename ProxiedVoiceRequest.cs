@@ -28,7 +28,8 @@
         Elevenlabs,
         AlternativeCache,
         XTTS,
-        None
+        None,
+        Blacklist
     }
 }
 

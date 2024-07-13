@@ -1,9 +1,7 @@
 ﻿using LibVLCSharp.Shared;
-using NAudio.CoreAudioApi;
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using Newtonsoft.Json.Linq;
 using RoleplayingVoiceCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
@@ -127,7 +125,7 @@ namespace RoleplayingMediaCore {
                             }
                         }
                         if (_volumeSampleProvider != null) {
-                            _volumeSampleProvider.Volume = (_volumeOffset + _baseVolume) * volumePercentage;
+                            _volumeSampleProvider.Volume = (_volumeOffset * _baseVolume) * volumePercentage;
                         }
                         lastPosition = _playerObject.Position;
                         Thread.Sleep(200);
@@ -166,7 +164,7 @@ namespace RoleplayingMediaCore {
             set {
                 if (_volumeSampleProvider != null) {
                     _baseVolume = value;
-                    _volumeSampleProvider.Volume = (_volumeOffset + value) * volumePercentage;
+                    _volumeSampleProvider.Volume = (_volumeOffset * value) * volumePercentage;
                 }
                 if (_vlcPlayer != null) {
                     try {
@@ -254,7 +252,7 @@ namespace RoleplayingMediaCore {
         }
 
         public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch,
-            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false, float speed = 1, float volumeOffset = 0) {
+            AudioOutputType audioPlayerType, float pitch = 0, bool lowPerformanceMode = false, float speed = 1, float volumeOffset = 1) {
             _volumeOffset = volumeOffset;
             if (!Invalidated) {
                 try {
@@ -309,7 +307,7 @@ namespace RoleplayingMediaCore {
                                 _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
                                 _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
-                                _volumeSampleProvider.Volume = _volumeOffset + volume;
+                                _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 _panningSampleProvider = new PanningSampleProvider(
                                 _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                                 Vector3 dir = CharacterObject.Position - _camera.Position;
@@ -346,11 +344,11 @@ namespace RoleplayingMediaCore {
                                     newSampleProvider = pitchSample;
                                 }
                                 _volumeSampleProvider = new VolumeSampleProvider(newSampleProvider);
-                                _volumeSampleProvider.Volume = _volumeOffset + volume;
+                                _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 sampleProvider = _volumeSampleProvider;
                             } else {
                                 _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
-                                _volumeSampleProvider.Volume = _volumeOffset + volume;
+                                _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 sampleProvider = _volumeSampleProvider;
                             }
                         }
@@ -462,7 +460,7 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = _volumeOffset + volume;
+                                    _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 } else {
                                     volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
@@ -479,7 +477,7 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = _volumeOffset + volume;
+                                    _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 } else {
                                     volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;

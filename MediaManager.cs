@@ -96,7 +96,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudioStream(IMediaGameObject playerObject, WaveStream audioStream, SoundType soundType,
             bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false,
-            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1, float volumeOffset = 0) {
+            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1, float volumeOffset = 1) {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
