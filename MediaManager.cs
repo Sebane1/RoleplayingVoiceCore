@@ -349,11 +349,9 @@ namespace RoleplayingMediaCore {
         }
         private void Update() {
             while (notDisposed) {
-                if (!_ignoreSpatialAudioForTTS) {
-                    Task.Run(() => {
-                        UpdateVolumes(_textToSpeechSounds);
-                    });
-                }
+                Task.Run(() => {
+                    UpdateVolumes(_textToSpeechSounds);
+                });
                 Task.Run(() => {
                     UpdateVolumes(_voicePackSounds);
                 });
@@ -391,7 +389,9 @@ namespace RoleplayingMediaCore {
                                     float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                                     float pan = Math.Clamp(direction / 3, -1, 1);
                                     try {
-                                        sounds[characterObjectName].Pan = pan;
+                                        if (!_ignoreSpatialAudioForTTS) {
+                                            sounds[characterObjectName].Pan = pan;
+                                        }
                                         sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
                                     } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                                 }
