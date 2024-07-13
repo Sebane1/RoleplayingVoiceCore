@@ -25,11 +25,11 @@
         public VoiceLinePriority VoiceLinePriority { get => _voiceLinePriority; set => _voiceLinePriority = value; }
     }
     public enum VoiceLinePriority {
-        Elevenlabs,
-        AlternativeCache,
-        XTTS,
-        None,
-        Blacklist
+        Elevenlabs = 0,
+        AlternativeCache = 1,
+        XTTS = 2,
+        None = 3,
+        Blacklist = 4
     }
 }
 
