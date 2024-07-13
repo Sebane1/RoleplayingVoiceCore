@@ -29,7 +29,8 @@
         AlternativeCache = 1,
         XTTS = 2,
         None = 3,
-        Blacklist = 4
+        Undefined = 4,
+        Ignore = 5,
     }
 }
 
