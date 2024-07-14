@@ -125,7 +125,7 @@ namespace RoleplayingVoiceCore {
                         }
                     }
                     if (succeeded) {
-                        if (voiceEngine != "XTTS" && voiceEngine != "OK") {
+                        if (voiceEngine != "XTTS" && voiceEngine != "OK" || character.ToLower().Contains("narrator")) {
                             if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
                                 _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
                             }
