@@ -26,7 +26,7 @@
     }
     public enum VoiceLinePriority {
         Elevenlabs = 0,
-        AlternativeCache = 1,
+        Alternative = 1,
         XTTS = 2,
         None = 3,
         Datamining = 4,

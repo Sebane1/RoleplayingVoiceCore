@@ -31,7 +31,8 @@ namespace RoleplayingMediaCore {
         private Voice _elevenLabsVoice;
         private string _xttsVoice;
         private string _voiceTypeElevenlabs;
-        private string _batchInstall = "call python -m pip install --upgrade pip\r\n" +
+        private string _batchInstall = "call winget install Microsoft.VisualStudio.2022. BuildTools --force --override \"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
+            "call python -m pip install --upgrade pip\r\n" +
             "call pip3 install --upgrade pip\r\n" +
             "call pip install --upgrade pip setuptools wheel\r\n" +
             "call python -m venv venv\r\n" +
