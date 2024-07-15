@@ -61,7 +61,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(),
-            EventHandler onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
+            EventHandler onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
             await Task.Run(() => {
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
