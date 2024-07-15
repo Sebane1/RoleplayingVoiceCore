@@ -31,6 +31,7 @@
         None = 3,
         Datamining = 4,
         Ignore = 5,
+        SendNote = 6,
     }
 }
 
