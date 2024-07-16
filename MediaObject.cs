@@ -29,7 +29,7 @@ namespace RoleplayingMediaCore {
         private static MemoryMappedFile _currentMappedFile;
         private static MemoryMappedViewAccessor _currentMappedViewAccessor;
         public event EventHandler<MediaError> OnErrorReceived;
-        public event EventHandler PlaybackStopped;
+        public event EventHandler<string> PlaybackStopped;
         public event EventHandler<StreamVolumeEventArgs> StreamVolumeChanged;
 
         private string _soundPath;
@@ -97,7 +97,7 @@ namespace RoleplayingMediaCore {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
                           (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                _wavePlayer.Stop();
+                                _wavePlayer?.Stop();
                                 break;
                             }
                         }
@@ -135,13 +135,16 @@ namespace RoleplayingMediaCore {
         }
         private void DonePlayingCheck() {
             Task.Run(async () => {
+                long lastPosition = _player.Position;
                 try {
                     Thread.Sleep(1200);
                     while (true) {
-                        if (_player.Position >= _player.Length) {
+                        if (_player.Position == lastPosition) {
                             Thread.Sleep(500);
                             _wavePlayer.Stop();
+                            break;
                         }
+                        lastPosition = _player.Position;
                         Thread.Sleep(250);
                     }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
@@ -227,7 +230,7 @@ namespace RoleplayingMediaCore {
                             _wavePlayer?.Stop();
                             _wavePlayer?.Dispose();
                         } catch {
-
+                            PlaybackStopped.Invoke(this, "OK");
                         }
                     }
                     if (_loopStream != null) {
@@ -238,7 +241,12 @@ namespace RoleplayingMediaCore {
 
                         }
                     }
-                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                } catch (Exception e) {
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                    PlaybackStopped.Invoke(this, "OK");
+                }
+            } else {
+                PlaybackStopped.Invoke(this, "OK");
             }
             if (_vlcPlayer != null) {
                 try {
@@ -384,18 +392,43 @@ namespace RoleplayingMediaCore {
                                 _wavePlayer.PlaybackStopped += delegate {
                                     if (PlaybackStopped != null) {
                                         try {
-                                            PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                            PlaybackStopped?.Invoke(this, "OK");
                                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                                     }
                                 };
                                 _wavePlayer?.Play();
                                 DonePlayingCheck();
-                            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                            } catch (Exception e) {
+                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                                PlaybackStopped?.Invoke(this, "ERR");
+                            }
                         }
                     }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
+
+        //private void NPCDoneTalking() {
+        //    Task.Run(async () => {
+        //        try {
+        //           int lastPosition = 
+        //            Thread.Sleep(500);
+        //            while (true) {
+        //                if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
+        //                    float distance = Vector3.Distance(lastPosition, _playerObject.Position);
+        //                    if () {
+        //                        _wavePlayer?.Stop();
+        //                        break;
+        //                    }
+        //                }
+        //                if (_soundType == SoundType.LoopWhileMoving) {
+        //                    lastPosition = _playerObject.Position;
+        //                }
+        //                Thread.Sleep(200);
+        //            }
+        //        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+        //    });
+        //}
 
         private void _meteringSampleProvider_StreamVolume(object? sender, StreamVolumeEventArgs e) {
             StreamVolumeChanged?.Invoke(sender, e);
@@ -513,7 +546,7 @@ namespace RoleplayingMediaCore {
                                         }
                                     }
                                     _wavePlayer.PlaybackStopped += delegate {
-                                        PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                                        PlaybackStopped?.Invoke(this, "OK");
                                     };
                                     if (_wavePlayer != null) {
                                         _wavePlayer?.Play();
@@ -521,7 +554,10 @@ namespace RoleplayingMediaCore {
                                     if (_soundType == SoundType.LoopUntilStopped) {
                                         MountLoopCheck();
                                     }
-                                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                } catch (Exception e) {
+                                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                                    PlaybackStopped?.Invoke(this, "ERR");
+                                }
                             }
                         } else {
                             try {
@@ -545,10 +581,16 @@ namespace RoleplayingMediaCore {
                                 Volume = volume;
                                 _vlcPlayer.Play();
                                 _vlcWasAbleToStart = true;
-                            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                            } catch (Exception e) {
+                                OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                                PlaybackStopped?.Invoke(this, "OK");
+                            }
                         }
                     }
-                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                } catch (Exception e) {
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                    PlaybackStopped?.Invoke(this, "ERR");
+                }
             });
         }
         public async void ChangeVideoStream(string soundPath, float width) {

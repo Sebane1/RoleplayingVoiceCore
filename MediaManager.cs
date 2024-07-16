@@ -61,7 +61,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(),
-            EventHandler onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
+            EventHandler<string> onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
             await Task.Run(() => {
                 if (!string.IsNullOrEmpty(audioPath)) {
                     if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
@@ -96,7 +96,7 @@ namespace RoleplayingMediaCore {
 
         public async void PlayAudioStream(IMediaGameObject playerObject, WaveStream audioStream, SoundType soundType,
             bool queuePlayback, bool useSmbPitch, float pitch, int delay = 0, bool forceLowLatency = false,
-            EventHandler onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1, float volumeOffset = 1) {
+            EventHandler<string> onStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeChanged = null, float speed = 1, float volumeOffset = 1) {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
@@ -111,7 +111,7 @@ namespace RoleplayingMediaCore {
                             _nativeAudioQueue[playerObject.Name].Enqueue(audioStream);
                             string name = playerObject.Name;
                             var queue = _nativeAudioQueue[name];
-                            EventHandler function = delegate {
+                            EventHandler<string> function = delegate {
                                 try {
                                     if (queue.Count > 0) {
                                         PlayAudioStream(playerObject, queue.Dequeue(), soundType,
@@ -119,7 +119,7 @@ namespace RoleplayingMediaCore {
                                     }
                                 } catch { }
                             };
-                            EventHandler removalFunction = delegate {
+                            EventHandler<string> removalFunction = delegate {
                                 mediaObject.PlaybackStopped -= function;
                                 mediaObject.Invalidated = true;
                             };
@@ -284,7 +284,7 @@ namespace RoleplayingMediaCore {
         }
         public async void ConfigureAudio(IMediaGameObject playerObject, string audioPath,
             SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds,
-            int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler value = null,
+            int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler<string> value = null,
             EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
             await Task.Run(delegate {
                 if (playerObject != null) {
