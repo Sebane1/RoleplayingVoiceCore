@@ -1,4 +1,5 @@
 ﻿using ElevenLabs.Voices;
+using NAudio.Wave;
 using Newtonsoft.Json;
 using RoleplayingMediaCore.AudioRecycler;
 using System.IO;
@@ -31,11 +32,12 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
-        public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string character,
+        public async Task<Tuple<WaveStream, bool, string>> GetCharacterAudio(string text, string originalValue, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             MemoryStream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
+            WaveStream waveStream = null;
             try {
                 string characterVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -55,15 +57,18 @@ namespace RoleplayingVoiceCore {
                         if (voiceLinePriority != VoiceLinePriority.None) {
                             needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
                         }
-                        if(overrideVoiceLinePriority != VoiceLinePriority.None) {
+                        if (overrideVoiceLinePriority != VoiceLinePriority.None) {
                             needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
                         }
                         string fullPath = Path.Combine(_cachePath, relativePath);
                         if (File.Exists(fullPath) && !needsRefreshing) {
                             voiceEngine = _characterVoices.VoiceEngine[character][text];
-                            memoryStream = new MemoryStream(await File.ReadAllBytesAsync(fullPath));
-                            memoryStream.Position = 0;
-                            succeeded = true;
+                            try {
+                                waveStream = new MediaFoundationReader(fullPath);
+                                succeeded = true;
+                            } catch {
+                                needsRefreshing = true;
+                            }
                         }
                     }
                 }
@@ -144,16 +149,21 @@ namespace RoleplayingVoiceCore {
                                 }
                                 _characterVoices.VoiceCatalogue[character][text] = filePath;
                                 Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
-                                await File.WriteAllBytesAsync(Path.Combine(_cachePath, filePath), memoryStream.ToArray());
+                                using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                    await memoryStream.CopyToAsync(stream);
+                                    await memoryStream.FlushAsync();
+                                }
                                 await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                             }
+                            memoryStream.Position = 0;
+                            waveStream = new StreamMediaFoundationReader(memoryStream);
                         }
                     }
                 }
             } catch {
-                return new Tuple<Stream, bool, string>(null, false, "Error");
+                return new Tuple<WaveStream, bool, string>(null, false, "Error");
             }
-            return new Tuple<Stream, bool, string>(memoryStream, succeeded, voiceEngine);
+            return new Tuple<WaveStream, bool, string>(waveStream, succeeded, voiceEngine);
         }
 
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {
