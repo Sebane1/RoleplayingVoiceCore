@@ -75,7 +75,7 @@ namespace RoleplayingVoiceCore {
                 }
                 if (!succeeded) {
                     if (_characterToVoicePairing.ContainsKey(characterVoice)) {
-                        if (overrideVoiceLinePriority == VoiceLinePriority.None) {
+                        if (voiceLinePriority == VoiceLinePriority.None) {
                             voiceLinePriority = VoiceLinePriority.Elevenlabs;
                         }
                         ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
@@ -105,7 +105,7 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                     } else {
-                        if (overrideVoiceLinePriority == VoiceLinePriority.None) {
+                        if (voiceLinePriority == VoiceLinePriority.None) {
                             voiceLinePriority = VoiceLinePriority.Alternative;
                         }
                         ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
