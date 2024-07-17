@@ -68,6 +68,7 @@ namespace RoleplayingVoiceCore {
                                 succeeded = true;
                             } catch {
                                 needsRefreshing = true;
+                                File.Delete(fullPath);
                             }
                         }
                     }

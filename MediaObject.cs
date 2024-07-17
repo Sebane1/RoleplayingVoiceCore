@@ -134,15 +134,23 @@ namespace RoleplayingMediaCore {
             });
         }
         private void DonePlayingCheck() {
+            Stopwatch stopwatch = new Stopwatch();
             Task.Run(async () => {
                 long lastPosition = _player.Position;
                 try {
                     Thread.Sleep(1200);
                     while (true) {
                         if (_player.Position == lastPosition) {
-                            Thread.Sleep(500);
-                            _wavePlayer.Stop();
-                            break;
+                            if (!stopwatch.IsRunning) {
+                                stopwatch.Start();
+                            }
+                            if (stopwatch.ElapsedMilliseconds > 500) {
+                                Thread.Sleep(500);
+                                _wavePlayer.Stop();
+                                break;
+                            }
+                        } else {
+                            stopwatch.Reset();
                         }
                         lastPosition = _player.Position;
                         Thread.Sleep(250);
