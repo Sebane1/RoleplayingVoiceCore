@@ -155,9 +155,9 @@ namespace RoleplayingVoiceCore {
                                 }
                                 await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                             }
-                            memoryStream.Position = 0;
-                            waveStream = new StreamMediaFoundationReader(memoryStream);
                         }
+                        memoryStream.Position = 0;
+                        waveStream = new StreamMediaFoundationReader(memoryStream);
                     }
                 }
             } catch {
