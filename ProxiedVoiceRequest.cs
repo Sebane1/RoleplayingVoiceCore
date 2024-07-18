@@ -23,6 +23,7 @@
         public bool RedoLine { get => _redoLine; set => _redoLine = value; }
         public bool Override { get => _override; set => _override = value; }
         public VoiceLinePriority VoiceLinePriority { get => _voiceLinePriority; set => _voiceLinePriority = value; }
+        public string RawText { get; internal set; }
     }
     public enum VoiceLinePriority {
         Elevenlabs = 0,

@@ -16,14 +16,16 @@ namespace RoleplayingVoiceCore {
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType, string cacheLocation) {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
-            _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
-            Directory.CreateDirectory(_cachePath);
-            string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
-            if (File.Exists(cacheFile)) {
-                try {
-                    _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
-                } catch {
+            if (cacheLocation != null) {
+                _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
+                Directory.CreateDirectory(_cachePath);
+                string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
+                if (File.Exists(cacheFile)) {
+                    try {
+                        _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
+                    } catch {
 
+                    }
                 }
             }
         }
@@ -32,7 +34,7 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
-        public async Task<Tuple<WaveStream, bool, string>> GetCharacterAudio(string text, string originalValue, string character,
+        public async Task<Tuple<WaveStream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             MemoryStream memoryStream = new MemoryStream();
             string voiceEngine = "";
@@ -50,25 +52,27 @@ namespace RoleplayingVoiceCore {
                 if (_characterToCacheType.ContainsKey(characterVoice)) {
                     voiceLinePriority = _characterToCacheType[characterVoice];
                 }
-                if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
-                    if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
-                        string relativePath = _characterVoices.VoiceCatalogue[character][text];
-                        bool needsRefreshing = false;
-                        if (voiceLinePriority != VoiceLinePriority.None) {
-                            needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
-                        }
-                        if (overrideVoiceLinePriority != VoiceLinePriority.None) {
-                            needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
-                        }
-                        string fullPath = Path.Combine(_cachePath, relativePath);
-                        if (File.Exists(fullPath) && !needsRefreshing) {
-                            voiceEngine = _characterVoices.VoiceEngine[character][text];
-                            try {
-                                waveStream = new MediaFoundationReader(fullPath);
-                                succeeded = true;
-                            } catch {
-                                needsRefreshing = true;
-                                File.Delete(fullPath);
+                if (!string.IsNullOrEmpty(_cachePath)) {
+                    if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
+                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
+                            string relativePath = _characterVoices.VoiceCatalogue[character][text];
+                            bool needsRefreshing = false;
+                            if (voiceLinePriority != VoiceLinePriority.None) {
+                                needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
+                            }
+                            if (overrideVoiceLinePriority != VoiceLinePriority.None) {
+                                needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
+                            }
+                            string fullPath = Path.Combine(_cachePath, relativePath);
+                            if (File.Exists(fullPath) && !needsRefreshing) {
+                                voiceEngine = _characterVoices.VoiceEngine[character][text];
+                                try {
+                                    waveStream = new MediaFoundationReader(fullPath);
+                                    succeeded = true;
+                                } catch {
+                                    needsRefreshing = true;
+                                    File.Delete(fullPath);
+                                }
                             }
                         }
                     }
@@ -81,6 +85,7 @@ namespace RoleplayingVoiceCore {
                         ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
                             Voice = _characterToVoicePairing[characterVoice],
                             Text = text,
+                            RawText = rawText,
                             UnfilteredText = originalValue,
                             Model = "quality",
                             Character = character,
@@ -111,11 +116,13 @@ namespace RoleplayingVoiceCore {
                         ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
                             Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
                             Text = text, Model = voiceModel.ToString().ToLower(),
+                            RawText = rawText,
                             UnfilteredText = originalValue,
                             Character = character,
                             AggressiveCache = aggressiveCache,
                             RedoLine = redoLine,
                             ExtraJsonData = extraJson,
+                            Override = overrideGeneration,
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                         };
                         using (HttpClient httpClient = new HttpClient()) {

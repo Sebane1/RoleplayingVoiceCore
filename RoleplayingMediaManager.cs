@@ -31,7 +31,10 @@ namespace RoleplayingMediaCore {
         private Voice _elevenLabsVoice;
         private string _xttsVoice;
         private string _voiceTypeElevenlabs;
-        private string _batchInstall = "call winget install Microsoft.VisualStudio.2022. BuildTools --force --override \"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
+
+        private string _installPython = "call winget install -e -i --id=Python.Python.3.10 --source=winget --scope=machine";
+
+        private string _batchInstall = "call winget install Microsoft.VisualStudio.2022.BuildTools --force --override \"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
             "call python -m pip install --upgrade pip\r\n" +
             "call pip3 install --upgrade pip\r\n" +
             "call pip install --upgrade pip setuptools wheel\r\n" +
@@ -49,6 +52,7 @@ namespace RoleplayingMediaCore {
         private bool _xttsReady;
         private string _basePath;
         private string installBatchFile;
+        private bool _pythonAutoInstalled;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -76,12 +80,35 @@ namespace RoleplayingMediaCore {
             installBatchFile = Path.Combine(cache, "install.bat");
             File.WriteAllText(installBatchFile, folder);
         }
+        public void InstallPython() {
+            var processStart = new ProcessStartInfo(_installPython);
+            processStart.RedirectStandardOutput = true;
+            processStart.RedirectStandardError = true;
+            processStart.WindowStyle = ProcessWindowStyle.Hidden;
+            processStart.UseShellExecute = false;
+            processStart.RedirectStandardInput = true;
+            processStart.CreateNoWindow = true;
+            Process process = new Process();
+            process.StartInfo = processStart;
+            process.OutputDataReceived += Process_OutputDataReceived;
+            process.ErrorDataReceived += Process_ErrorDataReceived;
+            process.EnableRaisingEvents = true;
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Python not detected, attempting to auto install.");
+            process.WaitForExit();
+            _pythonAutoInstalled = true;
+        }
         public void InitializeXTTS() {
-            if (Environment.GetEnvironmentVariable("Path").Contains("Python")) {
+            Task.Run(() => {
                 if (!xttsAlreadyEnabled) {
                     xttsAlreadyEnabled = true;
+                    if (!Environment.GetEnvironmentVariable("Path").Contains("Python")) {
+                        InstallPython();
+                    }
                     if (!XTTSCommunicator.SetSpeakers(Path.Combine(rpVoiceCache, "speakers"))) {
-                        if (!File.Exists(Path.Combine(rpVoiceCache, "venv\\Scripts\\activate.bat"))) {
+                        if (!File.Exists(Path.Combine(rpVoiceCache, "xtts_models\\v2.0.2\\model.pth"))) {
                             InstallXTTS(rpVoiceCache);
                         } else {
                             LaunchXTTS(rpVoiceCache);
@@ -91,12 +118,11 @@ namespace RoleplayingMediaCore {
                         _xttsReady = true;
                     }
                 }
-            } else {
-                InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Python path variable was not detected. Please install Python 3.10 to install and use local player voice.");
-            }
+            });
         }
 
         public void InstallXTTS(string cache) {
+            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Attempting to install C++ build tools please accept the UAC prompt that appears, as this dependency is required for XTTS installation to function. If the UAC prompt was rejected, restart Artemis to try again.");
             var processStart = new ProcessStartInfo(installBatchFile);
             processStart.RedirectStandardOutput = true;
             processStart.RedirectStandardError = true;
