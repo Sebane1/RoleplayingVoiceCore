@@ -12,8 +12,9 @@ namespace RoleplayingVoiceCore {
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
         private CharacterVoices _characterVoices = new CharacterVoices();
         private string _cachePath = "";
+        private string _versionIdentifier;
 
-        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType, string cacheLocation) {
+        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType, string cacheLocation, string version) {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
             if (cacheLocation != null) {
@@ -28,6 +29,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
+            _versionIdentifier = version;
         }
         public enum VoiceModel {
             Quality,
@@ -93,7 +95,8 @@ namespace RoleplayingVoiceCore {
                             RedoLine = redoLine,
                             ExtraJsonData = extraJson,
                             Override = overrideGeneration,
-                            VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
+                            VersionIdentifier = _versionIdentifier,
+                            VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
                         };
                         using (HttpClient httpClient = new HttpClient()) {
                             httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
@@ -123,6 +126,7 @@ namespace RoleplayingVoiceCore {
                             RedoLine = redoLine,
                             ExtraJsonData = extraJson,
                             Override = overrideGeneration,
+                            VersionIdentifier = _versionIdentifier,
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                         };
                         using (HttpClient httpClient = new HttpClient()) {
@@ -140,32 +144,34 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                     }
-                    if (succeeded) {
-                        if ((voiceEngine != "XTTS" && voiceEngine != "OK" && voiceEngine != "") || character.ToLower().Contains("narrator")) {
-                            if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
-                                _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
-                            }
-                            if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
-                                _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
-                            }
-                            if (memoryStream.Length > 0) {
-                                string relativeFolderPath = character + "\\";
-                                string filePath = relativeFolderPath + Guid.NewGuid() + ".mp3";
-                                _characterVoices.VoiceEngine[character][text] = voiceEngine;
-                                if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
-                                    File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
+                    if (!string.IsNullOrEmpty(_cachePath)) {
+                        if (succeeded) {
+                            if ((voiceEngine != "XTTS" && voiceEngine != "OK" && voiceEngine != "") || character.ToLower().Contains("narrator")) {
+                                if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
+                                    _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
                                 }
-                                _characterVoices.VoiceCatalogue[character][text] = filePath;
-                                Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
-                                using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
-                                    await memoryStream.CopyToAsync(stream);
-                                    await memoryStream.FlushAsync();
+                                if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
+                                    _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
                                 }
-                                await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                if (memoryStream.Length > 0) {
+                                    string relativeFolderPath = character + "\\";
+                                    string filePath = relativeFolderPath + Guid.NewGuid() + ".mp3";
+                                    _characterVoices.VoiceEngine[character][text] = voiceEngine;
+                                    if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
+                                        File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
+                                    }
+                                    _characterVoices.VoiceCatalogue[character][text] = filePath;
+                                    Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
+                                    using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                        await memoryStream.CopyToAsync(stream);
+                                        await memoryStream.FlushAsync();
+                                    }
+                                    await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                }
                             }
+                            memoryStream.Position = 0;
+                            waveStream = new StreamMediaFoundationReader(memoryStream);
                         }
-                        memoryStream.Position = 0;
-                        waveStream = new StreamMediaFoundationReader(memoryStream);
                     }
                 }
             } catch {

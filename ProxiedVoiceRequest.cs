@@ -1,12 +1,13 @@
 ﻿namespace RoleplayingVoiceCore {
     public class ProxiedVoiceRequest {
-        string _character;
-        string _voice;
-        string _text;
-        string _unfilteredtext;
-        string _model;
-        string extraJsonData;
-        VoiceLinePriority _voiceLinePriority;
+        private string _versionIdentifier;
+        private string _character;
+        private string _voice;
+        private string _text;
+        private string _unfilteredtext;
+        private string _model;
+        private string extraJsonData;
+        private VoiceLinePriority _voiceLinePriority;
 
         bool _aggressiveCache;
         bool _redoLine;
@@ -24,6 +25,7 @@
         public bool Override { get => _override; set => _override = value; }
         public VoiceLinePriority VoiceLinePriority { get => _voiceLinePriority; set => _voiceLinePriority = value; }
         public string RawText { get; internal set; }
+        public string VersionIdentifier { get => _versionIdentifier; set => _versionIdentifier = value; }
     }
     public enum VoiceLinePriority {
         Elevenlabs = 0,
