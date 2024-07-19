@@ -32,7 +32,7 @@ namespace RoleplayingMediaCore {
         private string _xttsVoice;
         private string _voiceTypeElevenlabs;
 
-        private string _installPython = "call winget install -e -i --id=Python.Python.3.10 --source=winget --scope=machine";
+        private string _installPythonBathc = "call winget install -e -i --id=Python.Python.3.10 --source=winget --scope=machine";
 
         private string _batchInstall = "call winget install Microsoft.VisualStudio.2022.BuildTools --force --override \"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
             "call python -m pip install --upgrade pip\r\n" +
@@ -53,6 +53,7 @@ namespace RoleplayingMediaCore {
         private string _basePath;
         private string installBatchFile;
         private bool _pythonAutoInstalled;
+        private string pythonBatchFile;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -76,12 +77,15 @@ namespace RoleplayingMediaCore {
             InitializationCallbacks += initializationCallbacks;
             RefreshElevenlabsSubscriptionInfo();
             GetVoiceListElevenlabs();
-            string folder = @"cd /d" + cache + "\r\n" + _batchInstall;
+            string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
             installBatchFile = Path.Combine(cache, "install.bat");
-            File.WriteAllText(installBatchFile, folder);
+            File.WriteAllText(installBatchFile, batchScript);
+            batchScript = @"cd /d" + cache + "\r\n" + _installPythonBathc;
+            pythonBatchFile = Path.Combine(cache, "pythonInstall.bat");
+            File.WriteAllText(pythonBatchFile, batchScript);
         }
         public void InstallPython() {
-            var processStart = new ProcessStartInfo(_installPython);
+            var processStart = new ProcessStartInfo(pythonBatchFile);
             processStart.RedirectStandardOutput = true;
             processStart.RedirectStandardError = true;
             processStart.WindowStyle = ProcessWindowStyle.Hidden;
