@@ -32,9 +32,10 @@ namespace RoleplayingMediaCore {
         private string _xttsVoice;
         private string _voiceTypeElevenlabs;
 
-        private string _installPythonBathc = "call winget install -e -i --id=Python.Python.3.10 --source=winget --scope=machine";
+        private string _installPythonBatch = "call winget install -e -i --id=Python.Python.3.10 --source=winget --scope=machine";
 
-        private string _batchInstall = "call winget install Microsoft.VisualStudio.2022.BuildTools --force --override \"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
+        private string _batchInstall = "call winget install Microsoft.VisualStudio.2022.BuildTools --force --override " +
+            "\"--passive --wait --add Microsoft.VisualStudio.Workload.VCTools; include Recommended\"\r\n" +
             "call python -m pip install --upgrade pip\r\n" +
             "call pip3 install --upgrade pip\r\n" +
             "call pip install --upgrade pip setuptools wheel\r\n" +
@@ -80,7 +81,7 @@ namespace RoleplayingMediaCore {
             string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
             installBatchFile = Path.Combine(cache, "install.bat");
             File.WriteAllText(installBatchFile, batchScript);
-            batchScript = @"cd /d" + cache + "\r\n" + _installPythonBathc;
+            batchScript = @"cd /d" + cache + "\r\n" + _installPythonBatch;
             pythonBatchFile = Path.Combine(cache, "pythonInstall.bat");
             File.WriteAllText(pythonBatchFile, batchScript);
         }
