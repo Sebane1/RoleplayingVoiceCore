@@ -363,7 +363,7 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 sampleProvider = _volumeSampleProvider;
                             } else {
-                                _volumeSampleProvider = new VolumeSampleProvider(desiredStream.ToSampleProvider());
+                                _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _volumeSampleProvider.Volume = _volumeOffset * volume;
                                 sampleProvider = _volumeSampleProvider;
                             }
