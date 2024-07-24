@@ -17,7 +17,7 @@ namespace RoleplayingMediaCore {
         private IMediaGameObject _playerObject;
         private IMediaGameObject _camera;
         private SoundType _soundType;
-
+        private bool _spatialAllowed;
         private VolumeSampleProvider _volumeSampleProvider;
         private PanningSampleProvider _panningSampleProvider;
         private IWavePlayer _wavePlayer;
@@ -68,13 +68,14 @@ namespace RoleplayingMediaCore {
         private float _volumeOffset;
 
         public MediaObject(MediaManager parent, IMediaGameObject playerObject, IMediaGameObject camera,
-            SoundType soundType, string soundPath, string libVLCPath) {
+            SoundType soundType, string soundPath, string libVLCPath, bool spatialAllowed) {
             _playerObject = playerObject;
             _soundPath = soundPath;
             _camera = camera;
             _libVLCPath = libVLCPath;
             _parent = parent;
             this._soundType = soundType;
+            _spatialAllowed = spatialAllowed;
             _pitch = Align(_width * _bytePerPixel);
             _lines = Align(_height);
         }
@@ -228,6 +229,7 @@ namespace RoleplayingMediaCore {
 
         public IMediaGameObject Camera { get => _camera; set => _camera = value; }
         public bool Invalidated { get; internal set; }
+        public bool SpatialAllowed { get => _spatialAllowed; set => _spatialAllowed = value; }
 
         public void Stop() {
             Volume = 0;
@@ -509,8 +511,10 @@ namespace RoleplayingMediaCore {
                                 _panningSampleProvider = new PanningSampleProvider(
                                 _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                                 Vector3 dir = CharacterObject.Position - _camera.Position;
-                                float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                                if (_spatialAllowed) {
+                                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                    _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                                }
                                 sampleProvider = _panningSampleProvider;
                             } else {
                                 _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());

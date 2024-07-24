@@ -4,6 +4,7 @@ using System.Net;
 using NAudio.Wave;
 using NAudio.Lame;
 using System.Diagnostics;
+using RoleplayingVoiceCore;
 
 namespace AIDataProxy.XTTS {
     public static class XTTSCommunicator {
@@ -12,7 +13,7 @@ namespace AIDataProxy.XTTS {
             var dummy = typeof(NAudio.Lame.LameDLL);
             noop(dummy);
         }
-        public static async Task<byte[]> GetAudioAlternate(string voice, string text, string folder) {
+        public static async Task<byte[]> GetAudioAlternate(string voice, string text, string folder, string language) {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             while (true && stopwatch.ElapsedMilliseconds < 120000) {
@@ -22,29 +23,18 @@ namespace AIDataProxy.XTTS {
                     httpWebRequest.Headers.Add("Accept: application/json");
                     httpWebRequest.Method = "POST";
                     httpWebRequest.Timeout = int.MaxValue;
-                    string json = JsonConvert.SerializeObject(new XTTSRequest(text, voice));
+                    string json = JsonConvert.SerializeObject(new XTTSRequest(text, voice, language));
                     using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream())) {
                         streamWriter.Write(json);
                     }
                     var httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
                     MemoryStream wavStream = new MemoryStream();
-                    MemoryStream mp3Stream = new MemoryStream();
                     if (httpResponse.StatusCode == HttpStatusCode.OK) {
                         var responseStream = httpResponse.GetResponseStream();
                         await responseStream.CopyToAsync(wavStream);
                         await responseStream.FlushAsync();
                         wavStream.Position = 0;
-                        using (WaveFileReader waveFileReader = new WaveFileReader(wavStream)) {
-                            using (var mp3Writer = new LameMP3FileWriter(mp3Stream, waveFileReader.WaveFormat, 64)) {
-                                await waveFileReader.CopyToAsync(mp3Writer);
-                                await waveFileReader.FlushAsync();
-                            }
-                        }
-                        mp3Stream.Position = 0;
-                        var bytes = mp3Stream.ToArray();
-                        if (bytes.Length > 0) {
-                            return bytes;
-                        }
+                        return await AudioConversionHelper.WaveStreamToMp3Bytes(wavStream);
                     } else {
                         Console.WriteLine(httpResponse.StatusCode.ToString());
                     }

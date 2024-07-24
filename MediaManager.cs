@@ -59,7 +59,7 @@ namespace RoleplayingMediaCore {
             _updateLoop = Task.Run(() => Update());
         }
 
-        public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType,
+        public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType, bool noSpatial,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(),
             EventHandler<string> onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
             await Task.Run(() => {
@@ -68,24 +68,24 @@ namespace RoleplayingMediaCore {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
-                                ConfigureAudio(playerObject, audioPath, soundType, _textToSpeechSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _textToSpeechSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.MainPlayerVoice:
                             case SoundType.OtherPlayer:
                             case SoundType.Emote:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
-                                ConfigureAudio(playerObject, audioPath, soundType, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.LoopUntilStopped:
-                                ConfigureAudio(playerObject, audioPath, soundType, _mountLoopSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _mountLoopSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.ChatSound:
-                                ConfigureAudio(playerObject, audioPath, soundType, _chatSounds, 0, default, onPlaybackStopped, streamVolumeEvent);
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _chatSounds, 0, default, onPlaybackStopped, streamVolumeEvent);
                                 break;
                             case SoundType.MainPlayerCombat:
                             case SoundType.OtherPlayerCombat:
-                                ConfigureAudio(playerObject, audioPath, soundType, _combatVoicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _combatVoicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                         }
                     }
@@ -131,7 +131,7 @@ namespace RoleplayingMediaCore {
                     if (!playbackQueued) {
                         _nativeGameAudio[playerObject.Name] = new MediaObject(
                             this, playerObject, _camera,
-                            soundType, "", _libVLCPath);
+                            soundType, "", _libVLCPath, true);
                         var mediaObject = _nativeGameAudio[playerObject.Name];
                         lock (_nativeGameAudio[playerObject.Name]) {
                             float volume = GetVolume(mediaObject.SoundType, mediaObject.CharacterObject);
@@ -185,7 +185,7 @@ namespace RoleplayingMediaCore {
                                 sound.Value?.Stop();
                             }
                             _playbackStreams.Clear();
-                            ConfigureAudio(playerObject, audioPath, SoundType.Livestream, _playbackStreams, delay);
+                            ConfigureAudio(playerObject, audioPath, SoundType.Livestream, false, _playbackStreams, delay);
                         }
                     }
                 } catch (Exception e) {
@@ -283,7 +283,7 @@ namespace RoleplayingMediaCore {
             }
         }
         public async void ConfigureAudio(IMediaGameObject playerObject, string audioPath,
-            SoundType soundType, ConcurrentDictionary<string, MediaObject> sounds,
+            SoundType soundType, bool noSpatial, ConcurrentDictionary<string, MediaObject> sounds,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(), EventHandler<string> value = null,
             EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
             await Task.Run(delegate {
@@ -322,10 +322,10 @@ namespace RoleplayingMediaCore {
                             try {
                                 sounds[playerObject.Name] = new MediaObject(
                                     this, playerObject, _camera,
-                                    soundType, audioPath, _libVLCPath);
+                                    soundType, audioPath, _libVLCPath, (soundType == SoundType.OtherPlayerTts) ? (!IgnoreSpatialAudioForTTS || !noSpatial) : !noSpatial);
                                 lock (sounds[playerObject.Name]) {
                                     float volume = GetVolume(sounds[playerObject.Name].SoundType, sounds[playerObject.Name].CharacterObject);
-                                    if (volume == 0) {
+                                    if (volume < 0.001f || (soundType == SoundType.OtherPlayerTts) ? IgnoreSpatialAudioForTTS || noSpatial : noSpatial) {
                                         volume = 1;
                                     }
                                     sounds[playerObject.Name].OnErrorReceived += MediaManager_OnErrorReceived;
@@ -350,7 +350,7 @@ namespace RoleplayingMediaCore {
         private void Update() {
             while (notDisposed) {
                 Task.Run(() => {
-                    UpdateVolumes(_textToSpeechSounds);
+                    UpdateVolumes(_textToSpeechSounds, IgnoreSpatialAudioForTTS);
                 });
                 Task.Run(() => {
                     UpdateVolumes(_voicePackSounds);
@@ -372,28 +372,32 @@ namespace RoleplayingMediaCore {
                 Thread.Sleep(_spatialAudioAccuracy);
             }
         }
-        public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds) {
+        public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds, bool noSpatial = false) {
             for (int i = 0; i < sounds.Count; i++) {
                 lock (sounds) {
                     string characterObjectName = sounds.Keys.ElementAt<string>(i);
                     if (sounds.ContainsKey(characterObjectName)) {
                         try {
                             lock (sounds[characterObjectName]) {
-                                if (sounds[characterObjectName].CharacterObject != null) {
-                                    Vector3 dir = new Vector3();
-                                    if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
-                                        dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
-                                    } else {
-                                        dir = _mainPlayer.Position - GetListeningPosition();
-                                    }
-                                    float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                    float pan = Math.Clamp(direction / 3, -1, 1);
-                                    try {
-                                        if (!_ignoreSpatialAudioForTTS) {
-                                            sounds[characterObjectName].Pan = pan;
+                                if (!noSpatial && sounds[characterObjectName].SpatialAllowed) {
+                                    if (sounds[characterObjectName].CharacterObject != null) {
+                                        Vector3 dir = new Vector3();
+                                        if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
+                                            dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
+                                        } else {
+                                            dir = _mainPlayer.Position - GetListeningPosition();
                                         }
-                                        sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
-                                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                        float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                        float pan = Math.Clamp(direction / 3, -1, 1);
+                                        try {
+                                            sounds[characterObjectName].Pan = pan;
+                                            sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
+
+                                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                    }
+                                } else {
+                                    sounds[characterObjectName].Pan = 0.5f;
+                                    sounds[characterObjectName].Volume = 1;
                                 }
                             }
                         } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }

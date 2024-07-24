@@ -12,6 +12,9 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Speech.Synthesis;
+using RoleplayingVoiceCore;
+using NAudio.Wave;
 
 namespace RoleplayingMediaCore {
     public class RoleplayingMediaManager {
@@ -55,6 +58,9 @@ namespace RoleplayingMediaCore {
         private string installBatchFile;
         private bool _pythonAutoInstalled;
         private string pythonBatchFile;
+        private string _microsoftNarratorVoice;
+        private string[] _microsoftNarratorVoices;
+        private string _microsoftNarratorVoiceType;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -362,6 +368,28 @@ namespace RoleplayingMediaCore {
                 }
             }
         }
+        public async void SetVoiceMicrosoftNarrator(string voiceType) {
+            _microsoftNarratorVoiceType = voiceType.ToLower();
+            ValidationResult state = new ValidationResult();
+            if (_api != null) {
+                try {
+                    _microsoftNarratorVoices = await GetVoiceListMicrosoftNarrator();
+                } catch (Exception e) {
+                    var errorVoiceGen = e.Message.ToString();
+                    OnApiValidationComplete?.Invoke(this, state);
+                }
+                if (_microsoftNarratorVoices != null) {
+                    foreach (var voice in _microsoftNarratorVoices) {
+                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType)) {
+                            if (voice != null) {
+                                _microsoftNarratorVoice = voice;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         public async Task<string> DoVoiceElevenlabs(string sender, string text,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
@@ -390,11 +418,15 @@ namespace RoleplayingMediaCore {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _elevenLabsVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
-                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
-                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new string[] { trimmedText });
+                            Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (string audioClip in audioClips) {
-                                audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip, _elevenLabsVoice));
+                            foreach (var audioClip in audioClips) {
+                                if (audioClip.Item2) {
+                                    audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip.Item1, _elevenLabsVoice));
+                                } else {
+                                    audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
+                                }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {
@@ -425,7 +457,7 @@ namespace RoleplayingMediaCore {
         }
 
         public async Task<string> DoVoiceXTTS(string sender, string text,
-    bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+    bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en") {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
             if (_xttsVoice == null) {
@@ -451,11 +483,15 @@ namespace RoleplayingMediaCore {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
-                            string[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
-                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new string[] { trimmedText });
+                            Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (string audioClip in audioClips) {
-                                audioPaths.Add(await GetVoicePathXTTS(_xttsVoice, audioClip));
+                            foreach (var audioClip in audioClips) {
+                                if (audioClip.Item2) {
+                                    audioPaths.Add(await GetVoicePathXTTS(_xttsVoice, audioClip.Item1, language));
+                                } else {
+                                    audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
+                                }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
                             try {
@@ -483,6 +519,103 @@ namespace RoleplayingMediaCore {
                 }
             }
             return clipPath;
+        }
+        public async Task<string> DoVoiceMicrosoftNarrator(string sender, string text,
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+            string clipPath = "";
+            string hash = Shai1Hash(sender + text);
+            if (_microsoftNarratorVoice == null) {
+                if (_microsoftNarratorVoices == null) {
+                    await GetVoiceListMicrosoftNarrator();
+                }
+                if (_microsoftNarratorVoices != null) {
+                    foreach (var voice in _microsoftNarratorVoices) {
+                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType)) {
+                            if (voice != null) {
+                                _microsoftNarratorVoice = voice;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (_microsoftNarratorVoice != null) {
+                string voice = _microsoftNarratorVoice;
+                try {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
+                        if (!File.Exists(stitchedPath)) {
+                            string trimmedText = TrimText(text);
+                            Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
+                            List<string> audioPaths = new List<string>();
+                            foreach (var audioClip in audioClips) {
+                                if (audioClip.Item2) {
+                                    audioPaths.Add(await GetVoicePathMicrosoftNarrator(voice, audioClip.Item1));
+                                } else {
+                                    audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
+                                }
+                            }
+                            MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
+                            try {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                                    playbackStream.Position = 0;
+                                    playbackStream.CopyTo(stitchedStream);
+                                    stitchedStream.Flush();
+                                    stitchedStream.Close();
+                                }
+                            } catch (Exception e) {
+                                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+                            }
+                        }
+                        if (useSync) {
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
+                        }
+                        clipPath = stitchedPath;
+                        VoicesUpdated?.Invoke(this, EventArgs.Empty);
+                    } else {
+                        return "";
+                    }
+
+                } catch {
+
+                }
+            }
+            return clipPath;
+        }
+
+        public async Task<string[]> GetVoiceListMicrosoftNarrator() {
+            ValidationResult state = new ValidationResult();
+            List<string> voicesNames = new List<string>();
+            var items = new SpeechSynthesizer().GetInstalledVoices();
+            List<string> narratorVoices = new List<string>();
+            foreach (var item in items) {
+                narratorVoices.Add(item.VoiceInfo.Name);
+            }
+            _microsoftNarratorVoices = narratorVoices.ToArray();
+            voicesNames.Add("None");
+            if (_microsoftNarratorVoices != null) {
+                foreach (var voice in _microsoftNarratorVoices) {
+                    voicesNames.Add(voice);
+                }
+            }
+            return voicesNames.ToArray();
+        }
+        public async Task<Tuple<string[], string[]>> GetGenderSortedVoiceListsMicrosoftNarrator() {
+            ValidationResult state = new ValidationResult();
+            List<string> voicesNamesMale = new List<string>();
+            List<string> voicesNamesFemale = new List<string>();
+            var items = new SpeechSynthesizer().GetInstalledVoices();
+            foreach (var item in items) {
+                if (item.VoiceInfo.Gender == VoiceGender.Male) {
+                    voicesNamesMale.Add(item.VoiceInfo.Name);
+                } else {
+                    voicesNamesFemale.Add(item.VoiceInfo.Name);
+                }
+            }
+            return new Tuple<string[], string[]>(voicesNamesMale.ToArray(), voicesNamesFemale.ToArray());
         }
 
         public async Task<bool> SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
@@ -533,19 +666,39 @@ namespace RoleplayingMediaCore {
             }
             return audioPath;
         }
-        private async Task<string> GetVoicePathXTTS(string voiceType, string trimmedText) {
+        private async Task<string> GetVoicePathXTTS(string voiceType, string trimmedText, string language) {
             string audioPath = "";
             try {
                 if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
                 if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
-                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType);
+                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType, language);
                 } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
                 } else {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
-                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType);
+                    audioPath = await GetVoiceFromXTTS(trimmedText, voiceType, language);
+                }
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+            }
+            return audioPath;
+        }
+
+        private async Task<string> GetVoicePathMicrosoftNarrator(string voiceType, string trimmedText) {
+            string audioPath = "";
+            try {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                    CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+                }
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                    audioPath = await GetVoiceFromMicrosoftNarrator(trimmedText, voiceType);
+                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                    audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                } else {
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                    audioPath = await GetVoiceFromMicrosoftNarrator(trimmedText, voiceType);
                 }
             } catch (Exception e) {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
@@ -573,7 +726,7 @@ namespace RoleplayingMediaCore {
             return audioPath;
         }
 
-        private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType) {
+        private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType, string language) {
             string unquotedText = trimmedText.Replace(@"""", null);
             string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
             string finalText = @"""" + numberAdjusted + @"""";
@@ -584,9 +737,38 @@ namespace RoleplayingMediaCore {
                 if (!foundInHistory) {
                     while (data == null || data.Length == 0) {
                         LameDLL.LoadNativeDLL(_basePath);
-                        data = await XTTSCommunicator.GetAudioAlternate(voiceType, finalText, Path.Combine(rpVoiceCache, "speakers"));
+                        data = await XTTSCommunicator.GetAudioAlternate(voiceType, finalText, Path.Combine(rpVoiceCache, "speakers"), language);
                         Directory.CreateDirectory(Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\"));
                         audioPath = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
+                        await File.WriteAllBytesAsync(audioPath, data);
+                    }
+                }
+                CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+            } catch {
+
+            }
+            return audioPath;
+        }
+        private async Task<string> GetVoiceFromMicrosoftNarrator(string trimmedText, string voiceType) {
+            string unquotedText = trimmedText.Replace(@"""", null);
+            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+            string finalText = @"""" + numberAdjusted + @"""";
+            string audioPath = "";
+            bool foundInHistory = false;
+            SpeechSynthesizer speechSynthesizer = new SpeechSynthesizer();
+            MemoryStream memoryStream = new MemoryStream();
+            speechSynthesizer.SetOutputToWaveStream(memoryStream);
+            try {
+                byte[] data = null;
+                if (!foundInHistory) {
+                    while (data == null || data.Length == 0) {
+                        LameDLL.LoadNativeDLL(_basePath);
+                        speechSynthesizer.SelectVoice(voiceType);
+                        speechSynthesizer.Speak(trimmedText);
+                        memoryStream.Position = 0;
+                        data = await AudioConversionHelper.WaveStreamToMp3Bytes(memoryStream);
+                        Directory.CreateDirectory(Path.Combine(rpVoiceCache, "MSN\\" + voiceType + "\\"));
+                        audioPath = Path.Combine(rpVoiceCache, "MSN\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
                         await File.WriteAllBytesAsync(audioPath, data);
                     }
                 }
@@ -612,7 +794,8 @@ namespace RoleplayingMediaCore {
                 {":D", "." },
                 {":P", "." },
                 {":3", "." },
-                {"<3", "love" }
+                {"<3", "love" },
+                {"omg", "oh my gosh" }
             };
             foreach (var word in wordReplacements) {
                 newText = Regex.Replace(newText, $@"(?<=^|\s){word.Key}(?=\s|$)", word.Value, RegexOptions.IgnoreCase);
@@ -625,10 +808,18 @@ namespace RoleplayingMediaCore {
 
         public MemoryStream ConcatenateAudio(params string[] mp3filenames) {
             MemoryStream output = new MemoryStream();
-            foreach (string filename in mp3filenames) {
-                if (File.Exists(filename)) {
-                    using (Stream stream = File.OpenRead(filename)) {
-                        stream.CopyTo(output);
+            foreach (string file in mp3filenames) {
+                if (File.Exists(file)) {
+                    using (Mp3FileReader reader = new Mp3FileReader(file)) {
+                        if ((output.Position == 0) && (reader.Id3v2Tag != null)) {
+                            output.Write(reader.Id3v2Tag.RawData,
+                                         0,
+                                         reader.Id3v2Tag.RawData.Length);
+                        }
+                        Mp3Frame frame = null;
+                        while ((frame = reader.ReadNextFrame()) != null) {
+                            output.Write(frame.RawData, 0, frame.RawData.Length);
+                        }
                     }
                 }
             }
@@ -655,10 +846,10 @@ namespace RoleplayingMediaCore {
             }
         }
 
-        private string[] ExtractQuotationsToList(string text, bool aggressiveSplicing) {
+        private Tuple<string, bool>[] ExtractQuotationsToList(string text, bool aggressiveSplicing) {
             string newText = "";
             string[] strings = null;
-            List<string> quotes = new List<string>();
+            List<Tuple<string, bool>> quotes = new List<Tuple<string, bool>>();
             if (text.Contains(@"""")) {
                 strings = text.Split('"');
             } else {
@@ -666,23 +857,24 @@ namespace RoleplayingMediaCore {
             }
             if (strings.Length > 1) {
                 for (int i = 0; i < strings.Length; i++) {
-                    if ((i + 1) % 2 == 0) {
-                        if (aggressiveSplicing) {
-                            quotes.AddRange(AggressiveWordSplicing(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - ")));
-                        } else {
-                            quotes.Add(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "));
+                    bool isQuoted = (i + 1) % 2 == 0;
+                    if (aggressiveSplicing) {
+                        foreach (var item in AggressiveWordSplicing(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "))) {
+                            quotes.Add(new Tuple<string, bool>(item.Item1, isQuoted));
                         }
+                    } else {
+                        quotes.Add(new Tuple<string, bool>(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "), isQuoted));
                     }
                 }
             } else {
-                quotes.Add(text);
+                quotes.Add(new Tuple<string, bool>(text, true));
             }
             return quotes.ToArray();
         }
 
-        private string[] AggressiveWordSplicing(string text) {
+        private Tuple<string, bool>[] AggressiveWordSplicing(string text) {
             string[] strings = null;
-            List<string> quotes = new List<string>();
+            List<Tuple<string, bool>> quotes = new List<Tuple<string, bool>>();
             strings = text.Split(' ');
             string temp = "";
             for (int i = 0; i < strings.Length; i++) {
@@ -690,12 +882,12 @@ namespace RoleplayingMediaCore {
                 if (strings[i].Contains(",") || (strings[i].Contains(".") && !strings[i].Contains("..."))
                     || strings[i].Contains("!") || strings[i].Contains("?") || strings[i].Contains(";")
                     || strings[i].Contains(":") || strings[i].Contains("·")) {
-                    quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
+                    quotes.Add(new Tuple<string, bool>(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim(), true));
                     temp = "";
                 }
             }
             if (!string.IsNullOrEmpty(temp)) {
-                quotes.Add(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim());
+                quotes.Add(new Tuple<string, bool>(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim(), true));
             }
             return quotes.ToArray();
         }
