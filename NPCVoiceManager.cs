@@ -37,7 +37,7 @@ namespace RoleplayingVoiceCore {
             Cheap,
         }
         public async Task<Tuple<WaveStream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
-            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
+            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             MemoryStream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
@@ -96,6 +96,7 @@ namespace RoleplayingVoiceCore {
                             ExtraJsonData = extraJson,
                             Override = overrideGeneration,
                             VersionIdentifier = _versionIdentifier,
+                            UseMuteList = useMuteList,
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
                         };
                         using (HttpClient httpClient = new HttpClient()) {
@@ -127,6 +128,7 @@ namespace RoleplayingVoiceCore {
                             ExtraJsonData = extraJson,
                             Override = overrideGeneration,
                             VersionIdentifier = _versionIdentifier,
+                            UseMuteList = useMuteList,
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                         };
                         using (HttpClient httpClient = new HttpClient()) {

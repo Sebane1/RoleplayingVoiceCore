@@ -1,5 +1,6 @@
 ﻿namespace RoleplayingVoiceCore {
     public class ProxiedVoiceRequest {
+        private bool _useMuteList;
         private string _versionIdentifier;
         private string _character;
         private string _voice;
@@ -26,6 +27,7 @@
         public VoiceLinePriority VoiceLinePriority { get => _voiceLinePriority; set => _voiceLinePriority = value; }
         public string RawText { get; internal set; }
         public string VersionIdentifier { get => _versionIdentifier; set => _versionIdentifier = value; }
+        internal bool UseMuteList { get => _useMuteList; set => _useMuteList = value; }
     }
     public enum VoiceLinePriority {
         Elevenlabs = 0,
