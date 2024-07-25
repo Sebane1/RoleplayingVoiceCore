@@ -61,6 +61,7 @@ namespace RoleplayingMediaCore {
         private string _microsoftNarratorVoice;
         private string[] _microsoftNarratorVoices;
         private string _microsoftNarratorVoiceType;
+        private bool _readUnquotedText;
 
         public event EventHandler<string> InitializationCallbacks;
         public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
@@ -219,6 +220,7 @@ namespace RoleplayingMediaCore {
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
         public string BasePath { get => _basePath; set => _basePath = value; }
+        public bool ReadUnquotedText { get => _readUnquotedText; set => _readUnquotedText = value; }
 
         public async Task<bool> ApiValidation(string key) {
             if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
@@ -424,7 +426,7 @@ namespace RoleplayingMediaCore {
                             foreach (var audioClip in audioClips) {
                                 if (audioClip.Item2) {
                                     audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip.Item1, _elevenLabsVoice));
-                                } else {
+                                } else if (_readUnquotedText){
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
@@ -489,7 +491,7 @@ namespace RoleplayingMediaCore {
                             foreach (var audioClip in audioClips) {
                                 if (audioClip.Item2) {
                                     audioPaths.Add(await GetVoicePathXTTS(_xttsVoice, audioClip.Item1, language));
-                                } else {
+                                } else if (_readUnquotedText) {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
@@ -554,7 +556,7 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                             foreach (var audioClip in audioClips) {
                                 if (audioClip.Item2) {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator(voice, audioClip.Item1));
-                                } else {
+                                } else if (_readUnquotedText) {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
@@ -708,12 +710,12 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
 
         private async Task<string> GetVoiceFromElevenLabs(string trimmedText, string voiceType,
             VoiceSettings defaultVoiceSettings, Voice characterVoice) {
-            string unquotedText = trimmedText.Replace(@"""", null);
-            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
-            string finalText = @"""" + numberAdjusted + @"""";
             string audioPath = "";
-            bool foundInHistory = false;
             try {
+                string unquotedText = trimmedText.Replace(@"""", null);
+                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+                string finalText = @"""" + numberAdjusted + @"""";
+                bool foundInHistory = false;
                 if (!foundInHistory) {
                     audioPath = await _api.TextToSpeechEndpoint
                         .TextToSpeechAsync(finalText, characterVoice,
@@ -727,12 +729,12 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
         }
 
         private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType, string language) {
-            string unquotedText = trimmedText.Replace(@"""", null);
-            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
-            string finalText = @"""" + numberAdjusted + @"""";
             string audioPath = "";
-            bool foundInHistory = false;
             try {
+                string unquotedText = trimmedText.Replace(@"""", null);
+                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+                string finalText = @"""" + numberAdjusted + @"""";
+                bool foundInHistory = false;
                 byte[] data = null;
                 if (!foundInHistory) {
                     while (data == null || data.Length == 0) {
@@ -750,15 +752,15 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
             return audioPath;
         }
         private async Task<string> GetVoiceFromMicrosoftNarrator(string trimmedText, string voiceType) {
-            string unquotedText = trimmedText.Replace(@"""", null);
-            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
-            string finalText = @"""" + numberAdjusted + @"""";
             string audioPath = "";
-            bool foundInHistory = false;
-            SpeechSynthesizer speechSynthesizer = new SpeechSynthesizer();
-            MemoryStream memoryStream = new MemoryStream();
-            speechSynthesizer.SetOutputToWaveStream(memoryStream);
             try {
+                string unquotedText = trimmedText.Replace(@"""", null);
+                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+                string finalText = @"""" + numberAdjusted + @"""";
+                bool foundInHistory = false;
+                SpeechSynthesizer speechSynthesizer = new SpeechSynthesizer();
+                MemoryStream memoryStream = new MemoryStream();
+                speechSynthesizer.SetOutputToWaveStream(memoryStream);
                 byte[] data = null;
                 if (!foundInHistory) {
                     while (data == null || data.Length == 0) {
