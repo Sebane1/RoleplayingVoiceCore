@@ -136,20 +136,20 @@ namespace RoleplayingMediaCore {
         public void InstallXTTS(string cache) {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Attempting to install C++ build tools please accept the UAC prompt that appears, as this dependency is required for XTTS installation to function. If the UAC prompt was rejected, restart Artemis to try again.");
             var processStart = new ProcessStartInfo(installBatchFile);
-            processStart.RedirectStandardOutput = true;
-            processStart.RedirectStandardError = true;
-            processStart.WindowStyle = ProcessWindowStyle.Hidden;
+           // processStart.RedirectStandardOutput = true;
+           // processStart.RedirectStandardError = true;
+            //processStart.WindowStyle = ProcessWindowStyle.Hidden;
             processStart.UseShellExecute = false;
-            processStart.RedirectStandardInput = true;
-            processStart.CreateNoWindow = true;
+           // processStart.RedirectStandardInput = true;
+           // processStart.CreateNoWindow = true;
             Process process = new Process();
             process.StartInfo = processStart;
-            process.OutputDataReceived += Process_OutputDataReceived;
-            process.ErrorDataReceived += Process_ErrorDataReceived;
-            process.EnableRaisingEvents = true;
+           // process.OutputDataReceived += Process_OutputDataReceived;
+            //process.ErrorDataReceived += Process_ErrorDataReceived;
+            //process.EnableRaisingEvents = true;
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+            //process.BeginOutputReadLine();
+            //process.BeginErrorReadLine();
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependencies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
         }
 
