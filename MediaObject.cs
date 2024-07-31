@@ -145,8 +145,8 @@ namespace RoleplayingMediaCore {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
-                            if (stopwatch.ElapsedMilliseconds > 500) {
-                                Thread.Sleep(500);
+                            if (stopwatch.ElapsedMilliseconds > 10) {
+                                Thread.Sleep(10);
                                 _wavePlayer.Stop();
                                 break;
                             }
@@ -154,7 +154,7 @@ namespace RoleplayingMediaCore {
                             stopwatch.Reset();
                         }
                         lastPosition = _player.Position;
-                        Thread.Sleep(250);
+                        Thread.Sleep(100);
                     }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
