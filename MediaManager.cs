@@ -375,33 +375,35 @@ namespace RoleplayingMediaCore {
         public void UpdateVolumes(ConcurrentDictionary<string, MediaObject> sounds, bool noSpatial = false) {
             for (int i = 0; i < sounds.Count; i++) {
                 lock (sounds) {
-                    string characterObjectName = sounds.Keys.ElementAt<string>(i);
-                    if (sounds.ContainsKey(characterObjectName)) {
-                        try {
-                            lock (sounds[characterObjectName]) {
-                                if (!noSpatial && sounds[characterObjectName].SpatialAllowed) {
-                                    if (sounds[characterObjectName].CharacterObject != null) {
-                                        Vector3 dir = new Vector3();
-                                        if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
-                                            dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
-                                        } else {
-                                            dir = _mainPlayer.Position - GetListeningPosition();
-                                        }
-                                        float direction = AngleDir(_camera.Forward, dir, _camera.Top);
-                                        float pan = Math.Clamp(direction / 3, -1, 1);
-                                        try {
-                                            sounds[characterObjectName].Pan = pan;
-                                            sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
+                    try {
+                        string characterObjectName = sounds.Keys.ElementAt<string>(i);
+                        if (sounds.ContainsKey(characterObjectName)) {
+                            try {
+                                lock (sounds[characterObjectName]) {
+                                    if (!noSpatial && sounds[characterObjectName].SpatialAllowed) {
+                                        if (sounds[characterObjectName].CharacterObject != null) {
+                                            Vector3 dir = new Vector3();
+                                            if (sounds[characterObjectName].CharacterObject.Position.Length() > 0) {
+                                                dir = sounds[characterObjectName].CharacterObject.Position - GetListeningPosition();
+                                            } else {
+                                                dir = _mainPlayer.Position - GetListeningPosition();
+                                            }
+                                            float direction = AngleDir(_camera.Forward, dir, _camera.Top);
+                                            float pan = Math.Clamp(direction / 3, -1, 1);
+                                            try {
+                                                sounds[characterObjectName].Pan = pan;
+                                                sounds[characterObjectName].Volume = CalculateObjectVolume(characterObjectName, sounds[characterObjectName]);
 
-                                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                                        }
+                                    } else {
+                                        sounds[characterObjectName].Pan = 0.5f;
+                                        sounds[characterObjectName].Volume = 1;
                                     }
-                                } else {
-                                    sounds[characterObjectName].Pan = 0.5f;
-                                    sounds[characterObjectName].Volume = 1;
                                 }
-                            }
-                        } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
-                    }
+                            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+                        }
+                    } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
                 }
             }
         }
