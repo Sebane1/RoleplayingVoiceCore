@@ -13,7 +13,7 @@ using System.Runtime.InteropServices;
 using VarispeedDemo.SoundTouch;
 
 namespace RoleplayingMediaCore {
-    public class MediaObject {
+    public class MediaObject : IDisposable {
         private IMediaGameObject _playerObject;
         private IMediaGameObject _camera;
         private SoundType _soundType;
@@ -37,7 +37,7 @@ namespace RoleplayingMediaCore {
 
         private bool stopPlaybackOnMovement;
         private Vector3 lastPosition;
-
+        private Vector3 lastRotation;
         private const uint _width = 1280;
         private const uint _height = 720;
 
@@ -66,6 +66,7 @@ namespace RoleplayingMediaCore {
         private MeteringSampleProvider _meteringSampleProvider;
         private bool _vlcWasAbleToStart;
         private float _volumeOffset;
+        private bool _disposed;
 
         public MediaObject(MediaManager parent, IMediaGameObject playerObject, IMediaGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath, bool spatialAllowed) {
@@ -92,18 +93,21 @@ namespace RoleplayingMediaCore {
                 try {
                     Thread.Sleep(500);
                     lastPosition = _playerObject.Position;
+                    lastRotation = _playerObject.Rotation;
                     Thread.Sleep(500);
                     while (true) {
                         if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
+                            float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
-                          (distance < 0.1f && _soundType == SoundType.LoopWhileMoving)) {
-                                _wavePlayer?.Stop();
+                          ((distance < 0.3f && rotationDistance < 30f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid) {
+                                Stop();
                                 break;
                             }
                         }
                         if (_soundType == SoundType.LoopWhileMoving) {
                             lastPosition = _playerObject.Position;
+                            lastRotation = _playerObject.Rotation;
                         }
                         Thread.Sleep(200);
                     }
@@ -230,33 +234,35 @@ namespace RoleplayingMediaCore {
         public IMediaGameObject Camera { get => _camera; set => _camera = value; }
         public bool Invalidated { get; internal set; }
         public bool SpatialAllowed { get => _spatialAllowed; set => _spatialAllowed = value; }
+        public void EndLooping() {
+            if (_loopStream != null) {
+                try {
+                    _loopStream.EnableLooping = false;
+                    _loopStream?.Dispose();
+                } catch {
 
+                }
+            }
+        }
         public void Stop() {
             Volume = 0;
             if (_wavePlayer != null) {
                 try {
                     if (_wavePlayer != null) {
+                        EndLooping();
                         try {
                             _wavePlayer?.Stop();
                             _wavePlayer?.Dispose();
                         } catch {
-                            PlaybackStopped.Invoke(this, "OK");
-                        }
-                    }
-                    if (_loopStream != null) {
-                        try {
-                            _loopStream.EnableLooping = false;
-                            _loopStream?.Dispose();
-                        } catch {
-
+                            PlaybackStopped?.Invoke(this, "OK");
                         }
                     }
                 } catch (Exception e) {
                     OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
-                    PlaybackStopped.Invoke(this, "OK");
+                    PlaybackStopped?.Invoke(this, "OK");
                 }
             } else {
-                PlaybackStopped.Invoke(this, "OK");
+                PlaybackStopped?.Invoke(this, "OK");
             }
             if (_vlcPlayer != null) {
                 try {
@@ -464,6 +470,7 @@ namespace RoleplayingMediaCore {
                                 _soundType != SoundType.OtherPlayerCombat &&
                                 _soundType != SoundType.NPC &&
                                 _soundType != SoundType.LoopUntilStopped &&
+                                _soundType != SoundType.PlayWhileMoving &&
                                 _player.TotalTime.TotalSeconds > 13) {
                                 _soundType = SoundType.Loop;
                             }
@@ -484,12 +491,14 @@ namespace RoleplayingMediaCore {
                                     Thread.Sleep(delay);
                                 }
                             }
-                            if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving) {
+                            if (_soundType == SoundType.Loop || _soundType == SoundType.LoopWhileMoving || _soundType == SoundType.PlayWhileMoving) {
                                 if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat && _soundType != SoundType.ChatSound) {
                                     SoundLoopCheck();
                                 }
+                                // if (_soundType != SoundType.PlayWhileMoving) {
                                 _loopStream = new LoopStream(_player) { EnableLooping = true };
                                 desiredStream = _loopStream;
+                                //}
                             } else if (_soundType == SoundType.LoopUntilStopped) {
                                 _loopStream = new LoopStream(_player) { EnableLooping = true };
                                 desiredStream = _loopStream;
@@ -665,6 +674,12 @@ namespace RoleplayingMediaCore {
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
         }
+
+        public void Dispose() {
+            _disposed = true;
+            Stop();
+            Volume = 0;
+        }
     }
     public enum SoundType {
         MainPlayerTts,
@@ -679,6 +694,7 @@ namespace RoleplayingMediaCore {
         OtherPlayerCombat,
         NPC,
         ChatSound,
-        LoopUntilStopped
+        LoopUntilStopped,
+        PlayWhileMoving
     }
 }

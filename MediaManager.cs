@@ -16,6 +16,7 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, Queue<WaveStream>> _nativeAudioQueue = new ConcurrentDictionary<string, Queue<WaveStream>>();
+        List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
         private ConcurrentDictionary<string, MediaObject> _mountLoopSounds = new ConcurrentDictionary<string, MediaObject>();
         MediaObject _npcSound = null;
 
@@ -75,6 +76,7 @@ namespace RoleplayingMediaCore {
                             case SoundType.Emote:
                             case SoundType.Loop:
                             case SoundType.LoopWhileMoving:
+                            case SoundType.PlayWhileMoving:
                                 ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _voicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                             case SoundType.LoopUntilStopped:
@@ -293,7 +295,7 @@ namespace RoleplayingMediaCore {
                         alreadyConfiguringSound = true;
                         bool soundIsPlayingAlready = false;
                         if (sounds.ContainsKey(playerObject.Name)) {
-                            if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat) {
+                            if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat || soundType == SoundType.PlayWhileMoving) {
                                 soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
                                 if (soundType == SoundType.MainPlayerCombat) {
                                     mainPlayerCombatCooldownTimer.Restart();
@@ -337,6 +339,7 @@ namespace RoleplayingMediaCore {
                                     }
                                     Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                                     sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode, volumeOffset);
+                                    cleanupList.Add(new KeyValuePair<string, MediaObject>(playerObject.Name, sounds[playerObject.Name]));
                                 }
                             } catch (Exception e) {
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -459,6 +462,7 @@ namespace RoleplayingMediaCore {
                         case SoundType.Loop:
                         case SoundType.LoopWhileMoving:
                         case SoundType.LoopUntilStopped:
+                        case SoundType.PlayWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:
                             return _livestreamVolume;
@@ -482,6 +486,7 @@ namespace RoleplayingMediaCore {
                         case SoundType.Loop:
                         case SoundType.LoopUntilStopped:
                         case SoundType.LoopWhileMoving:
+                        case SoundType.PlayWhileMoving:
                             return _sfxVolume;
                         case SoundType.Livestream:
                             return _livestreamVolume;
@@ -505,7 +510,6 @@ namespace RoleplayingMediaCore {
         }
         public void CleanNonStreamingSounds() {
             try {
-                List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
                 cleanupList.AddRange(_textToSpeechSounds);
                 cleanupList.AddRange(_voicePackSounds);
                 cleanupList.AddRange(_nativeGameAudio);
@@ -527,7 +531,6 @@ namespace RoleplayingMediaCore {
         }
         public void CleanSounds() {
             try {
-                List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
                 cleanupList.AddRange(_textToSpeechSounds);
                 cleanupList.AddRange(_voicePackSounds);
                 cleanupList.AddRange(_playbackStreams);
