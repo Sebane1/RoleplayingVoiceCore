@@ -246,10 +246,10 @@ namespace RoleplayingMediaCore {
         }
         public void Stop() {
             Volume = 0;
+            EndLooping();
             if (_wavePlayer != null) {
                 try {
                     if (_wavePlayer != null) {
-                        EndLooping();
                         try {
                             _wavePlayer?.Stop();
                             _wavePlayer?.Dispose();
@@ -270,6 +270,7 @@ namespace RoleplayingMediaCore {
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
             Volume = 0;
+            Invalidated = true;
         }
         public void LoopEarly() {
             _loopStream?.LoopEarly();
@@ -319,7 +320,7 @@ namespace RoleplayingMediaCore {
                             if (_soundType != SoundType.MainPlayerCombat && _soundType != SoundType.OtherPlayerCombat) {
                                 SoundLoopCheck();
                             }
-                            _loopStream = new LoopStream(_player) { EnableLooping = true };
+                            _loopStream = new LoopStream(_player) { EnableLooping = true, Parent = this };
                             desiredStream = _loopStream;
                         }
                         float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
@@ -496,11 +497,11 @@ namespace RoleplayingMediaCore {
                                     SoundLoopCheck();
                                 }
                                 // if (_soundType != SoundType.PlayWhileMoving) {
-                                _loopStream = new LoopStream(_player) { EnableLooping = true };
+                                _loopStream = new LoopStream(_player) { EnableLooping = true, Parent = this };
                                 desiredStream = _loopStream;
                                 //}
                             } else if (_soundType == SoundType.LoopUntilStopped) {
-                                _loopStream = new LoopStream(_player) { EnableLooping = true };
+                                _loopStream = new LoopStream(_player) { EnableLooping = true, Parent = this };
                                 desiredStream = _loopStream;
                             }
                             float distance = Vector3.Distance(_camera.Position, CharacterObject.Position);
