@@ -290,14 +290,14 @@ namespace RoleplayingMediaCore {
             EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 0) {
             await Task.Run(delegate {
                 if (playerObject != null) {
-                    if (!alreadyConfiguringSound && (soundType != SoundType.MainPlayerCombat
-                        || (soundType == SoundType.MainPlayerCombat && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
+                    if (!alreadyConfiguringSound && ((soundType != SoundType.MainPlayerCombat && soundType != SoundType.LoopWhileMoving)
+                        || ((soundType == SoundType.MainPlayerCombat || soundType == SoundType.LoopWhileMoving) && mainPlayerCombatCooldownTimer.ElapsedMilliseconds > 400 || !mainPlayerCombatCooldownTimer.IsRunning))) {
                         alreadyConfiguringSound = true;
                         bool soundIsPlayingAlready = false;
                         if (sounds.ContainsKey(playerObject.Name)) {
                             if (soundType == SoundType.MainPlayerVoice || soundType == SoundType.MainPlayerCombat || soundType == SoundType.PlayWhileMoving) {
                                 soundIsPlayingAlready = sounds[playerObject.Name].PlaybackState == PlaybackState.Playing;
-                                if (soundType == SoundType.MainPlayerCombat) {
+                                if (soundType == SoundType.MainPlayerCombat || soundType == SoundType.LoopWhileMoving) {
                                     mainPlayerCombatCooldownTimer.Restart();
                                 }
                             } else if (soundType == SoundType.MainPlayerTts) {

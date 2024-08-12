@@ -100,7 +100,7 @@ namespace RoleplayingMediaCore {
                             float distance = Vector3.Distance(lastPosition, _playerObject.Position);
                             float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
                             if ((distance > 0.01f && _soundType == SoundType.Loop) ||
-                          ((distance < 0.3f && rotationDistance < 30f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid) {
+                          ((distance < 0.3f && rotationDistance < 2f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid) {
                                 Stop();
                                 break;
                             }
