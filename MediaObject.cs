@@ -96,11 +96,12 @@ namespace RoleplayingMediaCore {
                     lastRotation = _playerObject.Rotation;
                     Thread.Sleep(500);
                     while (true) {
-                        if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
-                            float distance = Vector3.Distance(lastPosition, _playerObject.Position);
-                            float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
-                            if ((distance > 0.01f && _soundType == SoundType.Loop) ||
-                          ((distance < 0.3f && rotationDistance < 2f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid) {
+                    if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
+                        float distance = Vector3.Distance(lastPosition, _playerObject.Position);
+                        float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
+                        if ((distance > 0.01f && _soundType == SoundType.Loop) ||
+                      ((distance < 0.3f && rotationDistance < 2f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid || Invalidated || _parent.Invalidated) {
+                                Invalidated = true;
                                 Stop();
                                 break;
                             }
@@ -234,6 +235,8 @@ namespace RoleplayingMediaCore {
         public IMediaGameObject Camera { get => _camera; set => _camera = value; }
         public bool Invalidated { get; internal set; }
         public bool SpatialAllowed { get => _spatialAllowed; set => _spatialAllowed = value; }
+        public MediaManager Parent { get => _parent; set => _parent = value; }
+
         public void EndLooping() {
             if (_loopStream != null) {
                 try {

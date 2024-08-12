@@ -9,6 +9,7 @@ namespace RoleplayingMediaCore {
     public class MediaManager : IDisposable {
         AudioOutputType audioPlayerType = AudioOutputType.WaveOut;
         byte[] _lastFrame;
+        private bool _invalidated = false;
         ConcurrentDictionary<string, MediaObject> _textToSpeechSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _voicePackSounds = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _combatVoicePackSounds = new ConcurrentDictionary<string, MediaObject>();
@@ -51,6 +52,7 @@ namespace RoleplayingMediaCore {
         public float CameraAndPlayerPositionSlider { get => _cameraAndPlayerPositionSlider; set => _cameraAndPlayerPositionSlider = value; }
         public int SpatialAudioAccuracy { get => _spatialAudioAccuracy; set => _spatialAudioAccuracy = value; }
         public bool IgnoreSpatialAudioForTTS { get => _ignoreSpatialAudioForTTS; set => _ignoreSpatialAudioForTTS = value; }
+        public bool Invalidated { get => _invalidated; set => _invalidated = value; }
 
         public event EventHandler OnNewMediaTriggered;
         public MediaManager(IMediaGameObject playerObject, IMediaGameObject camera, string libVLCPath) {
@@ -517,6 +519,7 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_combatVoicePackSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
+                        sound.Value.Invalidated = true;
                         sound.Value?.Stop();
                         sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
                     }
@@ -540,6 +543,7 @@ namespace RoleplayingMediaCore {
                 cleanupList.AddRange(_mountLoopSounds);
                 foreach (var sound in cleanupList) {
                     if (sound.Value != null) {
+                        sound.Value.Invalidated = true;
                         sound.Value?.Stop();
                         sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
                     }

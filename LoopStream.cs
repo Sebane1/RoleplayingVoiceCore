@@ -56,7 +56,7 @@ namespace RoleplayingMediaCore {
             while (totalBytesRead < count) {
                 int bytesRead = sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
                 if (bytesRead == 0 || _LoopEarly) {
-                    if (sourceStream.Position == 0 || (!EnableLooping && !Parent.Invalidated)) {
+                    if (sourceStream.Position == 0 || (!EnableLooping && !Parent.Invalidated && !Parent.Parent.Invalidated)) {
                         // something wrong with the source stream
                         break;
                     }
