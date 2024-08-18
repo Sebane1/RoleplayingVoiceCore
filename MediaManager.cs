@@ -17,11 +17,12 @@ namespace RoleplayingMediaCore {
         ConcurrentDictionary<string, MediaObject> _nativeGameAudio = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, MediaObject> _playbackStreams = new ConcurrentDictionary<string, MediaObject>();
         ConcurrentDictionary<string, Queue<WaveStream>> _nativeAudioQueue = new ConcurrentDictionary<string, Queue<WaveStream>>();
-        List<KeyValuePair<string, MediaObject>> cleanupList = new List<KeyValuePair<string, MediaObject>>();
+        List<KeyValuePair<string, MediaObject>> _cleanupList = new List<KeyValuePair<string, MediaObject>>();
         private ConcurrentDictionary<string, MediaObject> _mountLoopSounds = new ConcurrentDictionary<string, MediaObject>();
         MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
+        public event EventHandler OnCleanupTime;
         private IMediaGameObject _mainPlayer = null;
         private IMediaGameObject _camera;
         private string _libVLCPath;
@@ -341,7 +342,7 @@ namespace RoleplayingMediaCore {
                                     }
                                     Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                                     sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode, volumeOffset);
-                                    cleanupList.Add(new KeyValuePair<string, MediaObject>(playerObject.Name, sounds[playerObject.Name]));
+                                    _cleanupList.Add(new KeyValuePair<string, MediaObject>(playerObject.Name, sounds[playerObject.Name]));
                                 }
                             } catch (Exception e) {
                                 OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
@@ -512,12 +513,12 @@ namespace RoleplayingMediaCore {
         }
         public void CleanNonStreamingSounds() {
             try {
-                cleanupList.AddRange(_textToSpeechSounds);
-                cleanupList.AddRange(_voicePackSounds);
-                cleanupList.AddRange(_nativeGameAudio);
-                cleanupList.AddRange(_chatSounds);
-                cleanupList.AddRange(_combatVoicePackSounds);
-                foreach (var sound in cleanupList) {
+                _cleanupList.AddRange(_textToSpeechSounds);
+                _cleanupList.AddRange(_voicePackSounds);
+                _cleanupList.AddRange(_nativeGameAudio);
+                _cleanupList.AddRange(_chatSounds);
+                _cleanupList.AddRange(_combatVoicePackSounds);
+                foreach (var sound in _cleanupList) {
                     if (sound.Value != null) {
                         sound.Value.Invalidated = true;
                         sound.Value?.Stop();
@@ -530,18 +531,20 @@ namespace RoleplayingMediaCore {
                 _nativeGameAudio?.Clear();
                 _chatSounds?.Clear();
                 _combatVoicePackSounds?.Clear();
+                _cleanupList.Clear();
+                OnCleanupTime?.Invoke(this, EventArgs.Empty);
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
         public void CleanSounds() {
             try {
-                cleanupList.AddRange(_textToSpeechSounds);
-                cleanupList.AddRange(_voicePackSounds);
-                cleanupList.AddRange(_playbackStreams);
-                cleanupList.AddRange(_nativeGameAudio);
-                cleanupList.AddRange(_chatSounds);
-                cleanupList.AddRange(_combatVoicePackSounds);
-                cleanupList.AddRange(_mountLoopSounds);
-                foreach (var sound in cleanupList) {
+                _cleanupList.AddRange(_textToSpeechSounds);
+                _cleanupList.AddRange(_voicePackSounds);
+                _cleanupList.AddRange(_playbackStreams);
+                _cleanupList.AddRange(_nativeGameAudio);
+                _cleanupList.AddRange(_chatSounds);
+                _cleanupList.AddRange(_combatVoicePackSounds);
+                _cleanupList.AddRange(_mountLoopSounds);
+                foreach (var sound in _cleanupList) {
                     if (sound.Value != null) {
                         sound.Value.Invalidated = true;
                         sound.Value?.Stop();
@@ -557,6 +560,8 @@ namespace RoleplayingMediaCore {
                 _combatVoicePackSounds?.Clear();
                 _mountLoopSounds?.Clear();
                 _npcSound = null;
+                _cleanupList.Clear();
+                OnCleanupTime?.Invoke(this, EventArgs.Empty);
             } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
         }
     }

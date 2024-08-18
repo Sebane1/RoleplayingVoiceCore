@@ -79,6 +79,11 @@ namespace RoleplayingMediaCore {
             _spatialAllowed = spatialAllowed;
             _pitch = Align(_width * _bytePerPixel);
             _lines = Align(_height);
+            _parent.OnCleanupTime += _parent_OnCleanupTime;
+        }
+
+        private void _parent_OnCleanupTime(object? sender, EventArgs e) {
+            Invalidated = true;
         }
 
         private static uint Align(uint size) {
