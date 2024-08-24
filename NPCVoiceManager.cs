@@ -14,7 +14,8 @@ namespace RoleplayingVoiceCore {
         private string _cachePath = "";
         private string _versionIdentifier;
 
-        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType, string cacheLocation, string version) {
+        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
+            string cacheLocation, string version) {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
             if (cacheLocation != null) {
@@ -82,7 +83,7 @@ namespace RoleplayingVoiceCore {
                 if (!succeeded) {
                     if (_characterToVoicePairing.ContainsKey(characterVoice)) {
                         if (voiceLinePriority == VoiceLinePriority.None) {
-                            voiceLinePriority = VoiceLinePriority.Elevenlabs;
+                            voiceLinePriority = VoiceLinePriority.ETTS;
                         }
                         ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
                             Voice = _characterToVoicePairing[characterVoice],
@@ -179,7 +180,7 @@ namespace RoleplayingVoiceCore {
             } catch {
                 return new Tuple<WaveStream, bool, string>(null, false, "Error");
             }
-            return new Tuple<WaveStream, bool, string>(waveStream, succeeded, voiceEngine);
+            return new Tuple<WaveStream, bool, string>(waveStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS"));
         }
 
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {

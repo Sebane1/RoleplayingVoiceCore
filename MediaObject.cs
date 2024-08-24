@@ -155,8 +155,8 @@ namespace RoleplayingMediaCore {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
-                            if (stopwatch.ElapsedMilliseconds > 500) {
-                                Thread.Sleep(500);
+                            if (stopwatch.ElapsedMilliseconds > 300) {
+                                Thread.Sleep(300);
                                 _wavePlayer.Stop();
                                 break;
                             }

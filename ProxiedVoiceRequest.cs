@@ -30,7 +30,7 @@
         internal bool UseMuteList { get => _useMuteList; set => _useMuteList = value; }
     }
     public enum VoiceLinePriority {
-        Elevenlabs = 0,
+        ETTS = 0,
         Alternative = 1,
         XTTS = 2,
         None = 3,
