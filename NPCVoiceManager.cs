@@ -66,6 +66,9 @@ namespace RoleplayingVoiceCore {
                             if (overrideVoiceLinePriority != VoiceLinePriority.None) {
                                 needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
                             }
+                            if (voiceLinePriority == VoiceLinePriority.Ignore) {
+                                needsRefreshing = true;
+                            }
                             string fullPath = Path.Combine(_cachePath, relativePath);
                             if (File.Exists(fullPath) && !needsRefreshing) {
                                 voiceEngine = _characterVoices.VoiceEngine[character][text];
