@@ -8,11 +8,16 @@ using System.Net.Http.Headers;
 
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
+        private bool _useCustomRelayServer = false;
         private Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
         private CharacterVoices _characterVoices = new CharacterVoices();
         private string _cachePath = "";
         private string _versionIdentifier;
+        private string _customRelayServer;
+
+        public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
+        public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version) {
@@ -39,6 +44,10 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
+            string currentRelayServer = "https://ai.hubujubu.com:5697";
+            if (_useCustomRelayServer) {
+                currentRelayServer = _customRelayServer + ":5670";
+            }
             MemoryStream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
@@ -106,7 +115,7 @@ namespace RoleplayingVoiceCore {
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
                         };
                         using (HttpClient httpClient = new HttpClient()) {
-                            httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
+                            httpClient.BaseAddress = new Uri(currentRelayServer);
                             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                             httpClient.Timeout = new TimeSpan(0, 6, 0);
                             var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
@@ -123,7 +132,7 @@ namespace RoleplayingVoiceCore {
                         if (voiceLinePriority == VoiceLinePriority.None) {
                             voiceLinePriority = VoiceLinePriority.Alternative;
                         }
-                        ProxiedVoiceRequest elevenLabsRequest = new ProxiedVoiceRequest() {
+                        ProxiedVoiceRequest ttsRequest = new ProxiedVoiceRequest() {
                             Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
                             Text = text, Model = voiceModel.ToString().ToLower(),
                             RawText = rawText,
@@ -138,10 +147,10 @@ namespace RoleplayingVoiceCore {
                             VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                         };
                         using (HttpClient httpClient = new HttpClient()) {
-                            httpClient.BaseAddress = new Uri("https://ai.hubujubu.com:5697");
+                            httpClient.BaseAddress = new Uri(currentRelayServer);
                             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                             httpClient.Timeout = new TimeSpan(0, 6, 0);
-                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(elevenLabsRequest)));
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 await result.CopyToAsync(memoryStream);
