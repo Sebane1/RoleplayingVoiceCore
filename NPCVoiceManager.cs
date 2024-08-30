@@ -37,12 +37,11 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
-        public async Task<Tuple<WaveStream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
+        public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             MemoryStream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
-            WaveStream waveStream = null;
             try {
                 string characterVoice = "none";
                 foreach (var pair in _characterToVoicePairing) {
@@ -73,8 +72,11 @@ namespace RoleplayingVoiceCore {
                             if (File.Exists(fullPath) && !needsRefreshing) {
                                 voiceEngine = _characterVoices.VoiceEngine[character][text];
                                 try {
-                                    waveStream = new MediaFoundationReader(fullPath);
-                                    succeeded = true;
+                                    using (FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                                        await file.CopyToAsync(memoryStream);
+                                        memoryStream.Position = 0;
+                                        succeeded = true;
+                                    }
                                 } catch {
                                     needsRefreshing = true;
                                     File.Delete(fullPath);
@@ -176,14 +178,17 @@ namespace RoleplayingVoiceCore {
                                 }
                             }
                             memoryStream.Position = 0;
-                            waveStream = new StreamMediaFoundationReader(memoryStream);
                         }
                     }
                 }
             } catch {
-                return new Tuple<WaveStream, bool, string>(null, false, "Error");
+                return new Tuple<Stream, bool, string>(null, false, "Error");
             }
-            return new Tuple<WaveStream, bool, string>(waveStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS"));
+            return new Tuple<Stream, bool, string>(memoryStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS"));
+        }
+
+        public WaveStream StreamToFoundationReader(Stream stream) {
+            return new StreamMediaFoundationReader(stream);
         }
 
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {

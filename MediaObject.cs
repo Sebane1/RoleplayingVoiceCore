@@ -101,11 +101,11 @@ namespace RoleplayingMediaCore {
                     lastRotation = _playerObject.Rotation;
                     Thread.Sleep(500);
                     while (true) {
-                    if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
-                        float distance = Vector3.Distance(lastPosition, _playerObject.Position);
-                        float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
-                        if ((distance > 0.01f && _soundType == SoundType.Loop) ||
-                      ((distance < 0.3f && rotationDistance < 2f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid || Invalidated || _parent.Invalidated) {
+                        if (_playerObject != null && _wavePlayer != null && _volumeSampleProvider != null) {
+                            float distance = Vector3.Distance(lastPosition, _playerObject.Position);
+                            float rotationDistance = Vector3.Distance(lastRotation, _playerObject.Rotation);
+                            if ((distance > 0.01f && _soundType == SoundType.Loop) ||
+                          ((distance < 0.3f && rotationDistance < 2f) && _soundType == SoundType.LoopWhileMoving) || _playerObject.Invalid || Invalidated || _parent.Invalidated) {
                                 Invalidated = true;
                                 Stop();
                                 break;
@@ -149,14 +149,14 @@ namespace RoleplayingMediaCore {
             Task.Run(async () => {
                 long lastPosition = _player.Position;
                 try {
-                    Thread.Sleep(1200);
+                    Thread.Sleep(300);
                     while (true) {
                         if (_player.Position == lastPosition) {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
-                            if (stopwatch.ElapsedMilliseconds > 300) {
-                                Thread.Sleep(300);
+                            if (stopwatch.ElapsedMilliseconds > 200) {
+                                Thread.Sleep(200);
                                 _wavePlayer.Stop();
                                 break;
                             }
