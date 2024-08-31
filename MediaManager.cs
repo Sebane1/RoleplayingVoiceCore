@@ -544,7 +544,8 @@ namespace RoleplayingMediaCore {
                 _cleanupList.AddRange(_chatSounds);
                 _cleanupList.AddRange(_combatVoicePackSounds);
                 _cleanupList.AddRange(_mountLoopSounds);
-                foreach (var sound in _cleanupList) {
+                for (int i = 0; i < _cleanupList.Count; i++) {
+                    var sound = _cleanupList[i];
                     if (sound.Value != null) {
                         sound.Value.Invalidated = true;
                         sound.Value?.Stop();
