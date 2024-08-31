@@ -48,7 +48,7 @@ namespace RoleplayingVoiceCore {
             if (_useCustomRelayServer) {
                 currentRelayServer = _customRelayServer + ":5670";
             }
-            MemoryStream memoryStream = new MemoryStream();
+            Stream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
             try {
@@ -60,8 +60,8 @@ namespace RoleplayingVoiceCore {
                     }
                 }
                 VoiceLinePriority voiceLinePriority = VoiceLinePriority.None;
-                if (_characterToCacheType.ContainsKey(characterVoice)) {
-                    voiceLinePriority = _characterToCacheType[characterVoice];
+                if (_characterToCacheType.ContainsKey(character)) {
+                    voiceLinePriority = _characterToCacheType[character];
                 }
                 if (!string.IsNullOrEmpty(_cachePath)) {
                     if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
@@ -81,11 +81,9 @@ namespace RoleplayingVoiceCore {
                             if (File.Exists(fullPath) && !needsRefreshing) {
                                 voiceEngine = _characterVoices.VoiceEngine[character][text];
                                 try {
-                                    using (FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                                        await file.CopyToAsync(memoryStream);
-                                        memoryStream.Position = 0;
-                                        succeeded = true;
-                                    }
+                                    FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                    memoryStream = file;
+                                    succeeded = true;
                                 } catch {
                                     needsRefreshing = true;
                                     File.Delete(fullPath);
