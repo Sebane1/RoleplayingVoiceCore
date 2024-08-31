@@ -13,7 +13,7 @@ namespace AIDataProxy.XTTS {
             var dummy = typeof(NAudio.Lame.LameDLL);
             noop(dummy);
         }
-        public static async Task<byte[]> GetAudioAlternate(string voice, string text, string folder, string language) {
+        public static async Task<byte[]> GetVoiceData(string voice, string text, string folder, string language) {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             while (true && stopwatch.ElapsedMilliseconds < 120000) {

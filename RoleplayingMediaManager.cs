@@ -18,6 +18,7 @@ using NAudio.Wave;
 
 namespace RoleplayingMediaCore {
     public class RoleplayingMediaManager {
+        private static bool _debugMode;
         private string _apiKey;
         private ElevenLabsClient? _api;
         private NetworkedClient _networkedClient;
@@ -136,15 +137,15 @@ namespace RoleplayingMediaCore {
         public void InstallXTTS(string cache) {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Attempting to install C++ build tools please accept the UAC prompt that appears, as this dependency is required for XTTS installation to function. If the UAC prompt was rejected, restart Artemis to try again.");
             var processStart = new ProcessStartInfo(installBatchFile);
-           // processStart.RedirectStandardOutput = true;
-           // processStart.RedirectStandardError = true;
+            // processStart.RedirectStandardOutput = true;
+            // processStart.RedirectStandardError = true;
             //processStart.WindowStyle = ProcessWindowStyle.Hidden;
             processStart.UseShellExecute = false;
-           // processStart.RedirectStandardInput = true;
-           // processStart.CreateNoWindow = true;
+            // processStart.RedirectStandardInput = true;
+            // processStart.CreateNoWindow = true;
             Process process = new Process();
             process.StartInfo = processStart;
-           // process.OutputDataReceived += Process_OutputDataReceived;
+            // process.OutputDataReceived += Process_OutputDataReceived;
             //process.ErrorDataReceived += Process_ErrorDataReceived;
             //process.EnableRaisingEvents = true;
             process.Start();
@@ -221,6 +222,7 @@ namespace RoleplayingMediaCore {
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
         public string BasePath { get => _basePath; set => _basePath = value; }
         public bool ReadUnquotedText { get => _readUnquotedText; set => _readUnquotedText = value; }
+        public static bool DebugMode { get => _debugMode; set => _debugMode = value; }
 
         public async Task<bool> ApiValidation(string key) {
             if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
@@ -283,7 +285,9 @@ namespace RoleplayingMediaCore {
             voicesNames.Add("None");
             if (_xttsVoices != null) {
                 foreach (var voice in _xttsVoices) {
-                    voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
+                    if (voice.EndsWith(".wav")) {
+                        voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
+                    }
                 }
             }
             return voicesNames.ToArray();
@@ -426,7 +430,7 @@ namespace RoleplayingMediaCore {
                             foreach (var audioClip in audioClips) {
                                 if (audioClip.Item2) {
                                     audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip.Item1, _elevenLabsVoice));
-                                } else if (_readUnquotedText){
+                                } else if (_readUnquotedText) {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
@@ -739,9 +743,20 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 if (!foundInHistory) {
                     while (data == null || data.Length == 0) {
                         LameDLL.LoadNativeDLL(_basePath);
-                        data = await XTTSCommunicator.GetAudioAlternate(voiceType, finalText, Path.Combine(rpVoiceCache, "speakers"), language);
-                        Directory.CreateDirectory(Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\"));
-                        audioPath = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
+                        string speakerPath = Path.Combine(rpVoiceCache, "speakers");
+                        if (DebugMode) {
+                            XTTSStatus?.Invoke(this, "Speaker path is " + speakerPath);
+                        }
+                        data = await XTTSCommunicator.GetVoiceData(voiceType, finalText, speakerPath, language);
+                        string directory = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\");
+                        Directory.CreateDirectory(directory);
+                        if (DebugMode) {
+                            XTTSStatus?.Invoke(this, "Output directory is " + directory);
+                        }
+                        audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
+                        if (DebugMode) {
+                            XTTSStatus?.Invoke(this, "Audio file output directory is" + audioPath);
+                        }
                         await File.WriteAllBytesAsync(audioPath, data);
                     }
                 }
@@ -769,8 +784,9 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                         speechSynthesizer.Speak(trimmedText);
                         memoryStream.Position = 0;
                         data = await AudioConversionHelper.WaveStreamToMp3Bytes(memoryStream);
-                        Directory.CreateDirectory(Path.Combine(rpVoiceCache, "MSN\\" + voiceType + "\\"));
-                        audioPath = Path.Combine(rpVoiceCache, "MSN\\" + voiceType + "\\" + Guid.NewGuid() + ".mp3");
+                        string directory = Path.Combine(rpVoiceCache, "MSN\\" + voiceType + "\\");
+                        Directory.CreateDirectory(directory);
+                        audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
                         await File.WriteAllBytesAsync(audioPath, data);
                     }
                 }
