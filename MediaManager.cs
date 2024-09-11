@@ -503,13 +503,15 @@ namespace RoleplayingMediaCore {
             return 1;
         }
         public void Dispose() {
-            notDisposed = false;
-            CleanSounds();
-            try {
-                if (_updateLoop != null) {
-                    _updateLoop?.Dispose();
-                }
-            } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            Task.Run(async () => {
+                notDisposed = false;
+                CleanSounds();
+                try {
+                    if (_updateLoop != null) {
+                        _updateLoop?.Dispose();
+                    }
+                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
+            });
         }
         public void CleanNonStreamingSounds() {
             try {
