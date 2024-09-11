@@ -148,7 +148,7 @@ namespace RoleplayingVoiceCore {
                             httpClient.BaseAddress = new Uri(currentRelayServer);
                             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                             httpClient.Timeout = new TimeSpan(0, 6, 0);
-                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
+                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 await result.CopyToAsync(memoryStream);

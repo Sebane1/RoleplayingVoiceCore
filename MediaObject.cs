@@ -600,9 +600,9 @@ namespace RoleplayingMediaCore {
                                 await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
                                     ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
                                 _vlcPlayer = new MediaPlayer(media);
-                                var processingCancellationTokenSource = new CancellationTokenSource();
-                                _vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
-                                _vlcPlayer.Stopped += delegate { _parent.LastFrame = null; };
+                                //var processingCancellationTokenSource = new CancellationTokenSource();
+                                //_vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
+                                _vlcPlayer.Stopped += delegate { _parent.LastFrame = new byte[0]; };
                                 if (soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")) {
                                     _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
                                     _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
