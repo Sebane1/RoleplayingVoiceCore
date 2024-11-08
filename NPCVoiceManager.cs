@@ -42,13 +42,12 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
-        public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
+        public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
             string currentRelayServer = "https://ai.hubujubu.com:5697";
             if (_useCustomRelayServer) {
                 currentRelayServer = _customRelayServer + ":5670";
             }
-            Stream memoryStream = new MemoryStream();
             string voiceEngine = "";
             bool succeeded = false;
             try {
@@ -82,7 +81,7 @@ namespace RoleplayingVoiceCore {
                                 voiceEngine = _characterVoices.VoiceEngine[character][text];
                                 try {
                                     FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                    memoryStream = file;
+                                    await file.CopyToAsync(outputStream);
                                     succeeded = true;
                                 } catch {
                                     needsRefreshing = true;
@@ -93,6 +92,7 @@ namespace RoleplayingVoiceCore {
                     }
                 }
                 if (!succeeded) {
+                    MemoryStream memoryStream = new MemoryStream();
                     if (_characterToVoicePairing.ContainsKey(characterVoice)) {
                         if (voiceLinePriority == VoiceLinePriority.None) {
                             voiceLinePriority = VoiceLinePriority.ETTS;
@@ -159,6 +159,8 @@ namespace RoleplayingVoiceCore {
                             }
                         }
                     }
+                    await memoryStream.CopyToAsync(outputStream);
+                    memoryStream.Position = 0;
                     if (!string.IsNullOrEmpty(_cachePath)) {
                         if (succeeded) {
                             if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
@@ -187,11 +189,12 @@ namespace RoleplayingVoiceCore {
                             memoryStream.Position = 0;
                         }
                     }
+                    memoryStream.DisposeAsync();
                 }
             } catch {
-                return new Tuple<Stream, bool, string>(null, false, "Error");
+                return new Tuple<bool, string>(false, "Error");
             }
-            return new Tuple<Stream, bool, string>(memoryStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
+            return new Tuple<bool, string>(succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
         }
 
         public WaveStream StreamToFoundationReader(Stream stream) {
