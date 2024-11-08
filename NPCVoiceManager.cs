@@ -161,7 +161,7 @@ namespace RoleplayingVoiceCore {
                     }
                     if (!string.IsNullOrEmpty(_cachePath)) {
                         if (succeeded) {
-                            if (voiceEngine != "OK" && voiceEngine != "" || character.ToLower().Contains("narrator")) {
+                            if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
                                 if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
                                     _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
                                 }
@@ -191,7 +191,7 @@ namespace RoleplayingVoiceCore {
             } catch {
                 return new Tuple<Stream, bool, string>(null, false, "Error");
             }
-            return new Tuple<Stream, bool, string>(memoryStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS"));
+            return new Tuple<Stream, bool, string>(memoryStream, succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
         }
 
         public WaveStream StreamToFoundationReader(Stream stream) {

@@ -94,7 +94,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
 
             }
-            return 0;
+            return ushort.MaxValue - 1;
         }
         public async Task<bool> SendShort(string sendID, ushort shortValue) {
             try {
