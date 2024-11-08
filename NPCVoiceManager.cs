@@ -148,7 +148,7 @@ namespace RoleplayingVoiceCore {
                             httpClient.BaseAddress = new Uri(currentRelayServer);
                             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                             httpClient.Timeout = new TimeSpan(0, 6, 0);
-                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 await result.CopyToAsync(memoryStream);
@@ -170,7 +170,7 @@ namespace RoleplayingVoiceCore {
                                 }
                                 if (memoryStream.Length > 0) {
                                     string relativeFolderPath = character + "\\";
-                                    string filePath = relativeFolderPath + Guid.NewGuid() + ".mp3";
+                                    string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
                                     _characterVoices.VoiceEngine[character][text] = voiceEngine;
                                     if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
                                         File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
@@ -197,7 +197,23 @@ namespace RoleplayingVoiceCore {
         public WaveStream StreamToFoundationReader(Stream stream) {
             return new StreamMediaFoundationReader(stream);
         }
+        public static string CreateMD5(string input) {
+            // Use input string to calculate MD5 hash
+            using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create()) {
+                byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
+                byte[] hashBytes = md5.ComputeHash(inputBytes);
 
+                return Convert.ToHexString(hashBytes); // .NET 5 +
+
+                // Convert the byte array to hexadecimal string prior to .NET 5
+                // StringBuilder sb = new System.Text.StringBuilder();
+                // for (int i = 0; i < hashBytes.Length; i++)
+                // {
+                //     sb.Append(hashBytes[i].ToString("X2"));
+                // }
+                // return sb.ToString();
+            }
+        }
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {
             if (!string.IsNullOrEmpty(character)) {
                 Random random = new Random(GetSimpleHash(character));
