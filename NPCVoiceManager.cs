@@ -44,9 +44,9 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<Tuple<Stream, bool, string>> GetCharacterAudio(string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
-            string currentRelayServer = "https://ai.hubujubu.com:5697";
+            string currentRelayServer = "https://ai.hubujubu.com:5670";
             if (_useCustomRelayServer) {
-                currentRelayServer = _customRelayServer + ":5670";
+                currentRelayServer = "http://" + _customRelayServer + ":5670";
             }
             Stream memoryStream = new MemoryStream();
             string voiceEngine = "";
@@ -148,7 +148,7 @@ namespace RoleplayingVoiceCore {
                             httpClient.BaseAddress = new Uri(currentRelayServer);
                             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                             httpClient.Timeout = new TimeSpan(0, 6, 0);
-                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 await result.CopyToAsync(memoryStream);
