@@ -47,7 +47,7 @@ namespace RoleplayingVoiceCore {
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, HttpListenerResponse resp = null) {
             string currentRelayServer = "https://ai.hubujubu.com:5697";
             if (_useCustomRelayServer) {
-                currentRelayServer = _customRelayServer + ":5670";
+                currentRelayServer = "http://" + _customRelayServer + ":5670";
             }
             string voiceEngine = "";
             bool succeeded = false;
