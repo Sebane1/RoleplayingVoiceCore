@@ -151,12 +151,12 @@ namespace RoleplayingMediaCore {
                 try {
                     Thread.Sleep(300);
                     while (true) {
-                        if (_player.Position == lastPosition) {
+                        if (_player.Position > _player.Length * 0.985f) {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
-                            if (stopwatch.ElapsedMilliseconds > 200) {
-                                Thread.Sleep(200);
+                            if (stopwatch.ElapsedMilliseconds > 100) {
+                                Thread.Sleep(100);
                                 _wavePlayer.Stop();
                                 break;
                             }
@@ -164,7 +164,7 @@ namespace RoleplayingMediaCore {
                             stopwatch.Reset();
                         }
                         lastPosition = _player.Position;
-                        Thread.Sleep(1000);
+                        Thread.Sleep(100);
                     }
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
