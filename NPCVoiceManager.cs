@@ -43,8 +43,9 @@ namespace RoleplayingVoiceCore {
             Cheap,
         }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
-            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
-            string currentRelayServer = "http://ai.hubujubu.com:5670";
+            bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
+            bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, HttpListenerResponse resp = null) {
+            string currentRelayServer = "https://ai.hubujubu.com:5697";
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":5670";
             }
@@ -119,11 +120,15 @@ namespace RoleplayingVoiceCore {
                             var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
+                                voiceEngine = post.ReasonPhrase;
+                                if (resp != null) {
+                                    resp.StatusCode = (int)HttpStatusCode.OK;
+                                    resp.StatusDescription = voiceEngine;
+                                }
                                 await result.CopyToAsync(memoryStream);
                                 await result.FlushAsync();
                                 memoryStream.Position = 0;
                                 succeeded = true;
-                                voiceEngine = post.ReasonPhrase;
                             }
                         }
                     } else {
@@ -151,11 +156,15 @@ namespace RoleplayingVoiceCore {
                             var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
+                                voiceEngine = post.ReasonPhrase;
+                                if (resp != null) {
+                                    resp.StatusCode = (int)HttpStatusCode.OK;
+                                    resp.StatusDescription = voiceEngine;
+                                }
                                 await result.CopyToAsync(memoryStream);
                                 await result.FlushAsync();
                                 memoryStream.Position = 0;
                                 succeeded = true;
-                                voiceEngine = post.ReasonPhrase;
                             }
                         }
                     }
