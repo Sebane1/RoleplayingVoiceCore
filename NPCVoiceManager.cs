@@ -44,7 +44,7 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "", bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None) {
-            string currentRelayServer = "https://ai.hubujubu.com:5670";
+            string currentRelayServer = "http://ai.hubujubu.com:5670";
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":5670";
             }
