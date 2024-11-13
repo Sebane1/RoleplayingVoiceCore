@@ -2,6 +2,7 @@
 using NAudio.Wave;
 using Newtonsoft.Json;
 using RoleplayingMediaCore.AudioRecycler;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
@@ -11,11 +12,13 @@ namespace RoleplayingVoiceCore {
         private bool _useCustomRelayServer = false;
         private Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
+        private string _cacheLocation;
         private CharacterVoices _characterVoices = new CharacterVoices();
         private string _cachePath = "";
         private string _versionIdentifier;
         private string _customRelayServer;
         private string _port = "5670";
+        Stopwatch cacheTimer = new Stopwatch();
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -25,11 +28,21 @@ namespace RoleplayingVoiceCore {
             string cacheLocation, string version) {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
+            _cacheLocation = cacheLocation;
+            RefreshCache(cacheLocation);
+            _versionIdentifier = version;
+            cacheTimer.Start();
+        }
+
+        private void RefreshCache(string cacheLocation) {
             if (cacheLocation != null) {
                 _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
                 Directory.CreateDirectory(_cachePath);
                 string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
                 if (File.Exists(cacheFile)) {
+                    if (_characterVoices != null) {
+                        _characterVoices.VoiceCatalogue.Clear();
+                    }
                     try {
                         _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
                     } catch {
@@ -37,8 +50,8 @@ namespace RoleplayingVoiceCore {
                     }
                 }
             }
-            _versionIdentifier = version;
         }
+
         public enum VoiceModel {
             Quality,
             Speed,
@@ -90,6 +103,10 @@ namespace RoleplayingVoiceCore {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
+            }
+            if (cacheTimer.ElapsedMilliseconds > 60000) {
+                RefreshCache(_cacheLocation);
+                cacheTimer.Restart();
             }
             string voiceEngine = "";
             bool succeeded = false;
