@@ -86,7 +86,7 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
-            bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, HttpListenerResponse resp = null) {
+            bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ArtemisDialogueServer1" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
@@ -110,14 +110,16 @@ namespace RoleplayingVoiceCore {
                         if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
                             string relativePath = _characterVoices.VoiceCatalogue[character][text];
                             bool needsRefreshing = false;
-                            if (voiceLinePriority != VoiceLinePriority.None) {
-                                needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
-                            }
-                            if (overrideVoiceLinePriority != VoiceLinePriority.None) {
-                                needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
-                            }
-                            if (voiceLinePriority == VoiceLinePriority.Ignore) {
-                                needsRefreshing = true;
+                            if (!ignoreRefreshCache) {
+                                if (voiceLinePriority != VoiceLinePriority.None) {
+                                    needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
+                                }
+                                if (overrideVoiceLinePriority != VoiceLinePriority.None) {
+                                    needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
+                                }
+                                if (voiceLinePriority == VoiceLinePriority.Ignore) {
+                                    needsRefreshing = true;
+                                }
                             }
                             string fullPath = Path.Combine(_cachePath, relativePath);
                             if (File.Exists(fullPath) && !needsRefreshing) {
