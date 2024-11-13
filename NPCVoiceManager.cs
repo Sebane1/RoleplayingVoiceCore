@@ -15,9 +15,11 @@ namespace RoleplayingVoiceCore {
         private string _cachePath = "";
         private string _versionIdentifier;
         private string _customRelayServer;
+        private string _port = "5670";
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
+        public string Port { get => _port; set => _port = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version) {
@@ -87,7 +89,7 @@ namespace RoleplayingVoiceCore {
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ArtemisDialogueServer1" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             if (_useCustomRelayServer) {
-                currentRelayServer = "http://" + _customRelayServer + ":5670";
+                currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
             string voiceEngine = "";
             bool succeeded = false;
