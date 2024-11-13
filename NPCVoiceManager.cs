@@ -42,6 +42,46 @@ namespace RoleplayingVoiceCore {
             Speed,
             Cheap,
         }
+        public async Task<bool> VerifyServer(string hostname, string port) {
+            string currentRelayServer = "http://" + hostname + ":" + port;
+            try {
+                MemoryStream memoryStream = new MemoryStream();
+                ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
+                    Voice = "Bella",
+                    Text = "Test",
+                    RawText = "",
+                    UnfilteredText = "",
+                    Model = "cheap",
+                    Character = "Test",
+                    AggressiveCache = false,
+                    RedoLine = false,
+                    ExtraJsonData = "",
+                    Override = false,
+                    VersionIdentifier = "",
+                    UseMuteList = false,
+                    VoiceLinePriority = VoiceLinePriority.None
+                };
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri(currentRelayServer);
+                    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    httpClient.Timeout = new TimeSpan(0, 6, 0);
+                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
+                    if (post.StatusCode == HttpStatusCode.OK) {
+                        var result = await post.Content.ReadAsStreamAsync();
+                        await result.CopyToAsync(memoryStream);
+                        await result.FlushAsync();
+                        if (memoryStream.Length > 0) {
+                            await memoryStream.DisposeAsync();
+                            return true;
+                        }
+                    }
+                }
+                memoryStream.Position = 0;
+            } catch {
+                return false;
+            }
+            return false;
+        }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, HttpListenerResponse resp = null) {
