@@ -6,12 +6,14 @@ using System.Net.Http.Headers;
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
         Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
+        private List<KeyValuePair<string, string>> _extrasVoiceList;
 
-        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing) {
+        public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, List<KeyValuePair<string, string>> extrasVoiceList) {
             _characterToVoicePairing = characterToVoicePairing;
+            _extrasVoiceList = extrasVoiceList;
         }
 
-        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character, 
+        public async Task<KeyValuePair<Stream, bool>> GetCharacterAudio(string text, string originalValue, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, bool fastSpeed = false, string extraJson = "", bool redoLine = false) {
             try {
                 string selectedVoice = "none";
@@ -66,8 +68,24 @@ namespace RoleplayingVoiceCore {
             } catch {
                 return new KeyValuePair<Stream, bool>(null, false);
             }
+            return new KeyValuePair<Stream, bool>(null, false);
         }
-
+        public bool CheckIfExtraExists(string name) {
+            foreach (var item in _extrasVoiceList) {
+                if (item.Key == name) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        public string GetVoiceExtra(string name) {
+            foreach (var item in _extrasVoiceList) {
+                if (item.Key == name) {
+                    return item.Value;
+                }
+            }
+            return "";
+        }
         private string PickVoiceBasedOnNameAndGender(string character, bool gender) {
             if (!string.IsNullOrEmpty(character)) {
                 Random random = new Random(GetSimpleHash(character));
