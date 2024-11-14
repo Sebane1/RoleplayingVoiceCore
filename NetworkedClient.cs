@@ -76,6 +76,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             try {
                 using (HttpClient httpClient = new HttpClient()) {
                     httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                    httpClient.Timeout = new TimeSpan(1, 0, 0);
                     MemoryStream memory = new MemoryStream();
                     BinaryWriter writer = new BinaryWriter(memory);
                     writer.Write(sendID);
@@ -94,7 +95,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
             } catch {
 
             }
-            return 0;
+            return ushort.MaxValue - 1;
         }
         public async Task<bool> SendShort(string sendID, ushort shortValue) {
             try {
