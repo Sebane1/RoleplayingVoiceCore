@@ -28,14 +28,16 @@ namespace RoleplayingVoiceCore {
         public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
-            string cacheLocation, string version) {
+            string cacheLocation, string version, bool isAServer) {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
             _cacheLocation = cacheLocation;
             RefreshCache(cacheLocation);
             _versionIdentifier = version;
             cacheTimer.Start();
-            GetCloserServerHost();
+            if (!isAServer) {
+                GetCloserServerHost();
+            }
         }
         public void GetCloserServerHost() {
             _ = Task.Run(async () => {
