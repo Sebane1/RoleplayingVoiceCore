@@ -1,4 +1,5 @@
-﻿using ElevenLabs.Voices;
+﻿using CachedTTSRelay;
+using ElevenLabs.Voices;
 using NAudio.Wave;
 using Newtonsoft.Json;
 using RoleplayingMediaCore.AudioRecycler;
@@ -18,11 +19,13 @@ namespace RoleplayingVoiceCore {
         private string _versionIdentifier;
         private string _customRelayServer;
         private string _port = "5670";
+        private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
         public string Port { get => _port; set => _port = value; }
+        public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version) {
@@ -32,8 +35,28 @@ namespace RoleplayingVoiceCore {
             RefreshCache(cacheLocation);
             _versionIdentifier = version;
             cacheTimer.Start();
+            GetCloserServerHost();
         }
-
+        public void GetCloserServerHost() {
+            _ = Task.Run(async () => {
+                Console.WriteLine("Aquiring Nearest Server");
+                ClientRegistrationRequest clientRegistrationRequest = new ClientRegistrationRequest();
+                using (HttpClient httpClient = new HttpClient()) {
+                    httpClient.BaseAddress = new Uri("http://ai.hubujubu.com:5677");
+                    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    httpClient.Timeout = new TimeSpan(0, 6, 0);
+                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(clientRegistrationRequest)));
+                    if (post.StatusCode == HttpStatusCode.OK) {
+                        string value = await post.Content.ReadAsStringAsync();
+                        ServerRegistrationRequest response = JsonConvert.DeserializeObject<ServerRegistrationRequest>(value);
+                        _useCustomRelayServer = true;
+                        _customRelayServer = response.PublicHostAddress;
+                        _port = response.Port;
+                        _currentServerAlias = response.Alias;
+                    }
+                }
+            });
+        }
         private void RefreshCache(string cacheLocation) {
             if (cacheLocation != null) {
                 _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
