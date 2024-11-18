@@ -34,8 +34,8 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
             _cacheLocation = cacheLocation;
-            RefreshCache(cacheLocation);
             _versionIdentifier = version;
+            RefreshCache(cacheLocation);
             cacheTimer.Start();
             cacheSaveTimer.Start();
             if (!isAServer) {
