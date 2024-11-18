@@ -22,6 +22,7 @@ namespace RoleplayingVoiceCore {
         private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
         Stopwatch cacheSaveTimer = new Stopwatch();
+        private bool _cacheLoaded;
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -80,6 +81,7 @@ namespace RoleplayingVoiceCore {
                         }
                     }
                 }
+                _cacheLoaded = true;
             }
         }
 
@@ -329,18 +331,28 @@ namespace RoleplayingVoiceCore {
                                             await memoryStream.FlushAsync();
                                         }
                                     }
-                                    if (cacheSaveTimer.ElapsedMilliseconds > 300000 || !isServerRequest) {
-                                        if (_characterVoices.VoiceCatalogue.Count > 0) {
-                                            string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
-                                            if (File.Exists(primaryCache)) {
-                                                File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
+                                    if (_cacheLoaded) {
+                                        if (cacheSaveTimer.ElapsedMilliseconds > 30000 || !isServerRequest) {
+                                            if (_characterVoices.VoiceCatalogue.Count > 0) {
+                                                string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
+                                                if (File.Exists(primaryCache)) {
+                                                    File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
+                                                }
+                                                bool isLocked = true;
+                                                while (isLocked) {
+                                                    try {
+                                                        await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                                        isLocked = false;
+                                                    } catch {
+                                                        Thread.Sleep(500);
+                                                    }
+                                                }
                                             }
-                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
-                                        }
-                                        cacheSaveTimer.Restart();
-                                        if (cacheTimer.ElapsedMilliseconds > 600000) {
-                                            RefreshCache(_cacheLocation);
-                                            cacheTimer.Restart();
+                                            cacheSaveTimer.Restart();
+                                            if (cacheTimer.ElapsedMilliseconds > 600000) {
+                                                RefreshCache(_cacheLocation);
+                                                cacheTimer.Restart();
+                                            }
                                         }
                                     }
                                 }
