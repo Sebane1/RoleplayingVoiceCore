@@ -123,6 +123,7 @@ namespace RoleplayingVoiceCore {
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
+            bool recoverLineType = false;
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
@@ -164,18 +165,47 @@ namespace RoleplayingVoiceCore {
                             if (File.Exists(fullPath) && !needsRefreshing) {
                                 voiceEngine = _characterVoices.VoiceEngine[character][text];
                                 try {
+                                    if (resp != null && !recoverLineType) {
+                                        resp.StatusCode = (int)HttpStatusCode.OK;
+                                        resp.StatusDescription = voiceEngine;
+                                    }
                                     FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                                     await file.CopyToAsync(outputStream);
                                     succeeded = true;
+                                    if (resp != null) {
+                                        resp.Close();
+                                    }
                                 } catch {
                                     needsRefreshing = true;
                                     File.Delete(fullPath);
                                 }
                             }
+                        } else {
+                            string relativeFolderPath = character + "\\";
+                            string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                            if (File.Exists(filePath)) {
+                                try {
+                                    voiceEngine = "Cached";
+                                    if (resp != null && !recoverLineType) {
+                                        resp.StatusCode = (int)HttpStatusCode.OK;
+                                        resp.StatusDescription = voiceEngine;
+                                    }
+                                    FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                    await file.CopyToAsync(outputStream);
+                                    succeeded = true;
+                                    voiceEngine = _characterVoices.VoiceEngine[character][text];
+                                    recoverLineType = true;
+                                    if (resp != null) {
+                                        resp.Close();
+                                    }
+                                } catch {
+                                    File.Delete(filePath);
+                                }
+                            }
                         }
                     }
                 }
-                if (!succeeded) {
+                if (!succeeded || recoverLineType) {
                     MemoryStream memoryStream = new MemoryStream();
                     if (_characterToVoicePairing.ContainsKey(characterVoice)) {
                         if (voiceLinePriority == VoiceLinePriority.None) {
@@ -204,13 +234,15 @@ namespace RoleplayingVoiceCore {
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 voiceEngine = post.ReasonPhrase;
-                                if (resp != null) {
+                                if (resp != null && !recoverLineType) {
                                     resp.StatusCode = (int)HttpStatusCode.OK;
                                     resp.StatusDescription = voiceEngine;
                                 }
-                                await result.CopyToAsync(memoryStream);
-                                await result.FlushAsync();
-                                memoryStream.Position = 0;
+                                if (!recoverLineType) {
+                                    await result.CopyToAsync(memoryStream);
+                                    await result.FlushAsync();
+                                    memoryStream.Position = 0;
+                                }
                                 succeeded = true;
                             }
                         }
@@ -240,18 +272,25 @@ namespace RoleplayingVoiceCore {
                             if (post.StatusCode == HttpStatusCode.OK) {
                                 var result = await post.Content.ReadAsStreamAsync();
                                 voiceEngine = post.ReasonPhrase;
-                                if (resp != null) {
+                                if (resp != null && !recoverLineType) {
                                     resp.StatusCode = (int)HttpStatusCode.OK;
                                     resp.StatusDescription = voiceEngine;
                                 }
-                                await result.CopyToAsync(memoryStream);
-                                await result.FlushAsync();
-                                memoryStream.Position = 0;
+                                if (!recoverLineType) {
+                                    await result.CopyToAsync(memoryStream);
+                                    await result.FlushAsync();
+                                    memoryStream.Position = 0;
+                                }
                                 succeeded = true;
                             }
                         }
                     }
-                    await memoryStream.CopyToAsync(outputStream);
+                    if (!recoverLineType) {
+                        await memoryStream.CopyToAsync(outputStream);
+                    }
+                    if (resp != null && !recoverLineType) {
+                        resp.Close();
+                    }
                     memoryStream.Position = 0;
                     if (!string.IsNullOrEmpty(_cachePath)) {
                         if (succeeded) {
@@ -266,14 +305,16 @@ namespace RoleplayingVoiceCore {
                                     string relativeFolderPath = character + "\\";
                                     string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
                                     _characterVoices.VoiceEngine[character][text] = voiceEngine;
-                                    if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
+                                    if (_characterVoices.VoiceCatalogue[character].ContainsKey(text) && !recoverLineType) {
                                         File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
                                     }
                                     _characterVoices.VoiceCatalogue[character][text] = filePath;
                                     Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
-                                    using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
-                                        await memoryStream.CopyToAsync(stream);
-                                        await memoryStream.FlushAsync();
+                                    if (!recoverLineType) {
+                                        using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                            await memoryStream.CopyToAsync(stream);
+                                            await memoryStream.FlushAsync();
+                                        }
                                     }
                                     await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                 }
