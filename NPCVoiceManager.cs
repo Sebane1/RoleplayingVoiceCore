@@ -148,6 +148,29 @@ namespace RoleplayingVoiceCore {
                 if (_characterToCacheType.ContainsKey(character)) {
                     voiceLinePriority = _characterToCacheType[character];
                 }
+
+                var task = async () => {
+                    string relativeFolderPath = character + "\\";
+                    string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                    if (File.Exists(filePath)) {
+                        try {
+                            voiceEngine = "Cached";
+                            if (resp != null && !recoverLineType) {
+                                resp.StatusCode = (int)HttpStatusCode.OK;
+                                resp.StatusDescription = voiceEngine;
+                            }
+                            FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                            await file.CopyToAsync(outputStream);
+                            succeeded = true;
+                            recoverLineType = true;
+                            if (resp != null) {
+                                resp.Close();
+                            }
+                        } catch {
+                        }
+                    }
+                };
+
                 if (!string.IsNullOrEmpty(_cachePath)) {
                     if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
                         if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
@@ -183,27 +206,11 @@ namespace RoleplayingVoiceCore {
                                     File.Delete(fullPath);
                                 }
                             }
+                        } else {
+                            await task.Invoke();
                         }
                     } else {
-                        string relativeFolderPath = character + "\\";
-                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
-                        if (File.Exists(filePath)) {
-                            try {
-                                voiceEngine = "Cached";
-                                if (resp != null && !recoverLineType) {
-                                    resp.StatusCode = (int)HttpStatusCode.OK;
-                                    resp.StatusDescription = voiceEngine;
-                                }
-                                FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                await file.CopyToAsync(outputStream);
-                                succeeded = true;
-                                recoverLineType = true;
-                                if (resp != null) {
-                                    resp.Close();
-                                }
-                            } catch {
-                            }
-                        }
+                        await task.Invoke();
                     }
                 }
                 if (!succeeded || recoverLineType) {
