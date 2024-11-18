@@ -243,6 +243,7 @@ namespace RoleplayingVoiceCore {
                                     await result.FlushAsync();
                                     memoryStream.Position = 0;
                                 }
+                                result.Close();
                                 succeeded = true;
                             }
                         }
@@ -281,6 +282,7 @@ namespace RoleplayingVoiceCore {
                                     await result.FlushAsync();
                                     memoryStream.Position = 0;
                                 }
+                                result.Close();
                                 succeeded = true;
                             }
                         }
