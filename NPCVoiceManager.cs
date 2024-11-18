@@ -289,11 +289,11 @@ namespace RoleplayingVoiceCore {
                     }
                     if (!recoverLineType) {
                         await memoryStream.CopyToAsync(outputStream);
+                        memoryStream.Position = 0;
                     }
                     if (resp != null && !recoverLineType) {
                         resp.Close();
                     }
-                    memoryStream.Position = 0;
                     if (!string.IsNullOrEmpty(_cachePath)) {
                         if (succeeded) {
                             if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
