@@ -65,9 +65,6 @@ namespace RoleplayingVoiceCore {
                 Directory.CreateDirectory(_cachePath);
                 string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
                 if (File.Exists(cacheFile)) {
-                    if (_characterVoices != null) {
-                        _characterVoices.VoiceCatalogue.Clear();
-                    }
                     try {
                         _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
                     } catch {
@@ -129,7 +126,7 @@ namespace RoleplayingVoiceCore {
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
-            if (cacheTimer.ElapsedMilliseconds > 60000) {
+            if (cacheTimer.ElapsedMilliseconds > 120000) {
                 RefreshCache(_cacheLocation);
                 cacheTimer.Restart();
             }
