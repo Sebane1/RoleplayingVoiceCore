@@ -70,7 +70,11 @@ namespace RoleplayingVoiceCore {
                         _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
                     } catch {
                         if (File.Exists(cacheFileBackup)) {
-                            _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFileBackup);
+                            try {
+                                _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFileBackup);
+                            } catch {
+
+                            }
                         }
                     }
                 }
