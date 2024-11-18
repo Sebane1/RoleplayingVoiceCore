@@ -64,11 +64,12 @@ namespace RoleplayingVoiceCore {
                 _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
                 Directory.CreateDirectory(_cachePath);
                 string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
+                string cacheFileBackup = Path.Combine(_cachePath, "cacheIndex_backup.json");
                 if (File.Exists(cacheFile)) {
                     try {
                         _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
                     } catch {
-
+                        _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFileBackup);
                     }
                 }
             }
@@ -317,6 +318,7 @@ namespace RoleplayingVoiceCore {
                                         }
                                     }
                                     if (_characterVoices.VoiceEngine.Count > 0) {
+                                        File.Copy(Path.Combine(_cachePath, "cacheIndex.json"), Path.Combine(_cachePath, "cacheIndex_backup.json"));
                                         await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                     }
                                 }
