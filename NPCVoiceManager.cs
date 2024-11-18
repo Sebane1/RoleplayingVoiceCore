@@ -200,7 +200,6 @@ namespace RoleplayingVoiceCore {
                                     resp.Close();
                                 }
                             } catch {
-                                File.Delete(filePath);
                             }
                         }
                     }
