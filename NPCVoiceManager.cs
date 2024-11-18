@@ -133,12 +133,9 @@ namespace RoleplayingVoiceCore {
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             bool recoverLineType = false;
+            bool isServerRequest = resp != null;
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
-            }
-            if (cacheTimer.ElapsedMilliseconds > 600000) {
-                RefreshCache(_cacheLocation);
-                cacheTimer.Restart();
             }
             string voiceEngine = "";
             bool succeeded = false;
@@ -332,8 +329,8 @@ namespace RoleplayingVoiceCore {
                                             await memoryStream.FlushAsync();
                                         }
                                     }
-                                    if (cacheSaveTimer.ElapsedMilliseconds > 300000 || resp == null) {
-                                        if (_characterVoices.VoiceEngine.Count > 0) {
+                                    if (cacheSaveTimer.ElapsedMilliseconds > 300000 || !isServerRequest) {
+                                        if (_characterVoices.VoiceCatalogue.Count > 0) {
                                             string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
                                             if (File.Exists(primaryCache)) {
                                                 File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
@@ -341,6 +338,10 @@ namespace RoleplayingVoiceCore {
                                             await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                         }
                                         cacheSaveTimer.Restart();
+                                        if (cacheTimer.ElapsedMilliseconds > 600000) {
+                                            RefreshCache(_cacheLocation);
+                                            cacheTimer.Restart();
+                                        }
                                     }
                                 }
                             }
