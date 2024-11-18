@@ -327,7 +327,10 @@ namespace RoleplayingVoiceCore {
                                         }
                                     }
                                     if (_characterVoices.VoiceEngine.Count > 0) {
-                                        File.Copy(Path.Combine(_cachePath, "cacheIndex.json"), Path.Combine(_cachePath, "cacheIndex_backup.json"));
+                                        string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
+                                        if (File.Exists(primaryCache)) {
+                                            File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"));
+                                        }
                                         await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                     }
                                 }
