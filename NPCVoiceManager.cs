@@ -180,27 +180,27 @@ namespace RoleplayingVoiceCore {
                                     File.Delete(fullPath);
                                 }
                             }
-                        } else {
-                            string relativeFolderPath = character + "\\";
-                            string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
-                            if (File.Exists(filePath)) {
-                                try {
-                                    voiceEngine = "Cached";
-                                    if (resp != null && !recoverLineType) {
-                                        resp.StatusCode = (int)HttpStatusCode.OK;
-                                        resp.StatusDescription = voiceEngine;
-                                    }
-                                    FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                    await file.CopyToAsync(outputStream);
-                                    succeeded = true;
-                                    voiceEngine = _characterVoices.VoiceEngine[character][text];
-                                    recoverLineType = true;
-                                    if (resp != null) {
-                                        resp.Close();
-                                    }
-                                } catch {
-                                    File.Delete(filePath);
+                        }
+                    } else {
+                        string relativeFolderPath = character + "\\";
+                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                        if (File.Exists(filePath)) {
+                            try {
+                                voiceEngine = "Cached";
+                                if (resp != null && !recoverLineType) {
+                                    resp.StatusCode = (int)HttpStatusCode.OK;
+                                    resp.StatusDescription = voiceEngine;
                                 }
+                                FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                await file.CopyToAsync(outputStream);
+                                succeeded = true;
+                                voiceEngine = _characterVoices.VoiceEngine[character][text];
+                                recoverLineType = true;
+                                if (resp != null) {
+                                    resp.Close();
+                                }
+                            } catch {
+                                File.Delete(filePath);
                             }
                         }
                     }
