@@ -194,7 +194,6 @@ namespace RoleplayingVoiceCore {
                                 FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
                                 await file.CopyToAsync(outputStream);
                                 succeeded = true;
-                                voiceEngine = _characterVoices.VoiceEngine[character][text];
                                 recoverLineType = true;
                                 if (resp != null) {
                                     resp.Close();
@@ -317,7 +316,9 @@ namespace RoleplayingVoiceCore {
                                             await memoryStream.FlushAsync();
                                         }
                                     }
-                                    await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                    if (_characterVoices.VoiceEngine.Count > 0) {
+                                        await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                    }
                                 }
                             }
                             memoryStream.Position = 0;
