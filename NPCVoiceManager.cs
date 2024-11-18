@@ -21,6 +21,7 @@ namespace RoleplayingVoiceCore {
         private string _port = "5670";
         private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
+        Stopwatch cacheSaveTimer = new Stopwatch();
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -35,6 +36,7 @@ namespace RoleplayingVoiceCore {
             RefreshCache(cacheLocation);
             _versionIdentifier = version;
             cacheTimer.Start();
+            cacheSaveTimer.Start();
             if (!isAServer) {
                 GetCloserServerHost();
             }
@@ -134,7 +136,7 @@ namespace RoleplayingVoiceCore {
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
-            if (cacheTimer.ElapsedMilliseconds > 120000) {
+            if (cacheTimer.ElapsedMilliseconds > 600000) {
                 RefreshCache(_cacheLocation);
                 cacheTimer.Restart();
             }
@@ -330,12 +332,15 @@ namespace RoleplayingVoiceCore {
                                             await memoryStream.FlushAsync();
                                         }
                                     }
-                                    if (_characterVoices.VoiceEngine.Count > 0) {
-                                        string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
-                                        if (File.Exists(primaryCache)) {
-                                            File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"));
+                                    if (cacheSaveTimer.ElapsedMilliseconds > 300000 || resp == null) {
+                                        if (_characterVoices.VoiceEngine.Count > 0) {
+                                            string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
+                                            if (File.Exists(primaryCache)) {
+                                                File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
+                                            }
+                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                         }
-                                        await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                        cacheSaveTimer.Restart();
                                     }
                                 }
                             }
