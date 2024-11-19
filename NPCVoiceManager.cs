@@ -21,6 +21,9 @@ namespace RoleplayingVoiceCore {
         private string _port = "5670";
         private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
+        Stopwatch cacheSaveTimer = new Stopwatch();
+        private bool _cacheLoaded;
+        private bool alreadySaving;
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -32,9 +35,10 @@ namespace RoleplayingVoiceCore {
             _characterToVoicePairing = characterToVoicePairing;
             _characterToCacheType = characterToCacheType;
             _cacheLocation = cacheLocation;
-            RefreshCache(cacheLocation);
             _versionIdentifier = version;
+            RefreshCache(cacheLocation);
             cacheTimer.Start();
+            cacheSaveTimer.Start();
             if (!isAServer) {
                 GetCloserServerHost();
             }
@@ -60,20 +64,26 @@ namespace RoleplayingVoiceCore {
             });
         }
         private void RefreshCache(string cacheLocation) {
-            if (cacheLocation != null) {
+            if (!string.IsNullOrEmpty(cacheLocation)) {
                 _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
                 Directory.CreateDirectory(_cachePath);
                 string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
+                string cacheFileBackup = Path.Combine(_cachePath, "cacheIndex_backup.json");
                 if (File.Exists(cacheFile)) {
-                    if (_characterVoices != null) {
-                        _characterVoices.VoiceCatalogue.Clear();
-                    }
                     try {
-                        _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(cacheFile);
-                    } catch {
+                        _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(File.ReadAllText(cacheFile));
+                    } catch (Exception e) {
+                        Console.WriteLine(e);
+                        if (File.Exists(cacheFileBackup)) {
+                            try {
+                                _characterVoices = JsonConvert.DeserializeObject<CharacterVoices>(File.ReadAllText(cacheFileBackup));
+                            } catch {
 
+                            }
+                        }
                     }
                 }
+                _cacheLoaded = true;
             }
         }
 
@@ -126,168 +136,242 @@ namespace RoleplayingVoiceCore {
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
+            bool recoverLineType = false;
+            bool isServerRequest = resp != null;
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
-            if (cacheTimer.ElapsedMilliseconds > 60000) {
-                RefreshCache(_cacheLocation);
-                cacheTimer.Restart();
-            }
             string voiceEngine = "";
             bool succeeded = false;
-            try {
-                string characterVoice = "none";
-                foreach (var pair in _characterToVoicePairing) {
-                    if (character.StartsWith(pair.Key) || character.EndsWith(pair.Key)) {
-                        characterVoice = pair.Key;
-                        break;
-                    }
-                }
-                VoiceLinePriority voiceLinePriority = VoiceLinePriority.None;
-                if (_characterToCacheType.ContainsKey(character)) {
-                    voiceLinePriority = _characterToCacheType[character];
-                }
-                if (!string.IsNullOrEmpty(_cachePath)) {
-                    if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
-                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
-                            string relativePath = _characterVoices.VoiceCatalogue[character][text];
-                            bool needsRefreshing = false;
-                            if (!ignoreRefreshCache) {
-                                if (voiceLinePriority != VoiceLinePriority.None) {
-                                    needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
-                                }
-                                if (overrideVoiceLinePriority != VoiceLinePriority.None) {
-                                    needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
-                                }
-                                if (voiceLinePriority == VoiceLinePriority.Ignore) {
-                                    needsRefreshing = true;
-                                }
-                            }
-                            string fullPath = Path.Combine(_cachePath, relativePath);
-                            if (File.Exists(fullPath) && !needsRefreshing) {
-                                voiceEngine = _characterVoices.VoiceEngine[character][text];
-                                try {
-                                    FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                    await file.CopyToAsync(outputStream);
-                                    succeeded = true;
-                                } catch {
-                                    needsRefreshing = true;
-                                    File.Delete(fullPath);
-                                }
-                            }
+            if (_cacheLoaded) {
+                try {
+                    string characterVoice = "none";
+                    foreach (var pair in _characterToVoicePairing) {
+                        if (character.StartsWith(pair.Key) || character.EndsWith(pair.Key)) {
+                            characterVoice = pair.Key;
+                            break;
                         }
                     }
-                }
-                if (!succeeded) {
-                    MemoryStream memoryStream = new MemoryStream();
-                    if (_characterToVoicePairing.ContainsKey(characterVoice)) {
-                        if (voiceLinePriority == VoiceLinePriority.None) {
-                            voiceLinePriority = VoiceLinePriority.ETTS;
-                        }
-                        ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
-                            Voice = _characterToVoicePairing[characterVoice],
-                            Text = text,
-                            RawText = rawText,
-                            UnfilteredText = originalValue,
-                            Model = "quality",
-                            Character = character,
-                            AggressiveCache = aggressiveCache,
-                            RedoLine = redoLine,
-                            ExtraJsonData = extraJson,
-                            Override = overrideGeneration,
-                            VersionIdentifier = _versionIdentifier,
-                            UseMuteList = useMuteList,
-                            VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
-                        };
-                        using (HttpClient httpClient = new HttpClient()) {
-                            httpClient.BaseAddress = new Uri(currentRelayServer);
-                            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                            httpClient.Timeout = new TimeSpan(0, 6, 0);
-                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
-                            if (post.StatusCode == HttpStatusCode.OK) {
-                                var result = await post.Content.ReadAsStreamAsync();
-                                voiceEngine = post.ReasonPhrase;
-                                if (resp != null) {
+                    VoiceLinePriority voiceLinePriority = VoiceLinePriority.None;
+                    if (_characterToCacheType.ContainsKey(character)) {
+                        voiceLinePriority = _characterToCacheType[character];
+                    }
+
+                    var task = async () => {
+                        string relativeFolderPath = character + "\\";
+                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                        if (File.Exists(filePath)) {
+                            try {
+                                voiceEngine = "Cached";
+                                if (resp != null && !recoverLineType) {
                                     resp.StatusCode = (int)HttpStatusCode.OK;
                                     resp.StatusDescription = voiceEngine;
                                 }
-                                await result.CopyToAsync(memoryStream);
-                                await result.FlushAsync();
-                                memoryStream.Position = 0;
+                                FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                await file.CopyToAsync(outputStream);
                                 succeeded = true;
-                            }
-                        }
-                    } else {
-                        if (voiceLinePriority == VoiceLinePriority.None) {
-                            voiceLinePriority = VoiceLinePriority.Alternative;
-                        }
-                        ProxiedVoiceRequest ttsRequest = new ProxiedVoiceRequest() {
-                            Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
-                            Text = text, Model = voiceModel.ToString().ToLower(),
-                            RawText = rawText,
-                            UnfilteredText = originalValue,
-                            Character = character,
-                            AggressiveCache = aggressiveCache,
-                            RedoLine = redoLine,
-                            ExtraJsonData = extraJson,
-                            Override = overrideGeneration,
-                            VersionIdentifier = _versionIdentifier,
-                            UseMuteList = useMuteList,
-                            VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
-                        };
-                        using (HttpClient httpClient = new HttpClient()) {
-                            httpClient.BaseAddress = new Uri(currentRelayServer);
-                            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                            httpClient.Timeout = new TimeSpan(0, 6, 0);
-                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
-                            if (post.StatusCode == HttpStatusCode.OK) {
-                                var result = await post.Content.ReadAsStreamAsync();
-                                voiceEngine = post.ReasonPhrase;
+                                recoverLineType = true;
                                 if (resp != null) {
-                                    resp.StatusCode = (int)HttpStatusCode.OK;
-                                    resp.StatusDescription = voiceEngine;
+                                    resp.Close();
                                 }
-                                await result.CopyToAsync(memoryStream);
-                                await result.FlushAsync();
-                                memoryStream.Position = 0;
-                                succeeded = true;
+                            } catch {
                             }
                         }
-                    }
-                    await memoryStream.CopyToAsync(outputStream);
-                    memoryStream.Position = 0;
+                    };
+
                     if (!string.IsNullOrEmpty(_cachePath)) {
-                        if (succeeded) {
-                            if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
-                                if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
-                                    _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
-                                }
-                                if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
-                                    _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
-                                }
-                                if (memoryStream.Length > 0) {
-                                    string relativeFolderPath = character + "\\";
-                                    string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
-                                    _characterVoices.VoiceEngine[character][text] = voiceEngine;
-                                    if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
-                                        File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
+                        if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
+                            if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
+                                string relativePath = _characterVoices.VoiceCatalogue[character][text];
+                                bool needsRefreshing = false;
+                                if (!ignoreRefreshCache) {
+                                    if (voiceLinePriority != VoiceLinePriority.None) {
+                                        needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
                                     }
-                                    _characterVoices.VoiceCatalogue[character][text] = filePath;
-                                    Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
-                                    using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
-                                        await memoryStream.CopyToAsync(stream);
-                                        await memoryStream.FlushAsync();
+                                    if (overrideVoiceLinePriority != VoiceLinePriority.None) {
+                                        needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
                                     }
-                                    await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                    if (voiceLinePriority == VoiceLinePriority.Ignore) {
+                                        needsRefreshing = true;
+                                    }
+                                }
+                                string fullPath = Path.Combine(_cachePath, relativePath);
+                                if (File.Exists(fullPath) && !needsRefreshing) {
+                                    voiceEngine = _characterVoices.VoiceEngine[character][text];
+                                    try {
+                                        if (resp != null && !recoverLineType) {
+                                            resp.StatusCode = (int)HttpStatusCode.OK;
+                                            resp.StatusDescription = voiceEngine;
+                                        }
+                                        FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                        await file.CopyToAsync(outputStream);
+                                        succeeded = true;
+                                        if (resp != null) {
+                                            resp.Close();
+                                        }
+                                    } catch {
+                                        needsRefreshing = true;
+                                        File.Delete(fullPath);
+                                    }
+                                }
+                            } else {
+                                await task.Invoke();
+                            }
+                        } else {
+                            await task.Invoke();
+                        }
+                    }
+                    if (!succeeded || recoverLineType) {
+                        MemoryStream memoryStream = new MemoryStream();
+                        if (_characterToVoicePairing.ContainsKey(characterVoice)) {
+                            if (voiceLinePriority == VoiceLinePriority.None) {
+                                voiceLinePriority = VoiceLinePriority.ETTS;
+                            }
+                            ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
+                                Voice = _characterToVoicePairing[characterVoice],
+                                Text = text,
+                                RawText = rawText,
+                                UnfilteredText = originalValue,
+                                Model = "quality",
+                                Character = character,
+                                AggressiveCache = aggressiveCache,
+                                RedoLine = redoLine,
+                                ExtraJsonData = extraJson,
+                                Override = overrideGeneration,
+                                VersionIdentifier = _versionIdentifier,
+                                UseMuteList = useMuteList,
+                                VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
+                            };
+                            using (HttpClient httpClient = new HttpClient()) {
+                                httpClient.BaseAddress = new Uri(currentRelayServer);
+                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                                httpClient.Timeout = new TimeSpan(0, 6, 0);
+                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
+                                if (post.StatusCode == HttpStatusCode.OK) {
+                                    var result = await post.Content.ReadAsStreamAsync();
+                                    voiceEngine = post.ReasonPhrase;
+                                    if (resp != null && !recoverLineType) {
+                                        resp.StatusCode = (int)HttpStatusCode.OK;
+                                        resp.StatusDescription = voiceEngine;
+                                    }
+                                    if (!recoverLineType) {
+                                        await result.CopyToAsync(memoryStream);
+                                        await result.FlushAsync();
+                                        memoryStream.Position = 0;
+                                    }
+                                    result.Close();
+                                    succeeded = true;
                                 }
                             }
+                        } else {
+                            if (voiceLinePriority == VoiceLinePriority.None) {
+                                voiceLinePriority = VoiceLinePriority.Alternative;
+                            }
+                            ProxiedVoiceRequest ttsRequest = new ProxiedVoiceRequest() {
+                                Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
+                                Text = text,
+                                Model = voiceModel.ToString().ToLower(),
+                                RawText = rawText,
+                                UnfilteredText = originalValue,
+                                Character = character,
+                                AggressiveCache = aggressiveCache,
+                                RedoLine = redoLine,
+                                ExtraJsonData = extraJson,
+                                Override = overrideGeneration,
+                                VersionIdentifier = _versionIdentifier,
+                                UseMuteList = useMuteList,
+                                VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
+                            };
+                            using (HttpClient httpClient = new HttpClient()) {
+                                httpClient.BaseAddress = new Uri(currentRelayServer);
+                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                                httpClient.Timeout = new TimeSpan(0, 6, 0);
+                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
+                                if (post.StatusCode == HttpStatusCode.OK) {
+                                    var result = await post.Content.ReadAsStreamAsync();
+                                    voiceEngine = post.ReasonPhrase;
+                                    if (resp != null && !recoverLineType) {
+                                        resp.StatusCode = (int)HttpStatusCode.OK;
+                                        resp.StatusDescription = voiceEngine;
+                                    }
+                                    if (!recoverLineType) {
+                                        await result.CopyToAsync(memoryStream);
+                                        await result.FlushAsync();
+                                        memoryStream.Position = 0;
+                                    }
+                                    result.Close();
+                                    succeeded = true;
+                                }
+                            }
+                        }
+                        if (!recoverLineType) {
+                            await memoryStream.CopyToAsync(outputStream);
                             memoryStream.Position = 0;
                         }
+                        if (resp != null && !recoverLineType) {
+                            resp.Close();
+                        }
+                        if (!string.IsNullOrEmpty(_cachePath)) {
+                            if (succeeded) {
+                                if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
+                                    if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
+                                        _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
+                                    }
+                                    if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
+                                        _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
+                                    }
+                                    if (memoryStream.Length > 0) {
+                                        string relativeFolderPath = character + "\\";
+                                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                                        _characterVoices.VoiceEngine[character][text] = voiceEngine;
+                                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text) && !recoverLineType) {
+                                            File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
+                                        }
+                                        _characterVoices.VoiceCatalogue[character][text] = filePath;
+                                        Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
+                                        if (!recoverLineType) {
+                                            using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                                await memoryStream.CopyToAsync(stream);
+                                                await memoryStream.FlushAsync();
+                                            }
+                                        }
+                                        if (_cacheLoaded && !alreadySaving) {
+                                            if (cacheSaveTimer.ElapsedMilliseconds > 30000 || !isServerRequest) {
+                                                if (_characterVoices.VoiceCatalogue.Count > 0) {
+                                                    alreadySaving = true;
+                                                    string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
+                                                    if (File.Exists(primaryCache)) {
+                                                        File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
+                                                    }
+                                                    bool isLocked = true;
+                                                    string json = JsonConvert.SerializeObject(_characterVoices, Formatting.Indented);
+                                                    while (isLocked) {
+                                                        try {
+                                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), json);
+                                                            isLocked = false;
+                                                        } catch {
+                                                            Thread.Sleep(500);
+                                                        }
+                                                    }
+                                                    alreadySaving = false;
+                                                }
+                                                cacheSaveTimer.Restart();
+                                                //if (cacheTimer.ElapsedMilliseconds > 600000) {
+                                                //    RefreshCache(_cacheLocation);
+                                                //    cacheTimer.Restart();
+                                                //}
+                                            }
+                                        }
+                                    }
+                                }
+                                memoryStream.Position = 0;
+                            }
+                        }
+                        memoryStream.DisposeAsync();
                     }
-                    memoryStream.DisposeAsync();
+                } catch {
+                    return new Tuple<bool, string>(false, "Error");
                 }
-            } catch {
-                return new Tuple<bool, string>(false, "Error");
             }
             return new Tuple<bool, string>(succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
         }
