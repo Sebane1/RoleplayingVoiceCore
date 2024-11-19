@@ -23,6 +23,7 @@ namespace RoleplayingVoiceCore {
         Stopwatch cacheTimer = new Stopwatch();
         Stopwatch cacheSaveTimer = new Stopwatch();
         private bool _cacheLoaded;
+        private bool alreadySaving;
 
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -134,45 +135,35 @@ namespace RoleplayingVoiceCore {
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
-                string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
-                bool recoverLineType = false;
-                bool isServerRequest = resp != null;
-                if (_useCustomRelayServer)
-                {
-                    currentRelayServer = "http://" + _customRelayServer + ":" + _port;
-                }
-                string voiceEngine = "";
-                bool succeeded = false;
-            if (_cacheLoaded)
-            {
-                try
-                {
+            string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
+            bool recoverLineType = false;
+            bool isServerRequest = resp != null;
+            if (_useCustomRelayServer) {
+                currentRelayServer = "http://" + _customRelayServer + ":" + _port;
+            }
+            string voiceEngine = "";
+            bool succeeded = false;
+            if (_cacheLoaded) {
+                try {
                     string characterVoice = "none";
-                    foreach (var pair in _characterToVoicePairing)
-                    {
-                        if (character.StartsWith(pair.Key) || character.EndsWith(pair.Key))
-                        {
+                    foreach (var pair in _characterToVoicePairing) {
+                        if (character.StartsWith(pair.Key) || character.EndsWith(pair.Key)) {
                             characterVoice = pair.Key;
                             break;
                         }
                     }
                     VoiceLinePriority voiceLinePriority = VoiceLinePriority.None;
-                    if (_characterToCacheType.ContainsKey(character))
-                    {
+                    if (_characterToCacheType.ContainsKey(character)) {
                         voiceLinePriority = _characterToCacheType[character];
                     }
 
-                    var task = async () =>
-                    {
+                    var task = async () => {
                         string relativeFolderPath = character + "\\";
                         string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
-                        if (File.Exists(filePath))
-                        {
-                            try
-                            {
+                        if (File.Exists(filePath)) {
+                            try {
                                 voiceEngine = "Cached";
-                                if (resp != null && !recoverLineType)
-                                {
+                                if (resp != null && !recoverLineType) {
                                     resp.StatusCode = (int)HttpStatusCode.OK;
                                     resp.StatusDescription = voiceEngine;
                                 }
@@ -180,87 +171,63 @@ namespace RoleplayingVoiceCore {
                                 await file.CopyToAsync(outputStream);
                                 succeeded = true;
                                 recoverLineType = true;
-                                if (resp != null)
-                                {
+                                if (resp != null) {
                                     resp.Close();
                                 }
-                            }
-                            catch
-                            {
+                            } catch {
                             }
                         }
                     };
 
-                    if (!string.IsNullOrEmpty(_cachePath))
-                    {
-                        if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine)
-                        {
-                            if (_characterVoices.VoiceCatalogue[character].ContainsKey(text))
-                            {
+                    if (!string.IsNullOrEmpty(_cachePath)) {
+                        if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
+                            if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
                                 string relativePath = _characterVoices.VoiceCatalogue[character][text];
                                 bool needsRefreshing = false;
-                                if (!ignoreRefreshCache)
-                                {
-                                    if (voiceLinePriority != VoiceLinePriority.None)
-                                    {
+                                if (!ignoreRefreshCache) {
+                                    if (voiceLinePriority != VoiceLinePriority.None) {
                                         needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
                                     }
-                                    if (overrideVoiceLinePriority != VoiceLinePriority.None)
-                                    {
+                                    if (overrideVoiceLinePriority != VoiceLinePriority.None) {
                                         needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
                                     }
-                                    if (voiceLinePriority == VoiceLinePriority.Ignore)
-                                    {
+                                    if (voiceLinePriority == VoiceLinePriority.Ignore) {
                                         needsRefreshing = true;
                                     }
                                 }
                                 string fullPath = Path.Combine(_cachePath, relativePath);
-                                if (File.Exists(fullPath) && !needsRefreshing)
-                                {
+                                if (File.Exists(fullPath) && !needsRefreshing) {
                                     voiceEngine = _characterVoices.VoiceEngine[character][text];
-                                    try
-                                    {
-                                        if (resp != null && !recoverLineType)
-                                        {
+                                    try {
+                                        if (resp != null && !recoverLineType) {
                                             resp.StatusCode = (int)HttpStatusCode.OK;
                                             resp.StatusDescription = voiceEngine;
                                         }
                                         FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                                         await file.CopyToAsync(outputStream);
                                         succeeded = true;
-                                        if (resp != null)
-                                        {
+                                        if (resp != null) {
                                             resp.Close();
                                         }
-                                    }
-                                    catch
-                                    {
+                                    } catch {
                                         needsRefreshing = true;
                                         File.Delete(fullPath);
                                     }
                                 }
-                            }
-                            else
-                            {
+                            } else {
                                 await task.Invoke();
                             }
-                        }
-                        else
-                        {
+                        } else {
                             await task.Invoke();
                         }
                     }
-                    if (!succeeded || recoverLineType)
-                    {
+                    if (!succeeded || recoverLineType) {
                         MemoryStream memoryStream = new MemoryStream();
-                        if (_characterToVoicePairing.ContainsKey(characterVoice))
-                        {
-                            if (voiceLinePriority == VoiceLinePriority.None)
-                            {
+                        if (_characterToVoicePairing.ContainsKey(characterVoice)) {
+                            if (voiceLinePriority == VoiceLinePriority.None) {
                                 voiceLinePriority = VoiceLinePriority.ETTS;
                             }
-                            ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest()
-                            {
+                            ProxiedVoiceRequest proxiedVoiceRequest = new ProxiedVoiceRequest() {
                                 Voice = _characterToVoicePairing[characterVoice],
                                 Text = text,
                                 RawText = rawText,
@@ -275,23 +242,19 @@ namespace RoleplayingVoiceCore {
                                 UseMuteList = useMuteList,
                                 VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
                             };
-                            using (HttpClient httpClient = new HttpClient())
-                            {
+                            using (HttpClient httpClient = new HttpClient()) {
                                 httpClient.BaseAddress = new Uri(currentRelayServer);
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                                 httpClient.Timeout = new TimeSpan(0, 6, 0);
                                 var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
-                                if (post.StatusCode == HttpStatusCode.OK)
-                                {
+                                if (post.StatusCode == HttpStatusCode.OK) {
                                     var result = await post.Content.ReadAsStreamAsync();
                                     voiceEngine = post.ReasonPhrase;
-                                    if (resp != null && !recoverLineType)
-                                    {
+                                    if (resp != null && !recoverLineType) {
                                         resp.StatusCode = (int)HttpStatusCode.OK;
                                         resp.StatusDescription = voiceEngine;
                                     }
-                                    if (!recoverLineType)
-                                    {
+                                    if (!recoverLineType) {
                                         await result.CopyToAsync(memoryStream);
                                         await result.FlushAsync();
                                         memoryStream.Position = 0;
@@ -300,15 +263,11 @@ namespace RoleplayingVoiceCore {
                                     succeeded = true;
                                 }
                             }
-                        }
-                        else
-                        {
-                            if (voiceLinePriority == VoiceLinePriority.None)
-                            {
+                        } else {
+                            if (voiceLinePriority == VoiceLinePriority.None) {
                                 voiceLinePriority = VoiceLinePriority.Alternative;
                             }
-                            ProxiedVoiceRequest ttsRequest = new ProxiedVoiceRequest()
-                            {
+                            ProxiedVoiceRequest ttsRequest = new ProxiedVoiceRequest() {
                                 Voice = !string.IsNullOrEmpty(backupVoice) ? backupVoice : PickVoiceBasedOnNameAndGender(character, gender),
                                 Text = text,
                                 Model = voiceModel.ToString().ToLower(),
@@ -323,23 +282,19 @@ namespace RoleplayingVoiceCore {
                                 UseMuteList = useMuteList,
                                 VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                             };
-                            using (HttpClient httpClient = new HttpClient())
-                            {
+                            using (HttpClient httpClient = new HttpClient()) {
                                 httpClient.BaseAddress = new Uri(currentRelayServer);
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                                 httpClient.Timeout = new TimeSpan(0, 6, 0);
                                 var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
-                                if (post.StatusCode == HttpStatusCode.OK)
-                                {
+                                if (post.StatusCode == HttpStatusCode.OK) {
                                     var result = await post.Content.ReadAsStreamAsync();
                                     voiceEngine = post.ReasonPhrase;
-                                    if (resp != null && !recoverLineType)
-                                    {
+                                    if (resp != null && !recoverLineType) {
                                         resp.StatusCode = (int)HttpStatusCode.OK;
                                         resp.StatusDescription = voiceEngine;
                                     }
-                                    if (!recoverLineType)
-                                    {
+                                    if (!recoverLineType) {
                                         await result.CopyToAsync(memoryStream);
                                         await result.FlushAsync();
                                         memoryStream.Position = 0;
@@ -349,69 +304,52 @@ namespace RoleplayingVoiceCore {
                                 }
                             }
                         }
-                        if (!recoverLineType)
-                        {
+                        if (!recoverLineType) {
                             await memoryStream.CopyToAsync(outputStream);
                             memoryStream.Position = 0;
                         }
-                        if (resp != null && !recoverLineType)
-                        {
+                        if (resp != null && !recoverLineType) {
                             resp.Close();
                         }
-                        if (!string.IsNullOrEmpty(_cachePath))
-                        {
-                            if (succeeded)
-                            {
-                                if (voiceEngine != "" || character.ToLower().Contains("narrator"))
-                                {
-                                    if (!_characterVoices.VoiceCatalogue.ContainsKey(character))
-                                    {
+                        if (!string.IsNullOrEmpty(_cachePath)) {
+                            if (succeeded) {
+                                if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
+                                    if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
                                         _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
                                     }
-                                    if (!_characterVoices.VoiceEngine.ContainsKey(character))
-                                    {
+                                    if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
                                         _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
                                     }
-                                    if (memoryStream.Length > 0)
-                                    {
+                                    if (memoryStream.Length > 0) {
                                         string relativeFolderPath = character + "\\";
                                         string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
                                         _characterVoices.VoiceEngine[character][text] = voiceEngine;
-                                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text) && !recoverLineType)
-                                        {
+                                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text) && !recoverLineType) {
                                             File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
                                         }
                                         _characterVoices.VoiceCatalogue[character][text] = filePath;
                                         Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
-                                        if (!recoverLineType)
-                                        {
-                                            using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write))
-                                            {
+                                        if (!recoverLineType) {
+                                            using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
                                                 await memoryStream.CopyToAsync(stream);
                                                 await memoryStream.FlushAsync();
                                             }
                                         }
-                                        if (_cacheLoaded)
-                                        {
-                                            if (cacheSaveTimer.ElapsedMilliseconds > 30000 || !isServerRequest)
-                                            {
-                                                if (_characterVoices.VoiceCatalogue.Count > 0)
-                                                {
+                                        if (_cacheLoaded && !alreadySaving) {
+                                            alreadySaving = true;
+                                            if (cacheSaveTimer.ElapsedMilliseconds > 30000 || !isServerRequest) {
+                                                if (_characterVoices.VoiceCatalogue.Count > 0) {
                                                     string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
-                                                    if (File.Exists(primaryCache))
-                                                    {
+                                                    if (File.Exists(primaryCache)) {
                                                         File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
                                                     }
                                                     bool isLocked = true;
-                                                    while (isLocked)
-                                                    {
-                                                        try
-                                                        {
+                                                    while (isLocked) {
+                                                        try {
                                                             await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
                                                             isLocked = false;
-                                                        }
-                                                        catch
-                                                        {
+                                                            alreadySaving = false;
+                                                        } catch {
                                                             Thread.Sleep(500);
                                                         }
                                                     }
@@ -430,9 +368,7 @@ namespace RoleplayingVoiceCore {
                         }
                         memoryStream.DisposeAsync();
                     }
-                }
-                catch
-                {
+                } catch {
                     return new Tuple<bool, string>(false, "Error");
                 }
             }
