@@ -367,7 +367,9 @@ namespace RoleplayingVoiceCore {
                                 memoryStream.Position = 0;
                             }
                         }
-                        memoryStream.DisposeAsync();
+                        if (isServerRequest) {
+                            memoryStream.DisposeAsync();
+                        }
                     }
                 } catch {
                     return new Tuple<bool, string>(false, "Error");
