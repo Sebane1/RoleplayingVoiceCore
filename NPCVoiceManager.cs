@@ -336,23 +336,24 @@ namespace RoleplayingVoiceCore {
                                             }
                                         }
                                         if (_cacheLoaded && !alreadySaving) {
-                                            alreadySaving = true;
                                             if (cacheSaveTimer.ElapsedMilliseconds > 30000 || !isServerRequest) {
                                                 if (_characterVoices.VoiceCatalogue.Count > 0) {
+                                                    alreadySaving = true;
                                                     string primaryCache = Path.Combine(_cachePath, "cacheIndex.json");
                                                     if (File.Exists(primaryCache)) {
                                                         File.Copy(primaryCache, Path.Combine(_cachePath, "cacheIndex_backup.json"), true);
                                                     }
                                                     bool isLocked = true;
+                                                    string json = JsonConvert.SerializeObject(_characterVoices, Formatting.Indented);
                                                     while (isLocked) {
                                                         try {
-                                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), JsonConvert.SerializeObject(_characterVoices, Formatting.Indented));
+                                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), json);
                                                             isLocked = false;
-                                                            alreadySaving = false;
                                                         } catch {
                                                             Thread.Sleep(500);
                                                         }
                                                     }
+                                                    alreadySaving = false;
                                                 }
                                                 cacheSaveTimer.Restart();
                                                 //if (cacheTimer.ElapsedMilliseconds > 600000) {
