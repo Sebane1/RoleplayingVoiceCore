@@ -318,7 +318,7 @@ namespace RoleplayingVoiceCore {
                                     if (!_characterVoices.VoiceCatalogue.ContainsKey(characterGendered)) {
                                         _characterVoices.VoiceCatalogue[characterGendered] = new Dictionary<string, string>();
                                     }
-                                    if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
+                                    if (!_characterVoices.VoiceEngine.ContainsKey(characterGendered)) {
                                         _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
                                     }
                                     if (memoryStream.Length > 0) {
