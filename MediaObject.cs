@@ -521,7 +521,7 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = _volumeOffset * volume;
+                                    _volumeSampleProvider.Volume = (_volumeOffset * volume) * volumePercentage;
                                 } else {
                                     volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
@@ -540,7 +540,7 @@ namespace RoleplayingMediaCore {
                                 _volumeSampleProvider = new VolumeSampleProvider(_meteringSampleProvider);
                                 _baseVolume = volume;
                                 if (_soundType != SoundType.LoopUntilStopped) {
-                                    _volumeSampleProvider.Volume = _volumeOffset * volume;
+                                    _volumeSampleProvider.Volume = (_volumeOffset * volume) * volumePercentage;
                                 } else {
                                     volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
