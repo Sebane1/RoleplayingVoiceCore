@@ -138,6 +138,7 @@ namespace RoleplayingVoiceCore {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             bool recoverLineType = false;
             bool isServerRequest = resp != null;
+            string characterGendered = character + (gender ? "_0":"_1");
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
@@ -158,8 +159,8 @@ namespace RoleplayingVoiceCore {
                     }
 
                     var task = async () => {
-                        string relativeFolderPath = character + "\\";
-                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
+                        string relativeFolderPath = characterGendered + "\\";
+                        string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
                         if (File.Exists(filePath)) {
                             try {
                                 voiceEngine = "Cached";
@@ -180,16 +181,16 @@ namespace RoleplayingVoiceCore {
                     };
 
                     if (!string.IsNullOrEmpty(_cachePath)) {
-                        if (_characterVoices.VoiceCatalogue.ContainsKey(character) && !redoLine) {
-                            if (_characterVoices.VoiceCatalogue[character].ContainsKey(text)) {
-                                string relativePath = _characterVoices.VoiceCatalogue[character][text];
+                        if (_characterVoices.VoiceCatalogue.ContainsKey(characterGendered) && !redoLine) {
+                            if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text)) {
+                                string relativePath = _characterVoices.VoiceCatalogue[characterGendered][text];
                                 bool needsRefreshing = false;
                                 if (!ignoreRefreshCache) {
                                     if (voiceLinePriority != VoiceLinePriority.None) {
-                                        needsRefreshing = _characterVoices.VoiceEngine[character][text] != voiceLinePriority.ToString();
+                                        needsRefreshing = _characterVoices.VoiceEngine[characterGendered][text] != voiceLinePriority.ToString();
                                     }
                                     if (overrideVoiceLinePriority != VoiceLinePriority.None) {
-                                        needsRefreshing = _characterVoices.VoiceEngine[character][text] != overrideVoiceLinePriority.ToString();
+                                        needsRefreshing = _characterVoices.VoiceEngine[characterGendered][text] != overrideVoiceLinePriority.ToString();
                                     }
                                     if (voiceLinePriority == VoiceLinePriority.Ignore) {
                                         needsRefreshing = true;
@@ -197,7 +198,7 @@ namespace RoleplayingVoiceCore {
                                 }
                                 string fullPath = Path.Combine(_cachePath, relativePath);
                                 if (File.Exists(fullPath) && !needsRefreshing) {
-                                    voiceEngine = _characterVoices.VoiceEngine[character][text];
+                                    voiceEngine = _characterVoices.VoiceEngine[characterGendered][text];
                                     try {
                                         if (resp != null && !recoverLineType) {
                                             resp.StatusCode = (int)HttpStatusCode.OK;
@@ -313,21 +314,21 @@ namespace RoleplayingVoiceCore {
                         }
                         if (!string.IsNullOrEmpty(_cachePath)) {
                             if (succeeded) {
-                                if (voiceEngine != "" || character.ToLower().Contains("narrator")) {
-                                    if (!_characterVoices.VoiceCatalogue.ContainsKey(character)) {
-                                        _characterVoices.VoiceCatalogue[character] = new Dictionary<string, string>();
+                                if (voiceEngine != "" || characterGendered.ToLower().Contains("narrator")) {
+                                    if (!_characterVoices.VoiceCatalogue.ContainsKey(characterGendered)) {
+                                        _characterVoices.VoiceCatalogue[characterGendered] = new Dictionary<string, string>();
                                     }
                                     if (!_characterVoices.VoiceEngine.ContainsKey(character)) {
-                                        _characterVoices.VoiceEngine[character] = new Dictionary<string, string>();
+                                        _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
                                     }
                                     if (memoryStream.Length > 0) {
-                                        string relativeFolderPath = character + "\\";
-                                        string filePath = relativeFolderPath + CreateMD5(character + text) + ".mp3";
-                                        _characterVoices.VoiceEngine[character][text] = voiceEngine;
-                                        if (_characterVoices.VoiceCatalogue[character].ContainsKey(text) && !recoverLineType) {
-                                            File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[character][text]));
+                                        string relativeFolderPath = characterGendered + "\\";
+                                        string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
+                                        _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
+                                        if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text) && !recoverLineType) {
+                                            File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[characterGendered][text]));
                                         }
-                                        _characterVoices.VoiceCatalogue[character][text] = filePath;
+                                        _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
                                         Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
                                         if (!recoverLineType) {
                                             using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
