@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using RoleplayingMediaCore.AudioRecycler;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -15,7 +16,10 @@ namespace RoleplayingVoiceCore {
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
         private string _cacheLocation;
         private CharacterVoices _characterVoices = new CharacterVoices();
+
+        private CharacterVoices _characterVoicesMasterList = new CharacterVoices();
         private string _cachePath = "";
+        private string _editorCacheLocation = "";
         private string _versionIdentifier;
         private string _customRelayServer;
         private string _port = "5670";
@@ -29,6 +33,7 @@ namespace RoleplayingVoiceCore {
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
         public string Port { get => _port; set => _port = value; }
         public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
+        public CharacterVoices CharacterVoices { get => _characterVoices; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version, bool isAServer) {
@@ -41,6 +46,7 @@ namespace RoleplayingVoiceCore {
             cacheSaveTimer.Start();
             if (!isAServer) {
                 GetCloserServerHost();
+                GetVoiceLineMasterList();
             }
         }
         public void GetCloserServerHost() {
@@ -66,7 +72,9 @@ namespace RoleplayingVoiceCore {
         private void RefreshCache(string cacheLocation) {
             if (!string.IsNullOrEmpty(cacheLocation)) {
                 _cachePath = Path.Combine(cacheLocation, "NPC Dialogue Cache\\");
+                _editorCacheLocation = Path.Combine(cacheLocation, "NPC Dialogue Editor\\");
                 Directory.CreateDirectory(_cachePath);
+                Directory.CreateDirectory(_editorCacheLocation);
                 string cacheFile = Path.Combine(_cachePath, "cacheIndex.json");
                 string cacheFileBackup = Path.Combine(_cachePath, "cacheIndex_backup.json");
                 if (File.Exists(cacheFile)) {
@@ -83,8 +91,51 @@ namespace RoleplayingVoiceCore {
                         }
                     }
                 }
-                _cacheLoaded = true;
             }
+            _cacheLoaded = true;
+        }
+        private async void GetVoiceLineMasterList() {
+            string currentRelayServer = "http://ai.hubujubu.com:5684";
+            MemoryStream memoryStream = new MemoryStream();
+            InformationRequest informationRequest = new InformationRequest();
+            informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
+            using (HttpClient httpClient = new HttpClient()) {
+                httpClient.BaseAddress = new Uri(currentRelayServer);
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.Timeout = new TimeSpan(0, 6, 0);
+                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(informationRequest)));
+                if (post.StatusCode == HttpStatusCode.OK) {
+                    var result = await post.Content.ReadAsStringAsync();
+                    _characterVoicesMasterList = JsonConvert.DeserializeObject<CharacterVoices>(result);
+                }
+            }
+        }
+
+        private async Task<bool> UploadCharacterVoicePack(string characterName) {
+            string currentRelayServer = "http://ai.hubujubu.com:5684";
+            string path = Path.Combine(_editorCacheLocation, characterName);
+            string zipPath = path + ".zip";
+            if (File.Exists(zipPath)) {
+                File.Delete(zipPath);
+            }
+            ZipFile.CreateFromDirectory(path, path + ".zip");
+            InformationRequest informationRequest = new InformationRequest();
+            informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
+            string json = JsonConvert.SerializeObject(informationRequest);
+            MemoryStream stream = new MemoryStream();
+            BinaryWriter binaryWriter = new BinaryWriter(stream);
+            binaryWriter.Write(json);
+            binaryWriter.Write(await File.ReadAllBytesAsync(zipPath));
+            using (HttpClient httpClient = new HttpClient()) {
+                httpClient.BaseAddress = new Uri(currentRelayServer);
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.Timeout = new TimeSpan(0, 6, 0);
+                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(stream));
+                if (post.StatusCode == HttpStatusCode.OK) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public enum VoiceModel {
@@ -132,13 +183,47 @@ namespace RoleplayingVoiceCore {
             }
             return false;
         }
+        public async Task<Tuple<bool, string>> AddCharacterAudio(Stream inputStream, string text, string character) {
+            string voiceEngine = "";
+            bool succeeded = false;
+            string characterGendered = character;
+            if (_cacheLoaded) {
+                if (!string.IsNullOrEmpty(_editorCacheLocation)) {
+                    if (succeeded) {
+                        if (voiceEngine != "" || characterGendered.ToLower().Contains("narrator")) {
+                            if (!_characterVoices.VoiceCatalogue.ContainsKey(characterGendered)) {
+                                _characterVoices.VoiceCatalogue[characterGendered] = new Dictionary<string, string>();
+                            }
+                            if (!_characterVoices.VoiceEngine.ContainsKey(characterGendered)) {
+                                _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
+                            }
+                            if (inputStream.Length > 0) {
+                                string relativeFolderPath = characterGendered + "\\";
+                                string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
+                                _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
+                                if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text)) {
+                                    File.Delete(Path.Combine(_editorCacheLocation, _characterVoices.VoiceCatalogue[characterGendered][text]));
+                                }
+                                _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
+                                Directory.CreateDirectory(Path.Combine(_editorCacheLocation, relativeFolderPath));
+                                using (FileStream stream = new FileStream(Path.Combine(_editorCacheLocation, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                    await inputStream.CopyToAsync(stream);
+                                    await inputStream.FlushAsync();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return new Tuple<bool, string>(succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
+        }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
             string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
             bool recoverLineType = false;
             bool isServerRequest = resp != null;
-            string characterGendered = character + (gender ? "_0":"_1");
+            string characterGendered = character + (gender ? "_0" : "_1");
             if (_useCustomRelayServer) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
             }
