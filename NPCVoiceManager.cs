@@ -104,13 +104,18 @@ namespace RoleplayingVoiceCore {
                     informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
                     using (HttpClient httpClient = new HttpClient()) {
                         httpClient.BaseAddress = new Uri(currentRelayServer);
-                        httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        //httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                         httpClient.Timeout = new TimeSpan(0, 6, 0);
-                        var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(informationRequest)));
-                        if (post.StatusCode == HttpStatusCode.OK) {
-                            var result = await post.Content.ReadAsStringAsync();
-                            _characterVoicesMasterList = JsonConvert.DeserializeObject<CharacterVoices>(result);
-                            OnMasterListAcquired?.Invoke(this, EventArgs.Empty);
+                        string requestJson = JsonConvert.SerializeObject(informationRequest);
+                        using (BinaryWriter streamWriter = new BinaryWriter(memoryStream)) {
+                            streamWriter.Write(requestJson);
+                            memoryStream.Position = 0;
+                            var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memoryStream));
+                            if (post.StatusCode == HttpStatusCode.OK) {
+                                var result = await post.Content.ReadAsStringAsync();
+                                _characterVoicesMasterList = JsonConvert.DeserializeObject<CharacterVoices>(result);
+                                OnMasterListAcquired?.Invoke(this, EventArgs.Empty);
+                            }
                         }
                     }
                 } catch {
@@ -118,7 +123,12 @@ namespace RoleplayingVoiceCore {
             });
         }
 
-        private async Task<bool> UploadCharacterVoicePack(string characterName) {
+        public int GetFileCountForCharacter(string characterName) {
+            string path = Path.Combine(_editorCacheLocation, characterName);
+            return Directory.EnumerateFiles(path).Count();
+        }
+
+        public async Task<bool> UploadCharacterVoicePack(string characterName) {
             string currentRelayServer = "http://ai.hubujubu.com:5684";
             string path = Path.Combine(_editorCacheLocation, characterName);
             string zipPath = path + ".zip";
@@ -127,16 +137,18 @@ namespace RoleplayingVoiceCore {
             }
             ZipFile.CreateFromDirectory(path, path + ".zip");
             InformationRequest informationRequest = new InformationRequest();
-            informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
+            informationRequest.Name = characterName;
+            informationRequest.InformationRequestType = InformationRequestType.UploadVoiceLines;
             string json = JsonConvert.SerializeObject(informationRequest);
             MemoryStream stream = new MemoryStream();
             BinaryWriter binaryWriter = new BinaryWriter(stream);
             binaryWriter.Write(json);
-            binaryWriter.Write(await File.ReadAllBytesAsync(zipPath));
+            stream.Write(await File.ReadAllBytesAsync(zipPath));
             using (HttpClient httpClient = new HttpClient()) {
                 httpClient.BaseAddress = new Uri(currentRelayServer);
-                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                //httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 httpClient.Timeout = new TimeSpan(0, 6, 0);
+                stream.Position = 0;
                 var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(stream));
                 if (post.StatusCode == HttpStatusCode.OK) {
                     return true;
@@ -190,39 +202,45 @@ namespace RoleplayingVoiceCore {
             }
             return false;
         }
-        public async Task<Tuple<bool, string>> AddCharacterAudio(Stream inputStream, string text, string character) {
-            string voiceEngine = "";
+
+        public async void AddCharacterAudio(Stream inputStream, string text, string character) {
+            string voiceEngine = "Real";
             bool succeeded = false;
             string characterGendered = character;
-            if (_cacheLoaded) {
-                if (!string.IsNullOrEmpty(_editorCacheLocation)) {
-                    if (succeeded) {
-                        if (voiceEngine != "" || characterGendered.ToLower().Contains("narrator")) {
-                            if (!_characterVoices.VoiceCatalogue.ContainsKey(characterGendered)) {
-                                _characterVoices.VoiceCatalogue[characterGendered] = new Dictionary<string, string>();
+            try {
+                if (_cacheLoaded) {
+                    if (!string.IsNullOrEmpty(_editorCacheLocation)) {
+                        if (!_characterVoices.VoiceCatalogue.ContainsKey(characterGendered)) {
+                            _characterVoices.VoiceCatalogue[characterGendered] = new Dictionary<string, string>();
+                        }
+                        if (!_characterVoices.VoiceEngine.ContainsKey(characterGendered)) {
+                            _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
+                        }
+                        if (inputStream.Length > 0) {
+                            string relativeFolderPath = characterGendered + "\\";
+                            string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
+                            _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
+                            if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text)) {
+                                File.Delete(Path.Combine(_editorCacheLocation, _characterVoices.VoiceCatalogue[characterGendered][text]));
                             }
-                            if (!_characterVoices.VoiceEngine.ContainsKey(characterGendered)) {
-                                _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
-                            }
-                            if (inputStream.Length > 0) {
-                                string relativeFolderPath = characterGendered + "\\";
-                                string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
-                                _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
-                                if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text)) {
-                                    File.Delete(Path.Combine(_editorCacheLocation, _characterVoices.VoiceCatalogue[characterGendered][text]));
-                                }
-                                _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
-                                Directory.CreateDirectory(Path.Combine(_editorCacheLocation, relativeFolderPath));
-                                using (FileStream stream = new FileStream(Path.Combine(_editorCacheLocation, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
-                                    await inputStream.CopyToAsync(stream);
-                                    await inputStream.FlushAsync();
-                                }
+                            _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
+                            Directory.CreateDirectory(Path.Combine(_editorCacheLocation, relativeFolderPath));
+                            using (FileStream stream = new FileStream(Path.Combine(_editorCacheLocation, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
+                                await inputStream.CopyToAsync(stream);
+                                await inputStream.FlushAsync();
                             }
                         }
                     }
                 }
+            } catch {
+
             }
-            return new Tuple<bool, string>(succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
+        }
+        public string VoicelinePath(string text, string character) {
+            string characterGendered = character;
+            string relativeFolderPath = characterGendered + "\\";
+            string filePath = Path.Combine(_editorCacheLocation, relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3");
+            return filePath;
         }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
@@ -252,7 +270,7 @@ namespace RoleplayingVoiceCore {
 
                     var task = async () => {
                         string relativeFolderPath = characterGendered + "\\";
-                        string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
+                        string filePath = Path.Combine(_cachePath, relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3");
                         if (File.Exists(filePath)) {
                             try {
                                 voiceEngine = "Cached";

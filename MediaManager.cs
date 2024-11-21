@@ -68,7 +68,7 @@ namespace RoleplayingMediaCore {
             EventHandler<string> onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
             await Task.Run(() => {
                 if (!string.IsNullOrEmpty(audioPath)) {
-                    if ((File.Exists(audioPath) && Directory.Exists(Path.GetDirectoryName(audioPath)))) {
+                    if (File.Exists(audioPath)) {
                         switch (soundType) {
                             case SoundType.MainPlayerTts:
                             case SoundType.OtherPlayerTts:
@@ -91,6 +91,9 @@ namespace RoleplayingMediaCore {
                             case SoundType.MainPlayerCombat:
                             case SoundType.OtherPlayerCombat:
                                 ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _combatVoicePackSounds, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
+                                break;
+                            case SoundType.NPC:
+                                ConfigureAudio(playerObject, audioPath, soundType, noSpatial, _nativeGameAudio, delay, default, onPlaybackStopped, streamVolumeEvent, volumeOffset);
                                 break;
                         }
                     }

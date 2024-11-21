@@ -33,7 +33,7 @@ namespace RoleplayingVoiceCore {
         public void RecordAudio(string outputPath) {
             _outputPath = outputPath;
             _waveSource = new WaveInEvent {
-                WaveFormat = new WaveFormat(16000, 1),
+                WaveFormat = new WaveFormat(44100, 1),
             };
             if (File.Exists(outputPath)) {
                 File.Delete(outputPath);
@@ -95,11 +95,11 @@ namespace RoleplayingVoiceCore {
                         VolumeSampleProvider volumeSampleProvider = new VolumeSampleProvider(floats);
                         volumeSampleProvider.Volume = 1.0f / max;
                         // write out to a new WAV file
-                        MediaFoundationEncoder.EncodeToMp3(volumeSampleProvider.ToWaveProvider16(), memoryStream);
+                        MediaFoundationEncoder.EncodeToMp3(volumeSampleProvider.ToMono().ToWaveProvider(), memoryStream, 320000);
                     }
                 }
-            } catch {
-
+            } catch (Exception e) {
+                Console.WriteLine(e);
             }
             try {
                 _waveSource?.Dispose();
@@ -107,6 +107,7 @@ namespace RoleplayingVoiceCore {
             } catch { }
             _timer.Reset();
             _isRecording = false;
+            memoryStream.Position = 0;
             return memoryStream;
         }
         /// <summary>
