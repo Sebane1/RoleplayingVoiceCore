@@ -137,7 +137,7 @@ namespace RoleplayingVoiceCore {
             }
             ZipFile.CreateFromDirectory(path, path + ".zip");
             InformationRequest informationRequest = new InformationRequest();
-            informationRequest.Name = characterName;
+            informationRequest.Name = characterName + "_" + NPCVoiceManager.CreateMD5(Environment.MachineName);
             informationRequest.InformationRequestType = InformationRequestType.UploadVoiceLines;
             string json = JsonConvert.SerializeObject(informationRequest);
             MemoryStream stream = new MemoryStream();
