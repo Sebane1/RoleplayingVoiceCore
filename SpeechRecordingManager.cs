@@ -95,7 +95,7 @@ namespace RoleplayingVoiceCore {
                         VolumeSampleProvider volumeSampleProvider = new VolumeSampleProvider(floats);
                         volumeSampleProvider.Volume = 1.0f / max;
                         // write out to a new WAV file
-                        MediaFoundationEncoder.EncodeToMp3(volumeSampleProvider.ToMono().ToWaveProvider(), memoryStream, 320000);
+                        MediaFoundationEncoder.EncodeToMp3(volumeSampleProvider.ToMono().ToWaveProvider(), memoryStream, 64000);
                     }
                 }
             } catch (Exception e) {
