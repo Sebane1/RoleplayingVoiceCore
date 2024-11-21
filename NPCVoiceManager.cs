@@ -28,12 +28,13 @@ namespace RoleplayingVoiceCore {
         Stopwatch cacheSaveTimer = new Stopwatch();
         private bool _cacheLoaded;
         private bool alreadySaving;
-
+        public event EventHandler OnMasterListAcquired;
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
         public string Port { get => _port; set => _port = value; }
         public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; }
+        public CharacterVoices CharacterVoicesMasterList { get => _characterVoicesMasterList; set => _characterVoicesMasterList = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version, bool isAServer) {
@@ -94,21 +95,27 @@ namespace RoleplayingVoiceCore {
             }
             _cacheLoaded = true;
         }
-        private async void GetVoiceLineMasterList() {
-            string currentRelayServer = "http://ai.hubujubu.com:5684";
-            MemoryStream memoryStream = new MemoryStream();
-            InformationRequest informationRequest = new InformationRequest();
-            informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
-            using (HttpClient httpClient = new HttpClient()) {
-                httpClient.BaseAddress = new Uri(currentRelayServer);
-                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                httpClient.Timeout = new TimeSpan(0, 6, 0);
-                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(informationRequest)));
-                if (post.StatusCode == HttpStatusCode.OK) {
-                    var result = await post.Content.ReadAsStringAsync();
-                    _characterVoicesMasterList = JsonConvert.DeserializeObject<CharacterVoices>(result);
+        private void GetVoiceLineMasterList() {
+            Task.Run(async () => {
+                try {
+                    string currentRelayServer = "http://ai.hubujubu.com:5684";
+                    MemoryStream memoryStream = new MemoryStream();
+                    InformationRequest informationRequest = new InformationRequest();
+                    informationRequest.InformationRequestType = InformationRequestType.GetVoiceLineList;
+                    using (HttpClient httpClient = new HttpClient()) {
+                        httpClient.BaseAddress = new Uri(currentRelayServer);
+                        httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        httpClient.Timeout = new TimeSpan(0, 6, 0);
+                        var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(informationRequest)));
+                        if (post.StatusCode == HttpStatusCode.OK) {
+                            var result = await post.Content.ReadAsStringAsync();
+                            _characterVoicesMasterList = JsonConvert.DeserializeObject<CharacterVoices>(result);
+                            OnMasterListAcquired?.Invoke(this, EventArgs.Empty);
+                        }
+                    }
+                } catch {
                 }
-            }
+            });
         }
 
         private async Task<bool> UploadCharacterVoicePack(string characterName) {
