@@ -95,7 +95,7 @@ namespace RoleplayingVoiceCore {
             }
             _cacheLoaded = true;
         }
-        private void GetVoiceLineMasterList() {
+        public void GetVoiceLineMasterList() {
             Task.Run(async () => {
                 try {
                     string currentRelayServer = "http://ai.hubujubu.com:5684";
