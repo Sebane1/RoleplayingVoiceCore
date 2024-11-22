@@ -125,7 +125,10 @@ namespace RoleplayingVoiceCore {
 
         public int GetFileCountForCharacter(string characterName) {
             string path = Path.Combine(_editorCacheLocation, characterName);
-            return Directory.EnumerateFiles(path).Count();
+            if (Directory.Exists(path)) {
+                return Directory.EnumerateFiles(path).Count();
+            }
+            return 0;
         }
 
         public async Task<bool> UploadCharacterVoicePack(string characterName) {
