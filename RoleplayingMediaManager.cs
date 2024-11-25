@@ -117,13 +117,8 @@ namespace RoleplayingMediaCore {
             Task.Run(() => {
                 if (!xttsAlreadyEnabled) {
                     xttsAlreadyEnabled = true;
-                    if (!Environment.GetEnvironmentVariable("Path").Contains("Python")) {
-                        InstallPython();
-                    }
                     if (!XTTSCommunicator.SetSpeakers(Path.Combine(rpVoiceCache, "speakers"))) {
-                        if (!File.Exists(Path.Combine(rpVoiceCache, "xtts_models\\v2.0.2\\model.pth"))) {
-                            InstallXTTS(rpVoiceCache);
-                        } else {
+                        if (File.Exists(Path.Combine(rpVoiceCache, "xtts_models\\v2.0.2\\model.pth"))) {
                             LaunchXTTS(rpVoiceCache);
                         }
                     } else {
