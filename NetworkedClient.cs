@@ -131,47 +131,49 @@ namespace FFXIVLooseTextureCompiler.Networking {
         }
 
         public async Task<bool> SendZip(string sendID, string path) {
-            if (!alreadySendingFiles) {
-                alreadySendingFiles = true;
-                try {
-                    using (HttpClient httpClient = new HttpClient()) {
-                        httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
-                        MemoryStream memory = new MemoryStream();
-                        string zipPath = path + ".zip";
-                        if (File.Exists(zipPath)) {
-                            File.Delete(zipPath);
-                        }
-                        AuditPathContents(path);
-                        ZipFile.CreateFromDirectory(path, zipPath);
-                        using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                            using (BinaryWriter writer = new(memory)) {
-                                writer.Write(sendID);
-                                writer.Write(0);
-                                writer.Write(fileStream.Length);
-
-                                fileStream.CopyTo(writer.BaseStream);
-                                fileStream.Flush();
-                                writer.Write(3600000);
-                                writer.Flush();
-                                memory.Position = 0;
-                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
-                                if (post.StatusCode != HttpStatusCode.OK) {
-
-                                }
-                                fileStream.Dispose();
+            if (Path.Exists(path)) {
+                if (!alreadySendingFiles) {
+                    alreadySendingFiles = true;
+                    try {
+                        using (HttpClient httpClient = new HttpClient()) {
+                            httpClient.BaseAddress = new Uri("http://" + _ipAddress + ":" + Port);
+                            MemoryStream memory = new MemoryStream();
+                            string zipPath = path + ".zip";
+                            if (File.Exists(zipPath)) {
+                                File.Delete(zipPath);
                             }
-                        }
-                        File.Delete(zipPath);
-                        return true;
-                    }
-                } catch {
+                            AuditPathContents(path);
+                            ZipFile.CreateFromDirectory(path, zipPath);
+                            using (FileStream fileStream = new(path + ".zip", FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                                using (BinaryWriter writer = new(memory)) {
+                                    writer.Write(sendID);
+                                    writer.Write(0);
+                                    writer.Write(fileStream.Length);
 
+                                    fileStream.CopyTo(writer.BaseStream);
+                                    fileStream.Flush();
+                                    writer.Write(3600000);
+                                    writer.Flush();
+                                    memory.Position = 0;
+                                    var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
+                                    if (post.StatusCode != HttpStatusCode.OK) {
+
+                                    }
+                                    fileStream.Dispose();
+                                }
+                            }
+                            File.Delete(zipPath);
+                            return true;
+                        }
+                    } catch {
+
+                    }
+                    alreadySendingFiles = false;
+                } else {
+                    alreadySendingFiles = false;
                 }
-                alreadySendingFiles = false;
-            } else {
-                alreadySendingFiles = false;
+                connectionAttempts = 0;
             }
-            connectionAttempts = 0;
             return false;
         }
 
