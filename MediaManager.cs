@@ -63,7 +63,7 @@ namespace RoleplayingMediaCore {
             _updateLoop = Task.Run(() => Update());
         }
 
-        public async void PlayAudio(IMediaGameObject playerObject, string audioPath, SoundType soundType, bool noSpatial,
+        public async void PlayMedia(IMediaGameObject playerObject, string audioPath, SoundType soundType, bool noSpatial,
             int delay = 0, TimeSpan skipAhead = new TimeSpan(),
             EventHandler<string> onPlaybackStopped = null, EventHandler<StreamVolumeEventArgs> streamVolumeEvent = null, int volumeOffset = 1) {
             await Task.Run(() => {
