@@ -1,4 +1,4 @@
-﻿using LibVLCSharp.Shared;
+using LibVLCSharp.Shared;
 using NAudio.Vorbis;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -459,17 +459,17 @@ namespace RoleplayingMediaCore {
             StreamVolumeChanged?.Invoke(sender, e);
         }
 
-        public async void Play(string soundPath, float volume, int delay, TimeSpan skipAhead,
+        public async void Play(string mediaPath, float volume, int delay, TimeSpan skipAhead,
             AudioOutputType audioPlayerType, bool lowPerformanceMode = false, int volumeOffset = 0) {
             _volumeOffset = volumeOffset;
             await Task.Run(async delegate {
                 try {
                     Stopwatch latencyTimer = Stopwatch.StartNew();
-                    if (!string.IsNullOrEmpty(soundPath) && PlaybackState == PlaybackState.Stopped) {
-                        if (!soundPath.StartsWith("http") && !soundPath.StartsWith("rtmp") &&
+                    if (!string.IsNullOrEmpty(mediaPath) && PlaybackState == PlaybackState.Stopped) {
+                        if (!mediaPath.StartsWith("http") && !mediaPath.StartsWith("rtmp") && !mediaPath.EndsWith(".mp4") && !mediaPath.EndsWith(".avi") &&
                             (audioPlayerType != AudioOutputType.VLCExperimental || _soundType != SoundType.NPC)) {
-                            _player = soundPath.EndsWith(".ogg") ?
-                            new VorbisWaveReader(soundPath) : new MediaFoundationReader(soundPath);
+                            _player = mediaPath.EndsWith(".ogg") ?
+                            new VorbisWaveReader(mediaPath) : new MediaFoundationReader(mediaPath);
                             WaveStream desiredStream = _player;
                             if (_soundType != SoundType.MainPlayerTts &&
                                 _soundType != SoundType.OtherPlayerTts &&
@@ -591,19 +591,19 @@ namespace RoleplayingMediaCore {
                             }
                         } else {
                             try {
-                                _parent.LastFrame = Array.Empty<byte>();
+                                _parent.LastFrame = new byte[0];
                                 string location = _libVLCPath + @"\libvlc\win-x64";
                                 Core.Initialize(location);
                                 libVLC = new LibVLC("--vout", "none");
-                                var media = new Media(libVLC, soundPath, soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                var media = new Media(libVLC, mediaPath, mediaPath.StartsWith("http") || mediaPath.StartsWith("rtmp")
                                     ? FromType.FromLocation : FromType.FromPath);
-                                await media.Parse(soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")
+                                await media.Parse(mediaPath.StartsWith("http") || mediaPath.StartsWith("rtmp")
                                     ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
                                 _vlcPlayer = new MediaPlayer(media);
                                 //var processingCancellationTokenSource = new CancellationTokenSource();
                                 //_vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
                                 _vlcPlayer.Stopped += delegate { _parent.LastFrame = new byte[0]; };
-                                if (soundPath.StartsWith("http") || soundPath.StartsWith("rtmp")) {
+                                if (mediaPath.StartsWith("http") || mediaPath.StartsWith("rtmp") || mediaPath.EndsWith(".mp4") || mediaPath.EndsWith(".avi")) {
                                     _vlcPlayer.SetVideoFormat("RV32", _width, _height, _pitch);
                                     _vlcPlayer.SetVideoCallbacks(Lock, null, Display);
                                 }
@@ -669,6 +669,7 @@ namespace RoleplayingMediaCore {
                             MemoryStream stream = new MemoryStream();
                             image.SaveAsJpeg(stream);
                             stream.Flush();
+                            stream.Position = 0;
                             _parent.LastFrame = stream.ToArray();
                         }
                     }
