@@ -84,14 +84,16 @@ namespace RoleplayingMediaCore {
                 }
             }
             InitializationCallbacks += initializationCallbacks;
-            RefreshElevenlabsSubscriptionInfo();
-            GetVoiceListElevenlabs();
-            string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
-            installBatchFile = Path.Combine(cache, "install.bat");
-            File.WriteAllText(installBatchFile, batchScript);
-            batchScript = @"cd /d" + cache + "\r\n" + _installPythonBatch;
-            pythonBatchFile = Path.Combine(cache, "pythonInstall.bat");
-            File.WriteAllText(pythonBatchFile, batchScript);
+            Task.Run(() => {
+                RefreshElevenlabsSubscriptionInfo();
+                GetVoiceListElevenlabs();
+                string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
+                installBatchFile = Path.Combine(cache, "install.bat");
+                File.WriteAllText(installBatchFile, batchScript);
+                batchScript = @"cd /d" + cache + "\r\n" + _installPythonBatch;
+                pythonBatchFile = Path.Combine(cache, "pythonInstall.bat");
+                File.WriteAllText(pythonBatchFile, batchScript);
+            });
         }
         public void InstallPython() {
             var processStart = new ProcessStartInfo(pythonBatchFile);
@@ -276,12 +278,16 @@ namespace RoleplayingMediaCore {
         public async Task<string[]> GetVoiceListXTTS() {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
-            _xttsVoices = Directory.GetFiles(Path.Combine(rpVoiceCache, "speakers"));
-            voicesNames.Add("None");
-            if (_xttsVoices != null) {
-                foreach (var voice in _xttsVoices) {
-                    if (voice.EndsWith(".wav")) {
-                        voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
+            string path = Path.Combine(rpVoiceCache, "speakers");
+            Directory.CreateDirectory(path);
+            if (Directory.Exists(path)) {
+                _xttsVoices = Directory.GetFiles(path);
+                voicesNames.Add("None");
+                if (_xttsVoices != null) {
+                    foreach (var voice in _xttsVoices) {
+                        if (voice.EndsWith(".wav")) {
+                            voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
+                        }
                     }
                 }
             }
