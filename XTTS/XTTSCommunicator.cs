@@ -13,6 +13,8 @@ namespace AIDataProxy.XTTS {
             var dummy = typeof(NAudio.Lame.LameDLL);
             noop(dummy);
         }
+        static bool _requestAlreadyProcessing = false;
+        static bool _lastSuccess;
         public static async Task<byte[]> GetVoiceData(string voice, string text, string folder, string language) {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -47,20 +49,25 @@ namespace AIDataProxy.XTTS {
             return null;
         }
         public static bool SetSpeakers(string folder) {
-            try {
-                var httpWebRequest = (HttpWebRequest)WebRequest.Create("http://localhost:8020/set_speaker_folder/");
-                httpWebRequest.ContentType = "application/json";
-                httpWebRequest.Headers.Add("Accept: application/json");
-                httpWebRequest.Method = "POST";
-                string json = "{\"speaker_folder\": \"" + folder.Replace(@"\", "/") + "\"}";
-                using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream())) {
-                    streamWriter.Write(json);
-                }
-                var httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                return httpResponse.StatusCode == HttpStatusCode.OK;
-
-            } catch { }
-            return false;
+            if (!_requestAlreadyProcessing) {
+                _requestAlreadyProcessing = true;
+                Task.Run(() => {
+                    try {
+                        var httpWebRequest = (HttpWebRequest)WebRequest.Create("http://localhost:8020/set_speaker_folder/");
+                        httpWebRequest.ContentType = "application/json";
+                        httpWebRequest.Headers.Add("Accept: application/json");
+                        httpWebRequest.Method = "POST";
+                        string json = "{\"speaker_folder\": \"" + folder.Replace(@"\", "/") + "\"}";
+                        using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream())) {
+                            streamWriter.Write(json);
+                        }
+                        var httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                        _lastSuccess = httpResponse.StatusCode == HttpStatusCode.OK;
+                    } catch { }
+                    _requestAlreadyProcessing = false;
+                });
+            }
+            return _lastSuccess;
         }
     }
 }
