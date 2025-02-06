@@ -724,7 +724,7 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 if (!foundInHistory) {
                     audioPath = await _api.TextToSpeechEndpoint
                         .TextToSpeechAsync(finalText, characterVoice,
-                        defaultVoiceSettings, new Model("eleven_turbo_v2"), rpVoiceCache);
+                        defaultVoiceSettings, new Model("eleven_flash_v2_5"), rpVoiceCache);
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
             } catch {
