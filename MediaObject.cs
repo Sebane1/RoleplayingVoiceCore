@@ -526,14 +526,19 @@ namespace RoleplayingMediaCore {
                                     volumePercentage = 0;
                                     _volumeSampleProvider.Volume = 0;
                                 }
-                                _panningSampleProvider = new PanningSampleProvider(
+                                if (_spatialAllowed)
+                                {
+                                    _panningSampleProvider = new PanningSampleProvider(
                                 _player.WaveFormat.Channels == 1 ? _volumeSampleProvider : _volumeSampleProvider.ToMono());
                                 Vector3 dir = CharacterObject.Position - _camera.Position;
-                                if (_spatialAllowed) {
                                     float direction = AngleDir(_camera.Forward, dir, _camera.Top);
                                     _panningSampleProvider.Pan = Math.Clamp(direction / 3, -1, 1);
+                                    sampleProvider = _panningSampleProvider;
                                 }
-                                sampleProvider = _panningSampleProvider;
+                                else
+                                {
+                                    sampleProvider = _volumeSampleProvider;
+                                }
                             } else {
                                 _meteringSampleProvider = new MeteringSampleProvider(desiredStream.ToSampleProvider());
                                 _meteringSampleProvider.StreamVolume += _meteringSampleProvider_StreamVolume;
