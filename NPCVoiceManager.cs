@@ -23,11 +23,14 @@ namespace RoleplayingVoiceCore {
         private string _versionIdentifier;
         private string _customRelayServer;
         private string _port = "5670";
+        private string _closestServerAlias;
         private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
         Stopwatch cacheSaveTimer = new Stopwatch();
         private bool _cacheLoaded;
         private bool alreadySaving;
+        private bool useClosestRelay;
+
         public event EventHandler OnMasterListAcquired;
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
@@ -35,6 +38,7 @@ namespace RoleplayingVoiceCore {
         public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; }
         public CharacterVoices CharacterVoicesMasterList { get => _characterVoicesMasterList; set => _characterVoicesMasterList = value; }
+        public bool UseClosestRelay { get => useClosestRelay; set => useClosestRelay = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version, bool isAServer) {
@@ -65,6 +69,7 @@ namespace RoleplayingVoiceCore {
                         _useCustomRelayServer = true;
                         _customRelayServer = response.PublicHostAddress;
                         _port = response.Port;
+                        _closestServerAlias = response.Alias;
                         _currentServerAlias = response.Alias;
                     }
                 }
@@ -252,8 +257,11 @@ namespace RoleplayingVoiceCore {
             bool recoverLineType = false;
             bool isServerRequest = resp != null;
             string characterGendered = character + (gender ? "_0" : "_1");
-            if (_useCustomRelayServer) {
+            if (_useCustomRelayServer && useClosestRelay) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
+                _currentServerAlias = _closestServerAlias;
+            } else {
+                _currentServerAlias = "Primary Relay (CA)";
             }
             string voiceEngine = "";
             bool succeeded = false;

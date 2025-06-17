@@ -37,7 +37,7 @@ namespace RoleplayingVoiceCore {
 
             }
         }
-        public event EventHandler RecordingFinished;
+        public event EventHandler<string> RecordingFinished;
 
         /// <summary>
         /// Record from the mic
@@ -83,7 +83,7 @@ namespace RoleplayingVoiceCore {
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void StopRecording() {
+        public async void StopRecording() {
             _waveSource?.StopRecording();
             _waveWriter.Flush();
             _waveSource.DataAvailable -= DataAvailable;
@@ -107,7 +107,7 @@ namespace RoleplayingVoiceCore {
                     }
                     _finalText = FinalText.Trim();
                     /*Send notification that the recording is complete*/
-                    RecordingFinished?.Invoke(this, null);
+                    RecordingFinished?.Invoke(this, _finalText);
                 } catch {
 
                 }
