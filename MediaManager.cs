@@ -358,26 +358,28 @@ namespace RoleplayingMediaCore {
         }
         private void Update() {
             while (notDisposed) {
-                Task.Run(() => {
+                List<Task> tasks = new List<Task>();
+                tasks.Add(Task.Run(() => {
                     UpdateVolumes(_textToSpeechSounds, IgnoreSpatialAudioForTTS);
-                });
-                Task.Run(() => {
+                }));
+                tasks.Add(Task.Run(() => {
                     UpdateVolumes(_voicePackSounds);
-                });
-                Task.Run(() => {
+                }));
+                tasks.Add(Task.Run(() => {
                     UpdateVolumes(_playbackStreams);
-                });
-                Task.Run(() => {
+                }));
+                tasks.Add(Task.Run(() => {
                     UpdateVolumes(_nativeGameAudio);
-                });
-                Task.Run(() => {
+                }));
+                tasks.Add(Task.Run(() => {
                     UpdateVolumes(_mountLoopSounds);
-                });
+                }));
                 if (!_lowPerformanceMode) {
-                    Task.Run(() => {
+                    tasks.Add(Task.Run(() => {
                         UpdateVolumes(_combatVoicePackSounds);
-                    });
+                    }));
                 }
+                Task.WaitAll(tasks.ToArray());
                 Thread.Sleep(_spatialAudioAccuracy);
             }
         }
