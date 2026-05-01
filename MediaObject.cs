@@ -605,6 +605,7 @@ namespace RoleplayingMediaCore {
                                 await media.Parse(mediaPath.StartsWith("http") || mediaPath.StartsWith("rtmp")
                                     ? MediaParseOptions.ParseNetwork : MediaParseOptions.ParseLocal);
                                 _vlcPlayer = new MediaPlayer(media);
+                                _vlcPlayer.SetAudioOutput("waveout");
                                 //var processingCancellationTokenSource = new CancellationTokenSource();
                                 //_vlcPlayer.Stopped += (s, e) => processingCancellationTokenSource.CancelAfter(1);
                                 _vlcPlayer.Stopped += delegate { _parent.LastFrame = new byte[0]; };
