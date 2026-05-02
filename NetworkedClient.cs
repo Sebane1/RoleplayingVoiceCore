@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using RoleplayingVoiceCore;
 using System.IO.Compression;
 using System.Net;
@@ -47,17 +47,18 @@ namespace FFXIVLooseTextureCompiler.Networking {
                             memory.Position = 0;
                             var post = await httpClient.PostAsync(httpClient.BaseAddress, new StreamContent(memory));
                             if (post.StatusCode != HttpStatusCode.OK) {
-                                OnConnectionFailed.Invoke(this, new FailureMessage() { Message = "Upload failed" });
+                                OnConnectionFailed?.Invoke(this, new FailureMessage() { Message = "Upload failed" });
                             }
                             return true;
                         }
                     }
                 }
             } catch (Exception e) {
-                SendFile(sendID, path);
-                if (sendAttempt > 10) {
-                    sendAttempt++;
-                    OnConnectionFailed.Invoke(this, new FailureMessage() { Message = e.Message });
+                sendAttempt++;
+                if (sendAttempt <= 10) {
+                    return await SendFile(sendID, path);
+                } else {
+                    OnConnectionFailed?.Invoke(this, new FailureMessage() { Message = e.Message });
                 }
             }
             connectionAttempts = 0;
@@ -205,7 +206,7 @@ namespace FFXIVLooseTextureCompiler.Networking {
                     }
                 }
             } catch (Exception e) {
-                OnConnectionFailed.Invoke(this, new FailureMessage() { Message = e.Message });
+                OnConnectionFailed?.Invoke(this, new FailureMessage() { Message = e.Message });
             }
             connectionAttempts = 0;
             return new KeyValuePair<Vector3, string>(position, path);

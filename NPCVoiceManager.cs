@@ -1,4 +1,4 @@
-﻿using CachedTTSRelay;
+using CachedTTSRelay;
 using ElevenLabs.Voices;
 using NAudio.Wave;
 using Newtonsoft.Json;
@@ -11,6 +11,10 @@ using System.Net.Http.Headers;
 
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
+        private static readonly string _debugLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "npc_voice_debug.log");
+        private static void DebugLog(string msg) {
+            try { File.AppendAllText(_debugLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n"); } catch { }
+        }
         private bool _useCustomRelayServer = false;
         private Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
@@ -265,6 +269,7 @@ namespace RoleplayingVoiceCore {
             }
             string voiceEngine = "";
             bool succeeded = false;
+            DebugLog($"[GetCharacterAudio] START char='{character}' gendered='{characterGendered}' cacheLoaded={_cacheLoaded} cachePath='{_cachePath}' server='{currentRelayServer}'");
             if (_cacheLoaded) {
                 try {
                     string characterVoice = "none";
@@ -307,19 +312,26 @@ namespace RoleplayingVoiceCore {
                                 string relativePath = _characterVoices.VoiceCatalogue[characterGendered][text];
                                 bool needsRefreshing = false;
                                 if (!ignoreRefreshCache) {
-                                    if (voiceLinePriority != VoiceLinePriority.None) {
+                                    bool hasVoiceEngine = _characterVoices.VoiceEngine.ContainsKey(characterGendered)
+                                        && _characterVoices.VoiceEngine[characterGendered].ContainsKey(text);
+                                    if (voiceLinePriority != VoiceLinePriority.None && hasVoiceEngine) {
                                         needsRefreshing = _characterVoices.VoiceEngine[characterGendered][text] != voiceLinePriority.ToString();
                                     }
-                                    if (overrideVoiceLinePriority != VoiceLinePriority.None) {
+                                    if (overrideVoiceLinePriority != VoiceLinePriority.None && hasVoiceEngine) {
                                         needsRefreshing = _characterVoices.VoiceEngine[characterGendered][text] != overrideVoiceLinePriority.ToString();
                                     }
                                     if (voiceLinePriority == VoiceLinePriority.Ignore) {
                                         needsRefreshing = true;
                                     }
+                                    if (!hasVoiceEngine) {
+                                        needsRefreshing = true;
+                                    }
                                 }
                                 string fullPath = Path.Combine(_cachePath, relativePath);
                                 if (File.Exists(fullPath) && !needsRefreshing) {
-                                    voiceEngine = _characterVoices.VoiceEngine[characterGendered][text];
+                                    voiceEngine = (_characterVoices.VoiceEngine.ContainsKey(characterGendered)
+                                        && _characterVoices.VoiceEngine[characterGendered].ContainsKey(text))
+                                        ? _characterVoices.VoiceEngine[characterGendered][text] : "Cached";
                                     try {
                                         if (resp != null && !recoverLineType) {
                                             resp.StatusCode = (int)HttpStatusCode.OK;
@@ -343,8 +355,10 @@ namespace RoleplayingVoiceCore {
                             await task.Invoke();
                         }
                     }
+                    DebugLog($"[GetCharacterAudio] After cache check: succeeded={succeeded} recoverLineType={recoverLineType} characterVoice='{characterVoice}'");
                     if (!succeeded || recoverLineType) {
                         MemoryStream memoryStream = new MemoryStream();
+                        DebugLog($"[GetCharacterAudio] Has voice pairing for '{characterVoice}': {_characterToVoicePairing.ContainsKey(characterVoice)}");
                         if (_characterToVoicePairing.ContainsKey(characterVoice)) {
                             if (voiceLinePriority == VoiceLinePriority.None) {
                                 voiceLinePriority = VoiceLinePriority.ETTS;
@@ -368,7 +382,9 @@ namespace RoleplayingVoiceCore {
                                 httpClient.BaseAddress = new Uri(currentRelayServer);
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                                 httpClient.Timeout = new TimeSpan(0, 6, 0);
+                                DebugLog($"[GetCharacterAudio] ETTS: Sending to {httpClient.BaseAddress}...");
                                 var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
+                                DebugLog($"[GetCharacterAudio] ETTS: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
                                 if (post.StatusCode == HttpStatusCode.OK) {
                                     var result = await post.Content.ReadAsStreamAsync();
                                     voiceEngine = post.ReasonPhrase;
@@ -383,6 +399,7 @@ namespace RoleplayingVoiceCore {
                                     }
                                     result.Close();
                                     succeeded = true;
+                                    DebugLog($"[GetCharacterAudio] ETTS: Success, stream length={memoryStream.Length}");
                                 }
                             }
                         } else {
@@ -408,7 +425,9 @@ namespace RoleplayingVoiceCore {
                                 httpClient.BaseAddress = new Uri(currentRelayServer);
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                                 httpClient.Timeout = new TimeSpan(0, 6, 0);
+                                DebugLog($"[GetCharacterAudio] TTS: Sending to {httpClient.BaseAddress} voice='{ttsRequest.Voice}'...");
                                 var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
+                                DebugLog($"[GetCharacterAudio] TTS: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
                                 if (post.StatusCode == HttpStatusCode.OK) {
                                     var result = await post.Content.ReadAsStreamAsync();
                                     voiceEngine = post.ReasonPhrase;
@@ -423,6 +442,7 @@ namespace RoleplayingVoiceCore {
                                     }
                                     result.Close();
                                     succeeded = true;
+                                    DebugLog($"[GetCharacterAudio] TTS: Success, stream length={memoryStream.Length}");
                                 }
                             }
                         }
@@ -446,8 +466,9 @@ namespace RoleplayingVoiceCore {
                                         string relativeFolderPath = characterGendered + "\\";
                                         string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
                                         _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
-                                        if (_characterVoices.VoiceCatalogue[characterGendered].ContainsKey(text) && !recoverLineType) {
-                                            File.Delete(Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[characterGendered][text]));
+                                        string fileToDelete = Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[characterGendered][text]);
+                                        if (File.Exists(fileToDelete)) {
+                                            File.Delete(fileToDelete);
                                         }
                                         _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
                                         Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
@@ -493,10 +514,12 @@ namespace RoleplayingVoiceCore {
                             memoryStream.DisposeAsync();
                         }
                     }
-                } catch {
+                } catch (Exception ex) {
+                    DebugLog("[NPCVoiceManager] GetCharacterAudio failed: " + ex.ToString());
                     return new Tuple<bool, string>(false, "Error");
                 }
             }
+            DebugLog($"[GetCharacterAudio] END succeeded={succeeded} voiceEngine='{voiceEngine}' outputStreamLength={outputStream.Length}");
             return new Tuple<bool, string>(succeeded, voiceEngine.Replace("Elevenlabs", "ETTS").Replace("OK", "XTTS"));
         }
 
