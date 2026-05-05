@@ -123,7 +123,7 @@ namespace RoleplayingMediaCore {
                                 try {
                                     if (queue.Count > 0) {
                                         PlayAudioStream(playerObject, queue.Dequeue(), soundType,
-                                        false, useSmbPitch, pitch, delay, forceLowLatency, onStopped, streamVolumeChanged, volumeOffset);
+                                        false, useSmbPitch, pitch, delay, forceLowLatency, onStopped, streamVolumeChanged, speed, volumeOffset);
                                     }
                                 } catch { }
                             };

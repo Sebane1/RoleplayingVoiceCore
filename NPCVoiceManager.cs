@@ -324,7 +324,11 @@ namespace RoleplayingVoiceCore {
                                         needsRefreshing = true;
                                     }
                                     if (!hasVoiceEngine) {
-                                        needsRefreshing = true;
+                                        // Don't force regeneration for missing VoiceEngine metadata.
+                                        // The cached audio file is fine; just backfill the metadata.
+                                        if (!_characterVoices.VoiceEngine.ContainsKey(characterGendered))
+                                            _characterVoices.VoiceEngine[characterGendered] = new Dictionary<string, string>();
+                                        _characterVoices.VoiceEngine[characterGendered][text] = "Cached";
                                     }
                                 }
                                 string fullPath = Path.Combine(_cachePath, relativePath);

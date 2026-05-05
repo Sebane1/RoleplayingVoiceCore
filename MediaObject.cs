@@ -385,7 +385,7 @@ namespace RoleplayingMediaCore {
                                 sampleProvider = _volumeSampleProvider;
                             }
                         }
-                        if (Math.Abs(speed) > 0.0001f) {
+                        if (Math.Abs(speed - 1.0f) > 0.0001f) {
                             if (sampleProvider != null) {
                                 var playbackSpeed = new VarispeedSampleProvider(sampleProvider, 100, new SoundTouchProfile(true, true));
                                 playbackSpeed.PlaybackRate = speed;
