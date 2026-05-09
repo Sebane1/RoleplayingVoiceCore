@@ -11,6 +11,12 @@ using System.Net.Http.Headers;
 
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
+        private const string PrimaryRelayAlias = "Primary Relay (CA)";
+        private const string PrimaryRelayServer = "http://ai.hubujubu.com:5670";
+        private const string ArtemisRelayServer = "https://ai.hubujubu.com:5697";
+        // NPC playback is interactive; waiting the previous six minutes made transient relay issues feel permanent.
+        private static readonly TimeSpan VoiceRequestTimeout = TimeSpan.FromSeconds(45);
+        private static readonly TimeSpan ClosestRelayFailureCooldown = TimeSpan.FromMinutes(5);
         private static readonly string _debugLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "npc_voice_debug.log");
         private static void DebugLog(string msg) {
             try { File.AppendAllText(_debugLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n"); } catch { }
@@ -34,6 +40,8 @@ namespace RoleplayingVoiceCore {
         private bool _cacheLoaded;
         private bool alreadySaving;
         private bool useClosestRelay;
+        private DateTime _closestRelayBlockedUntilUtc = DateTime.MinValue;
+        private bool _closestRelayRefreshInProgress;
 
         public event EventHandler OnMasterListAcquired;
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
@@ -59,7 +67,20 @@ namespace RoleplayingVoiceCore {
             }
         }
         public void GetCloserServerHost() {
+            if (_closestRelayRefreshInProgress) {
+                return;
+            }
+            _closestRelayRefreshInProgress = true;
             _ = Task.Run(async () => {
+                try {
+                    await GetCloserServerHostAsync();
+                } finally {
+                    _closestRelayRefreshInProgress = false;
+                }
+            });
+        }
+        private async Task GetCloserServerHostAsync() {
+            try {
                 Console.WriteLine("Aquiring Nearest Server");
                 ClientRegistrationRequest clientRegistrationRequest = new ClientRegistrationRequest();
                 using (HttpClient httpClient = new HttpClient()) {
@@ -77,7 +98,35 @@ namespace RoleplayingVoiceCore {
                         _currentServerAlias = response.Alias;
                     }
                 }
-            });
+            } catch (Exception ex) {
+                DebugLog("[GetCloserServerHost] Failed to acquire nearest relay: " + ex.Message);
+            }
+        }
+        private static string GetPrimaryRelayServer() {
+            return Environment.MachineName == "ARTEMISDIALOGUE" ? ArtemisRelayServer : PrimaryRelayServer;
+        }
+        private bool ShouldUseClosestRelay() {
+            // Keep the closest-relay preference enabled, but skip it while a recent request failure is cooling down.
+            return _useCustomRelayServer
+                && useClosestRelay
+                && DateTime.UtcNow >= _closestRelayBlockedUntilUtc;
+        }
+        private void MarkClosestRelayUnavailable(string reason) {
+            // Keep the user's "closest relay" preference, but avoid hammering a relay that just timed out.
+            _closestRelayBlockedUntilUtc = DateTime.UtcNow.Add(ClosestRelayFailureCooldown);
+            _currentServerAlias = PrimaryRelayAlias;
+            DebugLog($"[GetCharacterAudio] Closest relay unavailable; using primary relay for {ClosestRelayFailureCooldown.TotalMinutes:0} minutes. Reason: {reason}");
+            GetCloserServerHost();
+        }
+        private static bool IsRetryableRelayException(Exception ex) {
+            return ex is TaskCanceledException || ex is HttpRequestException || ex is IOException;
+        }
+        private static bool IsTransientRelayStatus(HttpStatusCode statusCode) {
+            // Only fail over for transport-style failures; application responses should stay with the selected relay.
+            return statusCode == HttpStatusCode.RequestTimeout
+                || statusCode == HttpStatusCode.BadGateway
+                || statusCode == HttpStatusCode.ServiceUnavailable
+                || statusCode == HttpStatusCode.GatewayTimeout;
         }
         private void RefreshCache(string cacheLocation) {
             if (!string.IsNullOrEmpty(cacheLocation)) {
@@ -257,15 +306,18 @@ namespace RoleplayingVoiceCore {
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
             bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
-            string currentRelayServer = Environment.MachineName == "ARTEMISDIALOGUE" ? "https://ai.hubujubu.com:5697" : "http://ai.hubujubu.com:5670";
+            string primaryRelayServer = GetPrimaryRelayServer();
+            string currentRelayServer = primaryRelayServer;
+            bool usingClosestRelay = false;
             bool recoverLineType = false;
             bool isServerRequest = resp != null;
             string characterGendered = character + (gender ? "_0" : "_1");
-            if (_useCustomRelayServer && useClosestRelay) {
+            if (ShouldUseClosestRelay()) {
                 currentRelayServer = "http://" + _customRelayServer + ":" + _port;
                 _currentServerAlias = _closestServerAlias;
+                usingClosestRelay = true;
             } else {
-                _currentServerAlias = "Primary Relay (CA)";
+                _currentServerAlias = PrimaryRelayAlias;
             }
             string voiceEngine = "";
             bool succeeded = false;
@@ -362,6 +414,58 @@ namespace RoleplayingVoiceCore {
                     DebugLog($"[GetCharacterAudio] After cache check: succeeded={succeeded} recoverLineType={recoverLineType} characterVoice='{characterVoice}'");
                     if (!succeeded || recoverLineType) {
                         MemoryStream memoryStream = new MemoryStream();
+                        async Task<(bool Success, HttpStatusCode? StatusCode)> SendVoiceRequestAsync(string relayServer, string requestJson, string requestType, string voiceLogSuffix) {
+                            using (HttpClient httpClient = new HttpClient()) {
+                                httpClient.BaseAddress = new Uri(relayServer);
+                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                                httpClient.Timeout = VoiceRequestTimeout;
+                                DebugLog($"[GetCharacterAudio] {requestType}: Sending to {httpClient.BaseAddress}{voiceLogSuffix}...");
+                                using (var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(requestJson))) {
+                                    DebugLog($"[GetCharacterAudio] {requestType}: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
+                                    if (post.StatusCode == HttpStatusCode.OK) {
+                                        using (var result = await post.Content.ReadAsStreamAsync()) {
+                                            voiceEngine = post.ReasonPhrase;
+                                            if (resp != null && !recoverLineType) {
+                                                resp.StatusCode = (int)HttpStatusCode.OK;
+                                                resp.StatusDescription = voiceEngine;
+                                            }
+                                            if (!recoverLineType) {
+                                                await result.CopyToAsync(memoryStream);
+                                                await result.FlushAsync();
+                                                memoryStream.Position = 0;
+                                            }
+                                            succeeded = true;
+                                            DebugLog($"[GetCharacterAudio] {requestType}: Success, stream length={memoryStream.Length}");
+                                        }
+                                        return (true, post.StatusCode);
+                                    }
+                                    return (false, post.StatusCode);
+                                }
+                            }
+                        }
+                        async Task<bool> SendVoiceRequestWithFallbackAsync(ProxiedVoiceRequest request, string requestType, string voiceLogSuffix) {
+                            string requestJson = JsonConvert.SerializeObject(request);
+                            try {
+                                var attempt = await SendVoiceRequestAsync(currentRelayServer, requestJson, requestType, voiceLogSuffix);
+                                if (attempt.Success || !usingClosestRelay) {
+                                    return attempt.Success;
+                                }
+                                if (attempt.StatusCode.HasValue && IsTransientRelayStatus(attempt.StatusCode.Value)) {
+                                    // A closest relay can be temporarily unhealthy even though the primary relay is fine.
+                                    // Retry once on primary so playback can recover without a plugin restart.
+                                    MarkClosestRelayUnavailable($"{requestType} returned {attempt.StatusCode.Value}");
+                                    var fallbackAttempt = await SendVoiceRequestAsync(primaryRelayServer, requestJson, requestType, voiceLogSuffix);
+                                    return fallbackAttempt.Success;
+                                }
+                                return false;
+                            } catch (Exception ex) when (usingClosestRelay && IsRetryableRelayException(ex)) {
+                                // Timeouts and socket failures match the bug report: the selected relay stopped responding,
+                                // but future requests kept using it. Cool it down and retry this line on primary.
+                                MarkClosestRelayUnavailable($"{requestType} failed with {ex.GetType().Name}: {ex.Message}");
+                                var fallbackAttempt = await SendVoiceRequestAsync(primaryRelayServer, requestJson, requestType, voiceLogSuffix);
+                                return fallbackAttempt.Success;
+                            }
+                        }
                         DebugLog($"[GetCharacterAudio] Has voice pairing for '{characterVoice}': {_characterToVoicePairing.ContainsKey(characterVoice)}");
                         if (_characterToVoicePairing.ContainsKey(characterVoice)) {
                             if (voiceLinePriority == VoiceLinePriority.None) {
@@ -382,30 +486,7 @@ namespace RoleplayingVoiceCore {
                                 UseMuteList = useMuteList,
                                 VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority
                             };
-                            using (HttpClient httpClient = new HttpClient()) {
-                                httpClient.BaseAddress = new Uri(currentRelayServer);
-                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                                httpClient.Timeout = new TimeSpan(0, 6, 0);
-                                DebugLog($"[GetCharacterAudio] ETTS: Sending to {httpClient.BaseAddress}...");
-                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(proxiedVoiceRequest)));
-                                DebugLog($"[GetCharacterAudio] ETTS: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
-                                if (post.StatusCode == HttpStatusCode.OK) {
-                                    var result = await post.Content.ReadAsStreamAsync();
-                                    voiceEngine = post.ReasonPhrase;
-                                    if (resp != null && !recoverLineType) {
-                                        resp.StatusCode = (int)HttpStatusCode.OK;
-                                        resp.StatusDescription = voiceEngine;
-                                    }
-                                    if (!recoverLineType) {
-                                        await result.CopyToAsync(memoryStream);
-                                        await result.FlushAsync();
-                                        memoryStream.Position = 0;
-                                    }
-                                    result.Close();
-                                    succeeded = true;
-                                    DebugLog($"[GetCharacterAudio] ETTS: Success, stream length={memoryStream.Length}");
-                                }
-                            }
+                            await SendVoiceRequestWithFallbackAsync(proxiedVoiceRequest, "ETTS", "");
                         } else {
                             if (voiceLinePriority == VoiceLinePriority.None) {
                                 voiceLinePriority = VoiceLinePriority.Alternative;
@@ -425,30 +506,7 @@ namespace RoleplayingVoiceCore {
                                 UseMuteList = useMuteList,
                                 VoiceLinePriority = overrideVoiceLinePriority == VoiceLinePriority.None ? voiceLinePriority : overrideVoiceLinePriority,
                             };
-                            using (HttpClient httpClient = new HttpClient()) {
-                                httpClient.BaseAddress = new Uri(currentRelayServer);
-                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                                httpClient.Timeout = new TimeSpan(0, 6, 0);
-                                DebugLog($"[GetCharacterAudio] TTS: Sending to {httpClient.BaseAddress} voice='{ttsRequest.Voice}'...");
-                                var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(JsonConvert.SerializeObject(ttsRequest)));
-                                DebugLog($"[GetCharacterAudio] TTS: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
-                                if (post.StatusCode == HttpStatusCode.OK) {
-                                    var result = await post.Content.ReadAsStreamAsync();
-                                    voiceEngine = post.ReasonPhrase;
-                                    if (resp != null && !recoverLineType) {
-                                        resp.StatusCode = (int)HttpStatusCode.OK;
-                                        resp.StatusDescription = voiceEngine;
-                                    }
-                                    if (!recoverLineType) {
-                                        await result.CopyToAsync(memoryStream);
-                                        await result.FlushAsync();
-                                        memoryStream.Position = 0;
-                                    }
-                                    result.Close();
-                                    succeeded = true;
-                                    DebugLog($"[GetCharacterAudio] TTS: Success, stream length={memoryStream.Length}");
-                                }
-                            }
+                            await SendVoiceRequestWithFallbackAsync(ttsRequest, "TTS", $" voice='{ttsRequest.Voice}'");
                         }
                         if (!recoverLineType) {
                             await memoryStream.CopyToAsync(outputStream);
