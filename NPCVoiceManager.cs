@@ -470,9 +470,13 @@ namespace RoleplayingVoiceCore {
                                         string relativeFolderPath = characterGendered + "\\";
                                         string filePath = relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3";
                                         _characterVoices.VoiceEngine[characterGendered][text] = voiceEngine;
-                                        string fileToDelete = Path.Combine(_cachePath, _characterVoices.VoiceCatalogue[characterGendered][text]);
-                                        if (File.Exists(fileToDelete)) {
-                                            File.Delete(fileToDelete);
+                                        // New voice lines won't have a catalogue entry yet, so only delete an old cache file
+                                        // when this text is replacing an existing generated line.
+                                        if (_characterVoices.VoiceCatalogue[characterGendered].TryGetValue(text, out var existingFilePath)) {
+                                            string fileToDelete = Path.Combine(_cachePath, existingFilePath);
+                                            if (File.Exists(fileToDelete)) {
+                                                File.Delete(fileToDelete);
+                                            }
                                         }
                                         _characterVoices.VoiceCatalogue[characterGendered][text] = filePath;
                                         Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
