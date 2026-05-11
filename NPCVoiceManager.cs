@@ -17,6 +17,8 @@ namespace RoleplayingVoiceCore {
         // NPC playback is interactive; waiting the previous six minutes made transient relay issues feel permanent.
         private static readonly TimeSpan VoiceRequestTimeout = TimeSpan.FromSeconds(45);
         private static readonly TimeSpan ClosestRelayFailureCooldown = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan RelayCircuitBreakerCooldown = TimeSpan.FromSeconds(30);
+        private const int RelayCircuitBreakerFailureThreshold = 3;
         private static readonly string _debugLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "npc_voice_debug.log");
         private static void DebugLog(string msg) {
             try { File.AppendAllText(_debugLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n"); } catch { }
@@ -42,6 +44,9 @@ namespace RoleplayingVoiceCore {
         private bool useClosestRelay;
         private DateTime _closestRelayBlockedUntilUtc = DateTime.MinValue;
         private bool _closestRelayRefreshInProgress;
+        private readonly object _relayCircuitLock = new object();
+        private int _consecutiveRelayFailures;
+        private DateTime _relayCircuitOpenUntilUtc = DateTime.MinValue;
 
         public event EventHandler OnMasterListAcquired;
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
@@ -127,6 +132,34 @@ namespace RoleplayingVoiceCore {
                 || statusCode == HttpStatusCode.BadGateway
                 || statusCode == HttpStatusCode.ServiceUnavailable
                 || statusCode == HttpStatusCode.GatewayTimeout;
+        }
+        private bool IsRelayCircuitOpen() {
+            lock (_relayCircuitLock) {
+                return DateTime.UtcNow < _relayCircuitOpenUntilUtc;
+            }
+        }
+        private void RecordRelaySuccess() {
+            lock (_relayCircuitLock) {
+                _consecutiveRelayFailures = 0;
+                _relayCircuitOpenUntilUtc = DateTime.MinValue;
+            }
+        }
+        private void RecordRelayFailure(string reason) {
+            lock (_relayCircuitLock) {
+                _consecutiveRelayFailures++;
+                DebugLog($"[GetCharacterAudio] Relay request failed ({_consecutiveRelayFailures}/{RelayCircuitBreakerFailureThreshold}): {reason}");
+                if (_consecutiveRelayFailures >= RelayCircuitBreakerFailureThreshold) {
+                    // When relays are repeatedly stalling, stop queuing new uncached
+                    // dialogue briefly. New dialogue can still play from cache, and
+                    // the next uncached line will retry after the cooldown.
+                    _relayCircuitOpenUntilUtc = DateTime.UtcNow.Add(RelayCircuitBreakerCooldown);
+                    _consecutiveRelayFailures = 0;
+                    _closestRelayBlockedUntilUtc = DateTime.UtcNow.Add(ClosestRelayFailureCooldown);
+                    _currentServerAlias = PrimaryRelayAlias;
+                    DebugLog($"[GetCharacterAudio] Relay circuit opened for {RelayCircuitBreakerCooldown.TotalSeconds:0} seconds after repeated failures.");
+                    GetCloserServerHost();
+                }
+            }
         }
         private void RefreshCache(string cacheLocation) {
             if (!string.IsNullOrEmpty(cacheLocation)) {
@@ -305,7 +338,8 @@ namespace RoleplayingVoiceCore {
         }
         public async Task<Tuple<bool, string>> GetCharacterAudio(Stream outputStream, string text, string originalValue, string rawText, string character,
             bool gender, string backupVoice = "", bool aggressiveCache = false, VoiceModel voiceModel = VoiceModel.Speed, string extraJson = "",
-            bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None, bool ignoreRefreshCache = false, HttpListenerResponse resp = null) {
+            bool redoLine = false, bool overrideGeneration = false, bool useMuteList = false, VoiceLinePriority overrideVoiceLinePriority = VoiceLinePriority.None,
+            bool ignoreRefreshCache = false, HttpListenerResponse resp = null, CancellationToken cancellationToken = default) {
             string primaryRelayServer = GetPrimaryRelayServer();
             string currentRelayServer = primaryRelayServer;
             bool usingClosestRelay = false;
@@ -347,7 +381,7 @@ namespace RoleplayingVoiceCore {
                                     resp.StatusDescription = voiceEngine;
                                 }
                                 FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                await file.CopyToAsync(outputStream);
+                                await file.CopyToAsync(outputStream, cancellationToken);
                                 succeeded = true;
                                 recoverLineType = true;
                                 if (resp != null) {
@@ -394,7 +428,7 @@ namespace RoleplayingVoiceCore {
                                             resp.StatusDescription = voiceEngine;
                                         }
                                         FileStream file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                                        await file.CopyToAsync(outputStream);
+                                        await file.CopyToAsync(outputStream, cancellationToken);
                                         succeeded = true;
                                         if (resp != null) {
                                             resp.Close();
@@ -413,6 +447,10 @@ namespace RoleplayingVoiceCore {
                     }
                     DebugLog($"[GetCharacterAudio] After cache check: succeeded={succeeded} recoverLineType={recoverLineType} characterVoice='{characterVoice}'");
                     if (!succeeded || recoverLineType) {
+                        if (IsRelayCircuitOpen()) {
+                            DebugLog($"[GetCharacterAudio] Relay circuit open; skipping uncached request for char='{character}'");
+                            return new Tuple<bool, string>(false, "RelayUnavailable");
+                        }
                         MemoryStream memoryStream = new MemoryStream();
                         async Task<(bool Success, HttpStatusCode? StatusCode)> SendVoiceRequestAsync(string relayServer, string requestJson, string requestType, string voiceLogSuffix) {
                             using (HttpClient httpClient = new HttpClient()) {
@@ -420,18 +458,18 @@ namespace RoleplayingVoiceCore {
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                                 httpClient.Timeout = VoiceRequestTimeout;
                                 DebugLog($"[GetCharacterAudio] {requestType}: Sending to {httpClient.BaseAddress}{voiceLogSuffix}...");
-                                using (var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(requestJson))) {
+                                using (var post = await httpClient.PostAsync(httpClient.BaseAddress, new StringContent(requestJson), cancellationToken)) {
                                     DebugLog($"[GetCharacterAudio] {requestType}: Response status={post.StatusCode} reason='{post.ReasonPhrase}'");
                                     if (post.StatusCode == HttpStatusCode.OK) {
-                                        using (var result = await post.Content.ReadAsStreamAsync()) {
+                                        using (var result = await post.Content.ReadAsStreamAsync(cancellationToken)) {
                                             voiceEngine = post.ReasonPhrase;
                                             if (resp != null && !recoverLineType) {
                                                 resp.StatusCode = (int)HttpStatusCode.OK;
                                                 resp.StatusDescription = voiceEngine;
                                             }
                                             if (!recoverLineType) {
-                                                await result.CopyToAsync(memoryStream);
-                                                await result.FlushAsync();
+                                                await result.CopyToAsync(memoryStream, cancellationToken);
+                                                await result.FlushAsync(cancellationToken);
                                                 memoryStream.Position = 0;
                                             }
                                             succeeded = true;
@@ -445,25 +483,55 @@ namespace RoleplayingVoiceCore {
                         }
                         async Task<bool> SendVoiceRequestWithFallbackAsync(ProxiedVoiceRequest request, string requestType, string voiceLogSuffix) {
                             string requestJson = JsonConvert.SerializeObject(request);
+                            async Task<bool> TryPrimaryRelayFallbackAsync(string failureReason) {
+                                try {
+                                    var fallbackAttempt = await SendVoiceRequestAsync(primaryRelayServer, requestJson, requestType, voiceLogSuffix);
+                                    if (fallbackAttempt.Success) {
+                                        RecordRelaySuccess();
+                                        return true;
+                                    }
+                                    RecordRelayFailure($"{requestType} fallback after {failureReason} returned {fallbackAttempt.StatusCode?.ToString() ?? "no status"}");
+                                    return false;
+                                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                                    DebugLog($"[GetCharacterAudio] {requestType}: fallback cancelled by newer dialogue request.");
+                                    throw;
+                                } catch (Exception ex) when (IsRetryableRelayException(ex)) {
+                                    RecordRelayFailure($"{requestType} fallback after {failureReason} failed with {ex.GetType().Name}: {ex.Message}");
+                                    return false;
+                                }
+                            }
                             try {
                                 var attempt = await SendVoiceRequestAsync(currentRelayServer, requestJson, requestType, voiceLogSuffix);
-                                if (attempt.Success || !usingClosestRelay) {
-                                    return attempt.Success;
+                                if (attempt.Success) {
+                                    RecordRelaySuccess();
+                                    return true;
+                                }
+                                if (!usingClosestRelay) {
+                                    if (attempt.StatusCode.HasValue && IsTransientRelayStatus(attempt.StatusCode.Value)) {
+                                        RecordRelayFailure($"{requestType} returned {attempt.StatusCode.Value}");
+                                    }
+                                    return false;
                                 }
                                 if (attempt.StatusCode.HasValue && IsTransientRelayStatus(attempt.StatusCode.Value)) {
                                     // A closest relay can be temporarily unhealthy even though the primary relay is fine.
                                     // Retry once on primary so playback can recover without a plugin restart.
                                     MarkClosestRelayUnavailable($"{requestType} returned {attempt.StatusCode.Value}");
-                                    var fallbackAttempt = await SendVoiceRequestAsync(primaryRelayServer, requestJson, requestType, voiceLogSuffix);
-                                    return fallbackAttempt.Success;
+                                    return await TryPrimaryRelayFallbackAsync(attempt.StatusCode.Value.ToString());
                                 }
                                 return false;
+                            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                                // The caller moved on to another dialogue line. This is expected
+                                // and should not count as a relay outage.
+                                DebugLog($"[GetCharacterAudio] {requestType}: cancelled by newer dialogue request.");
+                                throw;
                             } catch (Exception ex) when (usingClosestRelay && IsRetryableRelayException(ex)) {
                                 // Timeouts and socket failures match the bug report: the selected relay stopped responding,
                                 // but future requests kept using it. Cool it down and retry this line on primary.
                                 MarkClosestRelayUnavailable($"{requestType} failed with {ex.GetType().Name}: {ex.Message}");
-                                var fallbackAttempt = await SendVoiceRequestAsync(primaryRelayServer, requestJson, requestType, voiceLogSuffix);
-                                return fallbackAttempt.Success;
+                                return await TryPrimaryRelayFallbackAsync(ex.GetType().Name);
+                            } catch (Exception ex) when (IsRetryableRelayException(ex)) {
+                                RecordRelayFailure($"{requestType} failed with {ex.GetType().Name}: {ex.Message}");
+                                return false;
                             }
                         }
                         DebugLog($"[GetCharacterAudio] Has voice pairing for '{characterVoice}': {_characterToVoicePairing.ContainsKey(characterVoice)}");
@@ -509,7 +577,7 @@ namespace RoleplayingVoiceCore {
                             await SendVoiceRequestWithFallbackAsync(ttsRequest, "TTS", $" voice='{ttsRequest.Voice}'");
                         }
                         if (!recoverLineType) {
-                            await memoryStream.CopyToAsync(outputStream);
+                            await memoryStream.CopyToAsync(outputStream, cancellationToken);
                             memoryStream.Position = 0;
                         }
                         if (resp != null && !recoverLineType) {
@@ -540,8 +608,8 @@ namespace RoleplayingVoiceCore {
                                         Directory.CreateDirectory(Path.Combine(_cachePath, relativeFolderPath));
                                         if (!recoverLineType) {
                                             using (FileStream stream = new FileStream(Path.Combine(_cachePath, filePath), FileMode.Create, FileAccess.Write, FileShare.Write)) {
-                                                await memoryStream.CopyToAsync(stream);
-                                                await memoryStream.FlushAsync();
+                                                await memoryStream.CopyToAsync(stream, cancellationToken);
+                                                await memoryStream.FlushAsync(cancellationToken);
                                             }
                                         }
                                         if (_cacheLoaded && !alreadySaving) {
@@ -556,7 +624,7 @@ namespace RoleplayingVoiceCore {
                                                     string json = JsonConvert.SerializeObject(_characterVoices, Formatting.Indented);
                                                     while (isLocked) {
                                                         try {
-                                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), json);
+                                                            await File.WriteAllTextAsync(Path.Combine(_cachePath, "cacheIndex.json"), json, cancellationToken);
                                                             isLocked = false;
                                                         } catch {
                                                             Thread.Sleep(500);
@@ -580,6 +648,9 @@ namespace RoleplayingVoiceCore {
                             memoryStream.DisposeAsync();
                         }
                     }
+                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                    DebugLog("[NPCVoiceManager] GetCharacterAudio cancelled by caller.");
+                    return new Tuple<bool, string>(false, "Cancelled");
                 } catch (Exception ex) {
                     DebugLog("[NPCVoiceManager] GetCharacterAudio failed: " + ex.ToString());
                     return new Tuple<bool, string>(false, "Error");
