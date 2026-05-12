@@ -123,8 +123,18 @@ namespace RoleplayingVoiceCore {
             DebugLog($"[GetCharacterAudio] Closest relay unavailable; using primary relay for {ClosestRelayFailureCooldown.TotalMinutes:0} minutes. Reason: {reason}");
             GetCloserServerHost();
         }
+        private static bool IsCallerCancellation(CancellationToken cancellationToken) {
+            return cancellationToken.CanBeCanceled && cancellationToken.IsCancellationRequested;
+        }
         private static bool IsRetryableRelayException(Exception ex) {
-            return ex is TaskCanceledException || ex is HttpRequestException || ex is IOException;
+            return ex is TaskCanceledException
+                || ex is OperationCanceledException
+                || ex is TimeoutException
+                || ex is HttpRequestException
+                || ex is IOException;
+        }
+        private static string DescribeRelayException(Exception ex) {
+            return $"{ex.GetType().Name}: {ex.Message}";
         }
         private static bool IsTransientRelayStatus(HttpStatusCode statusCode) {
             // Only fail over for transport-style failures; application responses should stay with the selected relay.
@@ -492,11 +502,14 @@ namespace RoleplayingVoiceCore {
                                     }
                                     RecordRelayFailure($"{requestType} fallback after {failureReason} returned {fallbackAttempt.StatusCode?.ToString() ?? "no status"}");
                                     return false;
-                                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                                } catch (OperationCanceledException) when (IsCallerCancellation(cancellationToken)) {
                                     DebugLog($"[GetCharacterAudio] {requestType}: fallback cancelled by newer dialogue request.");
                                     throw;
                                 } catch (Exception ex) when (IsRetryableRelayException(ex)) {
-                                    RecordRelayFailure($"{requestType} fallback after {failureReason} failed with {ex.GetType().Name}: {ex.Message}");
+                                    // HttpClient timeouts also surface as OperationCanceledException/TaskCanceledException.
+                                    // If the caller did not cancel the request, treat it as a relay failure and keep the
+                                    // exception out of the outer GetCharacterAudio failure path.
+                                    RecordRelayFailure($"{requestType} fallback after {failureReason} failed with {DescribeRelayException(ex)}");
                                     return false;
                                 }
                             }
@@ -519,7 +532,7 @@ namespace RoleplayingVoiceCore {
                                     return await TryPrimaryRelayFallbackAsync(attempt.StatusCode.Value.ToString());
                                 }
                                 return false;
-                            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                            } catch (OperationCanceledException) when (IsCallerCancellation(cancellationToken)) {
                                 // The caller moved on to another dialogue line. This is expected
                                 // and should not count as a relay outage.
                                 DebugLog($"[GetCharacterAudio] {requestType}: cancelled by newer dialogue request.");
@@ -527,10 +540,10 @@ namespace RoleplayingVoiceCore {
                             } catch (Exception ex) when (usingClosestRelay && IsRetryableRelayException(ex)) {
                                 // Timeouts and socket failures match the bug report: the selected relay stopped responding,
                                 // but future requests kept using it. Cool it down and retry this line on primary.
-                                MarkClosestRelayUnavailable($"{requestType} failed with {ex.GetType().Name}: {ex.Message}");
+                                MarkClosestRelayUnavailable($"{requestType} failed with {DescribeRelayException(ex)}");
                                 return await TryPrimaryRelayFallbackAsync(ex.GetType().Name);
                             } catch (Exception ex) when (IsRetryableRelayException(ex)) {
-                                RecordRelayFailure($"{requestType} failed with {ex.GetType().Name}: {ex.Message}");
+                                RecordRelayFailure($"{requestType} failed with {DescribeRelayException(ex)}");
                                 return false;
                             }
                         }
@@ -648,9 +661,16 @@ namespace RoleplayingVoiceCore {
                             memoryStream.DisposeAsync();
                         }
                     }
-                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                } catch (OperationCanceledException) when (IsCallerCancellation(cancellationToken)) {
                     DebugLog("[NPCVoiceManager] GetCharacterAudio cancelled by caller.");
                     return new Tuple<bool, string>(false, "Cancelled");
+                } catch (OperationCanceledException ex) {
+                    // A relay-side timeout can surface as OperationCanceledException even when
+                    // the dialogue request itself was not cancelled. Keep the log concise so a
+                    // transient relay stall does not look like an unhandled plugin exception.
+                    DebugLog("[NPCVoiceManager] GetCharacterAudio relay request timed out: " + DescribeRelayException(ex));
+                    RecordRelayFailure("relay request timed out with " + DescribeRelayException(ex));
+                    return new Tuple<bool, string>(false, "RelayUnavailable");
                 } catch (Exception ex) {
                     DebugLog("[NPCVoiceManager] GetCharacterAudio failed: " + ex.ToString());
                     return new Tuple<bool, string>(false, "Error");
