@@ -265,21 +265,29 @@ namespace RoleplayingMediaCore {
         public void Stop() {
             Volume = 0;
             EndLooping();
-            if (_wavePlayer != null) {
+            var wavePlayer = _wavePlayer;
+            var player = _player;
+            if (_soundType == SoundType.NPC) {
+                _parent?.TraceDiagnostic($"NPC media stop entered name='{_playerObject?.Name}' hasWavePlayer={wavePlayer != null} hasStream={player != null} state={PlaybackState} invalidated={Invalidated} disposed={_disposed}");
+            }
+
+            if (wavePlayer != null) {
                 try {
-                    if (_wavePlayer != null) {
-                        try {
-                            _wavePlayer?.Stop();
-                            _wavePlayer?.Dispose();
-                        } catch {
-                            PlaybackStopped?.Invoke(this, "OK");
-                        }
+                    wavePlayer.Stop();
+                    wavePlayer.Dispose();
+                    if (_soundType == SoundType.NPC) {
+                        _parent?.TraceDiagnostic($"NPC media stop completed name='{_playerObject?.Name}'");
                     }
                 } catch (Exception e) {
+                    if (_soundType == SoundType.NPC) {
+                        _parent?.TraceDiagnostic($"NPC media stop failed name='{_playerObject?.Name}' type={e.GetType().Name} message='{e.Message}'");
+                    }
                     OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                     PlaybackStopped?.Invoke(this, "OK");
                 }
-                _wavePlayer = null;
+                if (ReferenceEquals(_wavePlayer, wavePlayer)) {
+                    _wavePlayer = null;
+                }
             } else {
                 PlaybackStopped?.Invoke(this, "OK");
             }
@@ -288,8 +296,16 @@ namespace RoleplayingMediaCore {
                     _vlcPlayer?.Stop();
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
-            try { _player?.Dispose(); } catch { }
-            _player = null;
+            try {
+                player?.Dispose();
+            } catch (Exception e) {
+                if (_soundType == SoundType.NPC) {
+                    _parent?.TraceDiagnostic($"NPC media stream dispose failed name='{_playerObject?.Name}' type={e.GetType().Name} message='{e.Message}'");
+                }
+            }
+            if (ReferenceEquals(_player, player)) {
+                _player = null;
+            }
             Volume = 0;
             Invalidated = true;
         }

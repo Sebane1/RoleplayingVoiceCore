@@ -22,6 +22,7 @@ namespace RoleplayingMediaCore {
         MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
+        public event EventHandler<string> OnDiagnosticReceived;
         public event EventHandler OnCleanupTime;
         private IMediaGameObject _mainPlayer = null;
         private IMediaGameObject _camera;
@@ -181,6 +182,10 @@ namespace RoleplayingMediaCore {
             OnErrorReceived?.Invoke(this, new MediaError() { Exception = e.Exception });
         }
 
+        internal void TraceDiagnostic(string message) {
+            OnDiagnosticReceived?.Invoke(this, message);
+        }
+
         public async void PlayStream(IMediaGameObject playerObject, string audioPath, int delay = 0) {
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             Task.Run(() => {
@@ -270,13 +275,20 @@ namespace RoleplayingMediaCore {
 
                 }
                 try {
-                    if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    if (_nativeGameAudio.TryGetValue(playerObject.Name, out var nativeGameAudio)) {
                         _nativeAudioQueue.Clear();
-                        _nativeGameAudio[playerObject.Name].Invalidated = true;
-                        _nativeGameAudio[playerObject.Name].Stop();
+                        TraceDiagnostic($"NPC audio stop requested name='{playerObject.Name}' state={nativeGameAudio.PlaybackState} invalidated={nativeGameAudio.Invalidated}");
+                        nativeGameAudio.Invalidated = true;
+                        nativeGameAudio.Stop();
+                    } else {
+                        // This is intentionally logged for NPC audio only: if skipped dialogue
+                        // still overlaps, this tells maintainers whether the manager had a live
+                        // media object to stop when the dialogue state was cleared.
+                        TraceDiagnostic($"NPC audio stop requested but no active native audio was found name='{playerObject.Name}' activeNativeAudio={_nativeGameAudio.Count}");
                     }
-                } catch {
-
+                } catch (Exception e) {
+                    TraceDiagnostic($"NPC audio stop failed name='{playerObject.Name}' type={e.GetType().Name} message='{e.Message}'");
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                 }
             }
         }
