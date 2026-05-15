@@ -110,11 +110,13 @@ namespace RoleplayingMediaCore {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
-                    if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                        var mediaObject = _nativeGameAudio[playerObject.Name];
+                    if (_nativeGameAudio.TryGetValue(playerObject.Name, out var existingMediaObject)) {
                         if (!queuePlayback) {
-                            mediaObject.Stop();
-                        } else if (mediaObject.PlaybackState == PlaybackState.Playing) {
+                            // Stop the previous NPC media object before replacing the
+                            // dictionary entry so we do not lose the only handle capable
+                            // of halting stale dialogue playback.
+                            existingMediaObject.Stop();
+                        } else if (existingMediaObject.PlaybackState == PlaybackState.Playing) {
                             if (!_nativeAudioQueue.ContainsKey(playerObject.Name)) {
                                 _nativeAudioQueue.TryAdd(playerObject.Name, new Queue<WaveStream>());
                             }
@@ -130,11 +132,11 @@ namespace RoleplayingMediaCore {
                                 } catch { }
                             };
                             EventHandler<string> removalFunction = delegate {
-                                mediaObject.PlaybackStopped -= function;
-                                mediaObject.Invalidated = true;
+                                existingMediaObject.PlaybackStopped -= function;
+                                existingMediaObject.Invalidated = true;
                             };
-                            mediaObject.PlaybackStopped += function;
-                            mediaObject.PlaybackStopped += removalFunction;
+                            existingMediaObject.PlaybackStopped += function;
+                            existingMediaObject.PlaybackStopped += removalFunction;
                             playbackQueued = true;
                         }
                     }
