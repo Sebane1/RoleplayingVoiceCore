@@ -308,7 +308,11 @@ namespace RoleplayingMediaCore {
                         }
                         switch (audioPlayerType) {
                             case AudioOutputType.WaveOut:
-                                _wavePlayer = new WaveOutEvent();
+                                var waveOut = new WaveOutEvent();
+                                if (_parent.AudioOutputDeviceIndex >= -1 && _parent.AudioOutputDeviceIndex < NAudio.Wave.WaveOut.DeviceCount) {
+                                    waveOut.DeviceNumber = _parent.AudioOutputDeviceIndex;
+                                }
+                                _wavePlayer = waveOut;
                                 break;
                             case AudioOutputType.DirectSound:
                                 _wavePlayer = new DirectSoundOut();
@@ -486,7 +490,11 @@ namespace RoleplayingMediaCore {
                             switch (audioPlayerType) {
                                 case AudioOutputType.VLCExperimental:
                                 case AudioOutputType.WaveOut:
-                                    _wavePlayer = new WaveOutEvent();
+                                    var waveOut = new WaveOutEvent();
+                                    if (_parent.AudioOutputDeviceIndex >= -1 && _parent.AudioOutputDeviceIndex < NAudio.Wave.WaveOut.DeviceCount) {
+                                        waveOut.DeviceNumber = _parent.AudioOutputDeviceIndex;
+                                    }
+                                    _wavePlayer = waveOut;
                                     break;
                                 case AudioOutputType.DirectSound:
                                     _wavePlayer = new DirectSoundOut();

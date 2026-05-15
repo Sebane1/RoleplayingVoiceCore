@@ -50,6 +50,7 @@ namespace RoleplayingMediaCore {
         public bool LowPerformanceMode { get => _lowPerformanceMode; set => _lowPerformanceMode = value; }
         public float NpcVolume { get => _npcVolume; set => _npcVolume = value; }
         public AudioOutputType AudioPlayerType { get => audioPlayerType; set => audioPlayerType = value; }
+        public int AudioOutputDeviceIndex { get; set; } = -1;
         public float CameraAndPlayerPositionSlider { get => _cameraAndPlayerPositionSlider; set => _cameraAndPlayerPositionSlider = value; }
         public int SpatialAudioAccuracy { get => _spatialAudioAccuracy; set => _spatialAudioAccuracy = value; }
         public bool IgnoreSpatialAudioForTTS { get => _ignoreSpatialAudioForTTS; set => _ignoreSpatialAudioForTTS = value; }
