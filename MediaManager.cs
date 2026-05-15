@@ -315,13 +315,13 @@ namespace RoleplayingMediaCore {
                                     Thread.Sleep(100);
                                 }
                                 try {
-                                    sounds[playerObject.Name]?.Stop();
+                                    sounds[playerObject.Name]?.Dispose();
                                 } catch (Exception e) {
                                     OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                                 }
                             } else {
                                 try {
-                                    sounds[playerObject.Name]?.Stop();
+                                    sounds[playerObject.Name]?.Dispose();
                                 } catch (Exception e) {
                                     OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                                 }
@@ -346,6 +346,7 @@ namespace RoleplayingMediaCore {
                                     }
                                     Stopwatch soundPlaybackTimer = Stopwatch.StartNew();
                                     sounds[playerObject.Name].Play(audioPath, volume, delay, skipAhead, audioPlayerType, _lowPerformanceMode, volumeOffset);
+                                    _cleanupList.RemoveAll(kvp => kvp.Value != null && kvp.Value.Invalidated && kvp.Value.PlaybackState == PlaybackState.Stopped);
                                     _cleanupList.Add(new KeyValuePair<string, MediaObject>(playerObject.Name, sounds[playerObject.Name]));
                                 }
                             } catch (Exception e) {
@@ -436,7 +437,9 @@ namespace RoleplayingMediaCore {
                     sound.Value.ResetVolume();
                 }
             }
-            new WaveOutEvent().Volume = 1;
+            using (var tempPlayer = new WaveOutEvent()) {
+                tempPlayer.Volume = 1;
+            }
         }
 
         public float CalculateObjectVolume(string playerName, MediaObject mediaObject) {
@@ -529,7 +532,7 @@ namespace RoleplayingMediaCore {
                 foreach (var sound in _cleanupList) {
                     if (sound.Value != null) {
                         sound.Value.Invalidated = true;
-                        sound.Value?.Stop();
+                        sound.Value?.Dispose();
                         sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
                     }
                 }
@@ -556,7 +559,7 @@ namespace RoleplayingMediaCore {
                     var sound = _cleanupList[i];
                     if (sound.Value != null) {
                         sound.Value.Invalidated = true;
-                        sound.Value?.Stop();
+                        sound.Value?.Dispose();
                         sound.Value.OnErrorReceived -= MediaManager_OnErrorReceived;
                     }
                 }

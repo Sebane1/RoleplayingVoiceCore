@@ -269,6 +269,7 @@ namespace RoleplayingMediaCore {
                     OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                     PlaybackStopped?.Invoke(this, "OK");
                 }
+                _wavePlayer = null;
             } else {
                 PlaybackStopped?.Invoke(this, "OK");
             }
@@ -277,6 +278,8 @@ namespace RoleplayingMediaCore {
                     _vlcPlayer?.Stop();
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             }
+            try { _player?.Dispose(); } catch { }
+            _player = null;
             Volume = 0;
             Invalidated = true;
         }
@@ -700,9 +703,17 @@ namespace RoleplayingMediaCore {
         }
 
         public void Dispose() {
+            if (_disposed) {
+                return;
+            }
             _disposed = true;
+            _parent.OnCleanupTime -= _parent_OnCleanupTime;
             Stop();
             Volume = 0;
+            try { _vlcPlayer?.Dispose(); } catch { }
+            _vlcPlayer = null;
+            try { libVLC?.Dispose(); } catch { }
+            libVLC = null;
         }
     }
     public enum SoundType {
