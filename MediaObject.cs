@@ -145,31 +145,37 @@ namespace RoleplayingMediaCore {
             });
         }
         private void DonePlayingCheck() {
+            var player = _player;
+            var wavePlayer = _wavePlayer;
+            if (player == null || wavePlayer == null) {
+                return;
+            }
+
             Stopwatch stopwatch = new Stopwatch();
-            Task.Run(async () => {
+            Task.Run(() => {
                 try {
                     Thread.Sleep(300);
-                    long lastPosition = _player?.Position ?? 0;
-                    while (true) {
-                        var player = _player;
-                        if (player == null) {
-                            break;
-                        }
+                    while (!Invalidated && !_disposed && ReferenceEquals(_player, player) && ReferenceEquals(_wavePlayer, wavePlayer)) {
                         if (player.Position > player.Length * 0.985f) {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
                             if (stopwatch.ElapsedMilliseconds > 100) {
                                 Thread.Sleep(100);
-                                _wavePlayer?.Stop();
+                                // Stop() can run when dialogue advances before natural playback completion.
+                                // In that case this poll should exit quietly instead of touching disposed audio state.
+                                if (!Invalidated && !_disposed && ReferenceEquals(_wavePlayer, wavePlayer)) {
+                                    wavePlayer.Stop();
+                                }
                                 break;
                             }
                         } else {
                             stopwatch.Reset();
                         }
-                        lastPosition = player.Position;
                         Thread.Sleep(100);
                     }
+                } catch (ObjectDisposedException) {
+                    // Stop()/Dispose() owns cleanup when playback is interrupted, such as skipping NPC dialogue.
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
         }
