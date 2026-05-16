@@ -22,6 +22,7 @@ namespace RoleplayingMediaCore {
         MediaObject _npcSound = null;
 
         public event EventHandler<MediaError> OnErrorReceived;
+        public event EventHandler<string> OnDiagnosticReceived;
         public event EventHandler OnCleanupTime;
         private IMediaGameObject _mainPlayer = null;
         private IMediaGameObject _camera;
@@ -109,11 +110,13 @@ namespace RoleplayingMediaCore {
             try {
                 if (playerObject != null) {
                     bool playbackQueued = false;
-                    if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
-                        var mediaObject = _nativeGameAudio[playerObject.Name];
+                    if (_nativeGameAudio.TryGetValue(playerObject.Name, out var existingMediaObject)) {
                         if (!queuePlayback) {
-                            mediaObject.Stop();
-                        } else if (mediaObject.PlaybackState == PlaybackState.Playing) {
+                            // Stop the previous NPC media object before replacing the
+                            // dictionary entry so we do not lose the only handle capable
+                            // of halting stale dialogue playback.
+                            existingMediaObject.Stop();
+                        } else if (existingMediaObject.PlaybackState == PlaybackState.Playing) {
                             if (!_nativeAudioQueue.ContainsKey(playerObject.Name)) {
                                 _nativeAudioQueue.TryAdd(playerObject.Name, new Queue<WaveStream>());
                             }
@@ -129,11 +132,11 @@ namespace RoleplayingMediaCore {
                                 } catch { }
                             };
                             EventHandler<string> removalFunction = delegate {
-                                mediaObject.PlaybackStopped -= function;
-                                mediaObject.Invalidated = true;
+                                existingMediaObject.PlaybackStopped -= function;
+                                existingMediaObject.Invalidated = true;
                             };
-                            mediaObject.PlaybackStopped += function;
-                            mediaObject.PlaybackStopped += removalFunction;
+                            existingMediaObject.PlaybackStopped += function;
+                            existingMediaObject.PlaybackStopped += removalFunction;
                             playbackQueued = true;
                         }
                     }
@@ -179,6 +182,10 @@ namespace RoleplayingMediaCore {
 
         private void MediaManager_OnErrorReceived(object? sender, MediaError e) {
             OnErrorReceived?.Invoke(this, new MediaError() { Exception = e.Exception });
+        }
+
+        internal void TraceDiagnostic(string message) {
+            OnDiagnosticReceived?.Invoke(this, message);
         }
 
         public async void PlayStream(IMediaGameObject playerObject, string audioPath, int delay = 0) {
@@ -270,13 +277,20 @@ namespace RoleplayingMediaCore {
 
                 }
                 try {
-                    if (_nativeGameAudio.ContainsKey(playerObject.Name)) {
+                    if (_nativeGameAudio.TryGetValue(playerObject.Name, out var nativeGameAudio)) {
                         _nativeAudioQueue.Clear();
-                        _nativeGameAudio[playerObject.Name].Invalidated = true;
-                        _nativeGameAudio[playerObject.Name].Stop();
+                        TraceDiagnostic($"NPC audio stop requested name='{playerObject.Name}' state={nativeGameAudio.PlaybackState} invalidated={nativeGameAudio.Invalidated}");
+                        nativeGameAudio.Invalidated = true;
+                        nativeGameAudio.Stop();
+                    } else {
+                        // This is intentionally logged for NPC audio only: if skipped dialogue
+                        // still overlaps, this tells maintainers whether the manager had a live
+                        // media object to stop when the dialogue state was cleared.
+                        TraceDiagnostic($"NPC audio stop requested but no active native audio was found name='{playerObject.Name}' activeNativeAudio={_nativeGameAudio.Count}");
                     }
-                } catch {
-
+                } catch (Exception e) {
+                    TraceDiagnostic($"NPC audio stop failed name='{playerObject.Name}' type={e.GetType().Name} message='{e.Message}'");
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
                 }
             }
         }

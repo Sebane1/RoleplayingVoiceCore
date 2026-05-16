@@ -67,6 +67,7 @@ namespace RoleplayingMediaCore {
         private bool _vlcWasAbleToStart;
         private float _volumeOffset;
         private bool _disposed;
+        private readonly object _playbackLifecycleLock = new object();
 
         public MediaObject(MediaManager parent, IMediaGameObject playerObject, IMediaGameObject camera,
             SoundType soundType, string soundPath, string libVLCPath, bool spatialAllowed) {
@@ -145,31 +146,37 @@ namespace RoleplayingMediaCore {
             });
         }
         private void DonePlayingCheck() {
+            var player = _player;
+            var wavePlayer = _wavePlayer;
+            if (player == null || wavePlayer == null) {
+                return;
+            }
+
             Stopwatch stopwatch = new Stopwatch();
-            Task.Run(async () => {
+            Task.Run(() => {
                 try {
                     Thread.Sleep(300);
-                    long lastPosition = _player?.Position ?? 0;
-                    while (true) {
-                        var player = _player;
-                        if (player == null) {
-                            break;
-                        }
+                    while (!Invalidated && !_disposed && ReferenceEquals(_player, player) && ReferenceEquals(_wavePlayer, wavePlayer)) {
                         if (player.Position > player.Length * 0.985f) {
                             if (!stopwatch.IsRunning) {
                                 stopwatch.Start();
                             }
                             if (stopwatch.ElapsedMilliseconds > 100) {
                                 Thread.Sleep(100);
-                                _wavePlayer?.Stop();
+                                // Stop() can run when dialogue advances before natural playback completion.
+                                // In that case this poll should exit quietly instead of touching disposed audio state.
+                                if (!Invalidated && !_disposed && ReferenceEquals(_wavePlayer, wavePlayer)) {
+                                    wavePlayer.Stop();
+                                }
                                 break;
                             }
                         } else {
                             stopwatch.Reset();
                         }
-                        lastPosition = player.Position;
                         Thread.Sleep(100);
                     }
+                } catch (ObjectDisposedException) {
+                    // Stop()/Dispose() owns cleanup when playback is interrupted, such as skipping NPC dialogue.
                 } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
             });
         }
@@ -251,44 +258,110 @@ namespace RoleplayingMediaCore {
                 try {
                     _loopStream.EnableLooping = false;
                     _loopStream?.Dispose();
+                    _loopStream = null;
                 } catch {
 
                 }
             }
         }
         public void Stop() {
-            Volume = 0;
-            EndLooping();
-            if (_wavePlayer != null) {
-                try {
-                    if (_wavePlayer != null) {
-                        try {
-                            _wavePlayer?.Stop();
-                            _wavePlayer?.Dispose();
-                        } catch {
-                            PlaybackStopped?.Invoke(this, "OK");
-                        }
-                    }
-                } catch (Exception e) {
-                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
-                    PlaybackStopped?.Invoke(this, "OK");
-                }
-                _wavePlayer = null;
-            } else {
-                PlaybackStopped?.Invoke(this, "OK");
-            }
-            if (_vlcPlayer != null) {
-                try {
-                    _vlcPlayer?.Stop();
-                } catch (Exception e) { OnErrorReceived?.Invoke(this, new MediaError() { Exception = e }); }
-            }
-            try { _player?.Dispose(); } catch { }
-            _player = null;
-            Volume = 0;
-            Invalidated = true;
+            StopAndDisposePlayback(false);
         }
         public void LoopEarly() {
             _loopStream?.LoopEarly();
+        }
+
+        private void StopAndDisposePlayback(bool disposeVideoResources) {
+            bool shouldNotifyStopped = false;
+            bool isNpc;
+            string objectName;
+            IWavePlayer wavePlayer;
+            WaveStream player;
+            MediaPlayer vlcPlayer;
+            LibVLC vlc;
+
+            lock (_playbackLifecycleLock) {
+                isNpc = _soundType == SoundType.NPC;
+                objectName = _playerObject?.Name;
+                var playbackState = PlaybackState;
+
+                try { Volume = 0; } catch { }
+                EndLooping();
+
+                wavePlayer = _wavePlayer;
+                player = _player;
+                vlcPlayer = _vlcPlayer;
+                vlc = libVLC;
+                shouldNotifyStopped = wavePlayer == null;
+
+                if (isNpc) {
+                    _parent?.TraceDiagnostic($"NPC media stop entered name='{objectName}' hasWavePlayer={wavePlayer != null} hasStream={player != null} hasVlcPlayer={vlcPlayer != null} state={playbackState} invalidated={Invalidated} disposed={_disposed}");
+                }
+
+                // Capture the handles before clearing fields. The local handles are
+                // now responsible for shutdown, so dictionary replacement or cleanup
+                // cannot drop the last object capable of stopping stale playback.
+                Invalidated = true;
+
+                if (ReferenceEquals(_wavePlayer, wavePlayer)) {
+                    _wavePlayer = null;
+                }
+                if (ReferenceEquals(_player, player)) {
+                    _player = null;
+                }
+                if (disposeVideoResources && ReferenceEquals(_vlcPlayer, vlcPlayer)) {
+                    _vlcPlayer = null;
+                }
+                if (disposeVideoResources && ReferenceEquals(libVLC, vlc)) {
+                    libVLC = null;
+                }
+
+                try { Volume = 0; } catch { }
+            }
+
+            if (wavePlayer != null) {
+                try {
+                    wavePlayer.Stop();
+                    wavePlayer.Dispose();
+                    if (isNpc) {
+                        _parent?.TraceDiagnostic($"NPC media wave stop completed name='{objectName}'");
+                    }
+                } catch (Exception e) {
+                    if (isNpc) {
+                        _parent?.TraceDiagnostic($"NPC media wave stop failed name='{objectName}' type={e.GetType().Name} message='{e.Message}'");
+                    }
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                    shouldNotifyStopped = true;
+                }
+            }
+
+            if (vlcPlayer != null) {
+                try {
+                    vlcPlayer.Stop();
+                    if (disposeVideoResources) {
+                        vlcPlayer.Dispose();
+                    }
+                } catch (Exception e) {
+                    OnErrorReceived?.Invoke(this, new MediaError() { Exception = e });
+                    shouldNotifyStopped = true;
+                }
+            }
+
+            try {
+                player?.Dispose();
+            } catch (Exception e) {
+                if (isNpc) {
+                    _parent?.TraceDiagnostic($"NPC media stream dispose failed name='{objectName}' type={e.GetType().Name} message='{e.Message}'");
+                }
+            }
+
+            if (disposeVideoResources) {
+                try { vlc?.Dispose(); } catch { }
+            }
+
+            if (shouldNotifyStopped) {
+                PlaybackStopped?.Invoke(this, "OK");
+            }
         }
 
         public async void Play(WaveStream soundPath, float volume, int delay, bool useSmbPitch,
@@ -712,12 +785,7 @@ namespace RoleplayingMediaCore {
             }
             _disposed = true;
             _parent.OnCleanupTime -= _parent_OnCleanupTime;
-            Stop();
-            Volume = 0;
-            try { _vlcPlayer?.Dispose(); } catch { }
-            _vlcPlayer = null;
-            try { libVLC?.Dispose(); } catch { }
-            libVLC = null;
+            StopAndDisposePlayback(true);
         }
     }
     public enum SoundType {
