@@ -292,7 +292,7 @@ namespace RoleplayingMediaCore {
                 player = _player;
                 vlcPlayer = _vlcPlayer;
                 vlc = libVLC;
-                shouldNotifyStopped = wavePlayer == null && vlcPlayer == null;
+                shouldNotifyStopped = wavePlayer == null;
 
                 if (isNpc) {
                     _parent?.TraceDiagnostic($"NPC media stop entered name='{objectName}' hasWavePlayer={wavePlayer != null} hasStream={player != null} hasVlcPlayer={vlcPlayer != null} state={playbackState} invalidated={Invalidated} disposed={_disposed}");
