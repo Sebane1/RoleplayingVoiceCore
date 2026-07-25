@@ -405,7 +405,13 @@ namespace RoleplayingMediaCore {
                         }
                         if (_wavePlayer != null && sampleProvider != null) {
                             try {
-                                _wavePlayer?.Init(sampleProvider);
+                                try {
+                                    _wavePlayer?.Init(sampleProvider);
+                                } catch (NAudio.MmException) {
+                                    _wavePlayer?.Dispose();
+                                    _wavePlayer = new WasapiOut();
+                                    _wavePlayer.Init(sampleProvider);
+                                }
                                 if (_soundType == SoundType.Loop ||
                                     _soundType == SoundType.MainPlayerVoice ||
                                     _soundType == SoundType.OtherPlayer) {
@@ -479,6 +485,9 @@ namespace RoleplayingMediaCore {
                     if (!string.IsNullOrEmpty(mediaPath) && PlaybackState == PlaybackState.Stopped) {
                         if (!mediaPath.StartsWith("http") && !mediaPath.StartsWith("rtmp") && !mediaPath.EndsWith(".mp4") && !mediaPath.EndsWith(".avi") &&
                             (audioPlayerType != AudioOutputType.VLCExperimental || _soundType != SoundType.NPC)) {
+                            if (File.Exists(mediaPath) && new FileInfo(mediaPath).Length == 0) {
+                                return;
+                            }
                             _player = mediaPath.EndsWith(".ogg") ?
                             new VorbisWaveReader(mediaPath) : new MediaFoundationReader(mediaPath);
                             WaveStream desiredStream = _player;

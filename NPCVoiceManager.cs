@@ -384,7 +384,10 @@ namespace RoleplayingVoiceCore {
                         string relativeFolderPath = characterGendered + "\\";
                         string filePath = Path.Combine(_cachePath, relativeFolderPath + CreateMD5(characterGendered + text) + ".mp3");
                         if (File.Exists(filePath)) {
-                            try {
+                            if (new FileInfo(filePath).Length == 0) {
+                                try { File.Delete(filePath); } catch { }
+                            } else {
+                                try {
                                 voiceEngine = "Cached";
                                 if (resp != null && !recoverLineType) {
                                     resp.StatusCode = (int)HttpStatusCode.OK;
@@ -398,6 +401,7 @@ namespace RoleplayingVoiceCore {
                                     resp.Close();
                                 }
                             } catch {
+                            }
                             }
                         }
                     };
@@ -428,6 +432,12 @@ namespace RoleplayingVoiceCore {
                                     }
                                 }
                                 string fullPath = Path.Combine(_cachePath, relativePath);
+                                if (File.Exists(fullPath)) {
+                                    if (new FileInfo(fullPath).Length == 0) {
+                                        needsRefreshing = true;
+                                        try { File.Delete(fullPath); } catch { }
+                                    }
+                                }
                                 if (File.Exists(fullPath) && !needsRefreshing) {
                                     voiceEngine = (_characterVoices.VoiceEngine.ContainsKey(characterGendered)
                                         && _characterVoices.VoiceEngine[characterGendered].ContainsKey(text))
