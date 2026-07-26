@@ -1,4 +1,4 @@
-﻿using AIDataProxy.XTTS;
+using AIDataProxy.XTTS;
 using ElevenLabs;
 using ElevenLabs.History;
 using ElevenLabs.Models;
@@ -6,6 +6,7 @@ using ElevenLabs.User;
 using ElevenLabs.Voices;
 using FFXIVLooseTextureCompiler.Networking;
 using NAudio.Lame;
+using System.Net.Http.Headers;
 using RoleplayingMediaCore.AudioRecycler;
 using System.Diagnostics;
 using System.Numerics;
@@ -62,6 +63,12 @@ namespace RoleplayingMediaCore {
         private string _microsoftNarratorVoice;
         private string[] _microsoftNarratorVoices;
         private string _microsoftNarratorVoiceType;
+        private string _fishAudioVoiceType;
+        private string[] _fishAudioVoices;
+        private Dictionary<string, string> _fishAudioVoiceMap = new Dictionary<string, string>();
+        private string _cttsVoiceType;
+        public string FishAudioApiKey { get; set; }
+        public string CTTSAddress { get; set; }
         private bool _readUnquotedText;
 
         public event EventHandler<string> InitializationCallbacks;
@@ -397,6 +404,14 @@ namespace RoleplayingMediaCore {
                 }
             }
         }
+        
+        public void SetVoiceFishAudio(string voiceType) {
+            _fishAudioVoiceType = voiceType;
+        }
+
+        public void SetVoiceCTTS(string voiceType) {
+            _cttsVoiceType = voiceType;
+        }
 
         public async Task<string> DoVoiceElevenlabs(string sender, string text,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
@@ -456,9 +471,11 @@ namespace RoleplayingMediaCore {
                         return "";
                     }
 
-                } catch {
-
+                } catch (Exception e) {
+                    OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Elevenlabs TTS failed", Exception = e });
                 }
+            } else {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"DoVoiceElevenlabs: _elevenLabsVoice was null. Current _voiceTypeElevenlabs: {_voiceTypeElevenlabs}" });
             }
             return clipPath;
         }
@@ -591,6 +608,42 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 }
             }
             return clipPath;
+        }
+
+        public async Task<string[]> GetVoiceListFishAudio() {
+            ValidationResult state = new ValidationResult();
+            List<string> voicesNames = new List<string>();
+            voicesNames.Add("None");
+            if (string.IsNullOrEmpty(FishAudioApiKey)) {
+                return voicesNames.ToArray();
+            }
+            try {
+                using (HttpClient client = new HttpClient()) {
+                    client.Timeout = TimeSpan.FromMinutes(2);
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                    
+                    // Fetch voices
+                    var response = await client.GetAsync("https://api.fish.audio/model");
+                    if (response.IsSuccessStatusCode) {
+                        string responseBody = await response.Content.ReadAsStringAsync();
+                        dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
+                        if (json != null && json.items != null) {
+                            _fishAudioVoiceMap.Clear();
+                            foreach (var item in json.items) {
+                                string title = item.title;
+                                string id = item._id; // Fish Audio usually uses _id for models in their v1 REST API
+                                voicesNames.Add(title);
+                                _fishAudioVoiceMap[title] = id;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                var errorVoiceGen = e.Message.ToString();
+                OnApiValidationComplete?.Invoke(this, state);
+            }
+            _fishAudioVoices = voicesNames.ToArray();
+            return _fishAudioVoices;
         }
 
         public async Task<string[]> GetVoiceListMicrosoftNarrator() {
@@ -947,6 +1000,209 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 return await _networkedClient.GetZip(hash, path);
             }
             return "";
+        }
+
+        private async Task<string> GetVoiceFromFishAudio(string trimmedText, string voiceType) {
+            string audioPath = "";
+            try {
+                if (string.IsNullOrEmpty(FishAudioApiKey)) return "";
+                string unquotedText = trimmedText.Replace(@"""", null);
+                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+                
+                // Retrieve the actual ID from the map if it exists
+                string referenceId = voiceType;
+                if (_fishAudioVoiceMap.ContainsKey(voiceType)) {
+                    referenceId = _fishAudioVoiceMap[voiceType];
+                }
+
+                using (HttpClient client = new HttpClient()) {
+                    client.Timeout = TimeSpan.FromMinutes(2);
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                    client.DefaultRequestHeaders.Add("model", "s2-pro");
+                    
+                    var payload = new {
+                        text = numberAdjusted,
+                        reference_id = referenceId,
+                        format = "mp3"
+                    };
+                    
+                    var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), System.Text.Encoding.UTF8, "application/json");
+                    var response = await client.PostAsync("https://api.fish.audio/v1/tts", content);
+                    
+                    if (response.IsSuccessStatusCode) {
+                        byte[] data = await response.Content.ReadAsByteArrayAsync();
+                        string directory = Path.Combine(rpVoiceCache, "FishAudio\\" + voiceType + "\\");
+                        Directory.CreateDirectory(directory);
+                        audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
+                        await File.WriteAllBytesAsync(audioPath, data);
+                        CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                    } else {
+                        string errorResponse = await response.Content.ReadAsStringAsync();
+                        OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"Fish Audio API Error: {response.StatusCode} - {errorResponse}" });
+                    }
+                }
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Fish Audio exception", Exception = e });
+            }
+            return audioPath;
+        }
+
+        private async Task<string> GetVoiceFromCTTS(string trimmedText, string voiceType, string language) {
+            string audioPath = "";
+            try {
+                string unquotedText = trimmedText.Replace(@"""", null);
+                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+                
+                string speakerPath = "";
+                if (voiceType.Contains(".wav")) {
+                    speakerPath = voiceType;
+                } else {
+                    speakerPath = Path.Combine(rpVoiceCache, "speakers\\" + voiceType + ".wav");
+                }
+                if (!File.Exists(speakerPath)) return "";
+                
+                string cttsAddr = string.IsNullOrEmpty(CTTSAddress) ? "http://localhost:8308" : CTTSAddress;
+                
+                byte[] data = await AIDataProxy.CTTS.CTTSCommunicator.GetVoiceData(numberAdjusted, speakerPath, language, cttsAddr);
+                if (data != null && data.Length > 0) {
+                    string directory = Path.Combine(rpVoiceCache, "CTTS\\" + voiceType + "\\");
+                    Directory.CreateDirectory(directory);
+                    audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
+                    await File.WriteAllBytesAsync(audioPath, data);
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                }
+            } catch { }
+            return audioPath;
+        }
+
+        public async Task<string> DoVoiceFishAudio(string sender, string text,
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+            string clipPath = "";
+            string hash = Shai1Hash(sender + text);
+            if (_fishAudioVoiceType != null) {
+                string voice = _fishAudioVoiceType;
+                try {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
+                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
+                        if (!File.Exists(stitchedPath)) {
+                            string trimmedText = TrimText(text);
+                            Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
+                            List<string> audioPaths = new List<string>();
+                            foreach (var audioClip in audioClips) {
+                                if (audioClip.Item2) {
+                                    audioPaths.Add(await GetVoicePathFishAudio(voice, audioClip.Item1));
+                                } else if (_readUnquotedText) {
+                                    audioPaths.Add(await GetVoicePathFishAudio(voice, audioClip.Item1));
+                                }
+                            }
+                            MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
+                            try {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                                    playbackStream.Position = 0;
+                                    playbackStream.CopyTo(stitchedStream);
+                                    stitchedStream.Flush();
+                                    stitchedStream.Close();
+                                }
+                            } catch (Exception e) {
+                                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+                            }
+                        }
+                        if (useSync) {
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
+                        }
+                        clipPath = stitchedPath;
+                        VoicesUpdated?.Invoke(this, EventArgs.Empty);
+                    }
+                } catch { }
+            }
+            return clipPath;
+        }
+
+        public async Task<string> DoVoiceCTTS(string sender, string text,
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en") {
+            string clipPath = "";
+            string hash = Shai1Hash(sender + text);
+            if (_cttsVoiceType != null) {
+                string voice = _cttsVoiceType;
+                try {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
+                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
+                        if (!File.Exists(stitchedPath)) {
+                            string trimmedText = TrimText(text);
+                            Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))
+                                ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
+                            List<string> audioPaths = new List<string>();
+                            foreach (var audioClip in audioClips) {
+                                if (audioClip.Item2) {
+                                    audioPaths.Add(await GetVoicePathCTTS(voice, audioClip.Item1, language));
+                                } else if (_readUnquotedText) {
+                                    audioPaths.Add(await GetVoicePathCTTS(voice, audioClip.Item1, language));
+                                }
+                            }
+                            MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
+                            try {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                                    playbackStream.Position = 0;
+                                    playbackStream.CopyTo(stitchedStream);
+                                    stitchedStream.Flush();
+                                    stitchedStream.Close();
+                                }
+                            } catch (Exception e) {
+                                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+                            }
+                        }
+                        if (useSync) {
+                            Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
+                        }
+                        clipPath = stitchedPath;
+                        VoicesUpdated?.Invoke(this, EventArgs.Empty);
+                    }
+                } catch { }
+            }
+            return clipPath;
+        }
+
+        private async Task<string> GetVoicePathFishAudio(string voiceType, string trimmedText) {
+            string audioPath = "";
+            try {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                    CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+                }
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                    audioPath = await GetVoiceFromFishAudio(trimmedText, voiceType);
+                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                    audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                } else {
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                    audioPath = await GetVoiceFromFishAudio(trimmedText, voiceType);
+                }
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+            }
+            return audioPath;
+        }
+
+        private async Task<string> GetVoicePathCTTS(string voiceType, string trimmedText, string language) {
+            string audioPath = "";
+            try {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+                    CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
+                }
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                    audioPath = await GetVoiceFromCTTS(trimmedText, voiceType, language);
+                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                    audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
+                } else {
+                    CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
+                    audioPath = await GetVoiceFromCTTS(trimmedText, voiceType, language);
+                }
+            } catch (Exception e) {
+                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
+            }
+            return audioPath;
         }
     }
 

@@ -579,9 +579,19 @@ namespace RoleplayingMediaCore {
                             }
                             if (_wavePlayer != null) {
                                 try {
+                                    bool initSuccess = false;
                                     try {
                                         _wavePlayer?.Init(sampleProvider);
-                                    } catch {
+                                        initSuccess = true;
+                                    } catch (Exception initEx) {
+                                        try {
+                                            _wavePlayer?.Dispose();
+                                            _wavePlayer = new WasapiOut();
+                                            _wavePlayer.Init(sampleProvider);
+                                            initSuccess = true;
+                                        } catch (Exception wasapiEx) {
+                                            OnErrorReceived?.Invoke(this, new MediaError() { Exception = new Exception($"NAudio Init failed (Wasapi fallback also failed: {wasapiEx.Message})", initEx) });
+                                        }
                                     }
                                     if (_soundType == SoundType.Loop ||
                                         _soundType == SoundType.MainPlayerVoice ||
@@ -607,7 +617,7 @@ namespace RoleplayingMediaCore {
                                     _wavePlayer.PlaybackStopped += delegate {
                                         PlaybackStopped?.Invoke(this, "OK");
                                     };
-                                    if (_wavePlayer != null) {
+                                    if (_wavePlayer != null && initSuccess) {
                                         _wavePlayer?.Play();
                                     }
                                     if (_soundType == SoundType.LoopUntilStopped) {
