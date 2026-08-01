@@ -12,7 +12,7 @@ using System.Net.Http.Headers;
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
         private const string PrimaryRelayAlias = "Primary Relay (CA)";
-        private const string PrimaryRelayServer = "http://ai.hubujubu.com:5670";
+        private const string PrimaryRelayServer = "https://ai.hubujubu.com:5697";
         private const string ArtemisRelayServer = "https://ai.hubujubu.com:5697";
         // NPC playback is interactive; waiting the previous six minutes made transient relay issues feel permanent.
         private static readonly TimeSpan VoiceRequestTimeout = TimeSpan.FromSeconds(45);
@@ -47,6 +47,7 @@ namespace RoleplayingVoiceCore {
         private readonly object _relayCircuitLock = new object();
         private int _consecutiveRelayFailures;
         private DateTime _relayCircuitOpenUntilUtc = DateTime.MinValue;
+        private bool _isServer = false;
 
         public event EventHandler OnMasterListAcquired;
         public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
@@ -63,6 +64,7 @@ namespace RoleplayingVoiceCore {
             _characterToCacheType = characterToCacheType;
             _cacheLocation = cacheLocation;
             _versionIdentifier = version;
+            _isServer = isAServer;
             RefreshCache(cacheLocation);
             cacheTimer.Start();
             cacheSaveTimer.Start();
@@ -107,8 +109,8 @@ namespace RoleplayingVoiceCore {
                 DebugLog("[GetCloserServerHost] Failed to acquire nearest relay: " + ex.Message);
             }
         }
-        private static string GetPrimaryRelayServer() {
-            return Environment.MachineName == "ARTEMISDIALOGUE" ? ArtemisRelayServer : PrimaryRelayServer;
+        private string GetPrimaryRelayServer() {
+            return _isServer || Environment.MachineName == "ARTEMISDIALOGUE" ? ArtemisRelayServer : PrimaryRelayServer;
         }
         private bool ShouldUseClosestRelay() {
             // Keep the closest-relay preference enabled, but skip it while a recent request failure is cooling down.
