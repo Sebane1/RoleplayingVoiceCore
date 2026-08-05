@@ -25,6 +25,7 @@ namespace RoleplayingMediaCore {
         private NetworkedClient _networkedClient;
         private CharacterVoices _characterVoices = new CharacterVoices();
         SubscriptionInfo _info = new SubscriptionInfo();
+        string _fishAudioCredit;
         public event EventHandler? VoicesUpdated;
         public event EventHandler<ValidationResult>? OnApiValidationComplete;
         public event EventHandler<VoiceFailure>? OnVoiceFailed;
@@ -93,6 +94,7 @@ namespace RoleplayingMediaCore {
             InitializationCallbacks += initializationCallbacks;
             Task.Run(() => {
                 RefreshElevenlabsSubscriptionInfo();
+                RefreshFishAudioSubscriptionInfo();
                 GetVoiceListElevenlabs();
                 string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
                 installBatchFile = Path.Combine(cache, "install.bat");
@@ -222,6 +224,7 @@ namespace RoleplayingMediaCore {
         public CharacterVoices CharacterVoices { get => _characterVoices; set => _characterVoices = value; }
         public string ApiKey { get => _apiKey; set => _apiKey = value; }
         public SubscriptionInfo Info { get => _info; set => _info = value; }
+        public string FishAudioCredit { get => _fishAudioCredit; set => _fishAudioCredit = value; }
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
         public string BasePath { get => _basePath; set => _basePath = value; }
@@ -306,6 +309,27 @@ namespace RoleplayingMediaCore {
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
+        }
+        public void RefreshFishAudioSubscriptionInfo() {
+            Task.Run(async delegate {
+                if (!string.IsNullOrEmpty(FishAudioApiKey)) {
+                    try {
+                        using (var client = new HttpClient()) {
+                            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                            var response = await client.GetAsync("https://api.fish.audio/wallet/self/api-credit");
+                            if (response.IsSuccessStatusCode) {
+                                var content = await response.Content.ReadAsStringAsync();
+                                dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(content);
+                                FishAudioCredit = json.credit != null ? json.credit.ToString() : null;
+                            } else {
+                                FishAudioCredit = null;
+                            }
+                        }
+                    } catch {
+                        FishAudioCredit = null;
+                    }
+                }
+            });
         }
         public void RefreshElevenlabsSubscriptionInfo() {
             Task.Run(async delegate {
@@ -436,8 +460,8 @@ namespace RoleplayingMediaCore {
             if (_elevenLabsVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
-                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _elevenLabsVoice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
@@ -503,8 +527,8 @@ namespace RoleplayingMediaCore {
             if (_xttsVoice != null) {
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
-                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
@@ -568,8 +592,8 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 string voice = _microsoftNarratorVoice;
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
-                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
-                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
+                        string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
@@ -623,7 +647,7 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
                     
                     // Fetch voices
-                    var response = await client.GetAsync("https://api.fish.audio/model");
+                    var response = await client.GetAsync("https://api.fish.audio/model?self=true");
                     if (response.IsSuccessStatusCode) {
                         string responseBody = await response.Content.ReadAsStringAsync();
                         dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
@@ -1018,7 +1042,7 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 using (HttpClient client = new HttpClient()) {
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
-                    client.DefaultRequestHeaders.Add("model", "s2-pro");
+                    client.DefaultRequestHeaders.Add("model", "s2.1-pro");
                     
                     var payload = new {
                         text = numberAdjusted,
@@ -1083,8 +1107,8 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 string voice = _fishAudioVoiceType;
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
-                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))
@@ -1128,8 +1152,8 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 string voice = _cttsVoiceType;
                 try {
                     if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
-                        Directory.CreateDirectory(rpVoiceCache + @"\Outgoing");
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
+                        Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
                         if (!File.Exists(stitchedPath)) {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))

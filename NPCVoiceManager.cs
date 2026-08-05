@@ -12,8 +12,8 @@ using System.Net.Http.Headers;
 namespace RoleplayingVoiceCore {
     public class NPCVoiceManager {
         private const string PrimaryRelayAlias = "Primary Relay (CA)";
-        private const string PrimaryRelayServer = "https://ai.hubujubu.com:5697";
-        private const string ArtemisRelayServer = "https://ai.hubujubu.com:5697";
+        private const string PrimaryRelayServer = "https://ai.hubujubu.com:5671";
+        private const string ArtemisRelayServer = "https://ai.hubujubu.com:5671";
         // NPC playback is interactive; waiting the previous six minutes made transient relay issues feel permanent.
         private static readonly TimeSpan VoiceRequestTimeout = TimeSpan.FromSeconds(45);
         private static readonly TimeSpan ClosestRelayFailureCooldown = TimeSpan.FromMinutes(5);
