@@ -1042,7 +1042,7 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 using (HttpClient client = new HttpClient()) {
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
-                    client.DefaultRequestHeaders.Add("model", "s2.1-pro");
+                    client.DefaultRequestHeaders.Add("model", "s2.1-pro-free");
                     
                     var payload = new {
                         text = numberAdjusted,
@@ -1066,8 +1066,43 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                     }
                 }
             } catch (Exception e) {
+                using (HttpClient client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromMinutes(2);
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                    client.DefaultRequestHeaders.Add("model", "s2.1-pro");
+
+                    var payload = new
+                    {
+                        text = numberAdjusted,
+                        reference_id = referenceId,
+                        format = "mp3"
+                    };
+
+                    var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), System.Text.Encoding.UTF8, "application/json");
+                    var response = await client.PostAsync("https://api.fish.audio/v1/tts", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        byte[] data = await response.Content.ReadAsByteArrayAsync();
+                        string directory = Path.Combine(rpVoiceCache, "FishAudio\\" + voiceType + "\\");
+                        Directory.CreateDirectory(directory);
+                        audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
+                        await File.WriteAllBytesAsync(audioPath, data);
+                        CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                    }
+                    else
+                    {
+                        string errorResponse = await response.Content.ReadAsStringAsync();
+                        OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"Fish Audio API Error: {response.StatusCode} - {errorResponse}" });
+                    }
+                }
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Fish Audio exception", Exception = e });
             }
+        }
             return audioPath;
         }
 
