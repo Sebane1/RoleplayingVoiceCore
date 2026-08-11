@@ -262,7 +262,13 @@ namespace RoleplayingMediaCore
         public string FishAudioCredit { get => _fishAudioCredit; set => _fishAudioCredit = value; }
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
-        public string BasePath { get => _basePath; set => _basePath = value; }
+        public string BasePath {
+            get => _basePath;
+            set {
+                _basePath = value;
+                AudioConversionHelper.NativeLibrarySearchPath = value;
+            }
+        }
         public bool ReadUnquotedText { get => _readUnquotedText; set => _readUnquotedText = value; }
         public static bool DebugMode { get => _debugMode; set => _debugMode = value; }
 
@@ -1066,7 +1072,6 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 {
                     while (data == null || data.Length == 0)
                     {
-                        LameDLL.LoadNativeDLL(_basePath);
                         string speakerPath = Path.Combine(rpVoiceCache, "speakers");
                         if (DebugMode)
                         {
@@ -1112,7 +1117,6 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 {
                     while (data == null || data.Length == 0)
                     {
-                        LameDLL.LoadNativeDLL(_basePath);
                         speechSynthesizer.SelectVoice(voiceType);
                         speechSynthesizer.Speak(trimmedText);
                         memoryStream.Position = 0;

@@ -8,10 +8,32 @@ using System.Threading.Tasks;
 
 namespace RoleplayingVoiceCore {
     public static class AudioConversionHelper {
+        private static string? _nativeLibrarySearchPath;
+
+        public static string? NativeLibrarySearchPath {
+            get => _nativeLibrarySearchPath;
+            set => _nativeLibrarySearchPath = value;
+        }
+
+        private static void EnsureLameNativeLibraryLoaded() {
+            var searchPaths = new List<string>();
+            if (!string.IsNullOrEmpty(_nativeLibrarySearchPath)) {
+                searchPaths.Add(_nativeLibrarySearchPath);
+            }
+
+            var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            if (!string.IsNullOrEmpty(baseDirectory)) {
+                searchPaths.Add(baseDirectory);
+            }
+
+            LameDLL.LoadNativeDLL(searchPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+        }
+
         public static int GetSimpleHash(string s) {
             return s.Select(a => (int)a).Sum();
         }
         public static async Task<byte[]> WaveStreamToMp3Bytes(Stream wavStream) {
+            EnsureLameNativeLibraryLoaded();
             wavStream.Position = 0;
             MemoryStream mp3Stream = new MemoryStream();
             using (WaveFileReader waveFileReader = new WaveFileReader(wavStream)) {

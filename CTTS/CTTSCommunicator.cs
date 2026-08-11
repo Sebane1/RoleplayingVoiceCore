@@ -11,7 +11,7 @@ namespace AIDataProxy.CTTS {
         public static async Task<byte[]> GetVoiceData(string text, string speakerWavPath, string language, string serverAddress) {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            while (true && stopwatch.ElapsedMilliseconds < 120000) {
+            //while (true && stopwatch.ElapsedMilliseconds < 120000) {
                 try {
                     using (HttpClient client = new HttpClient()) {
                         client.Timeout = TimeSpan.FromMinutes(2);
@@ -46,7 +46,7 @@ namespace AIDataProxy.CTTS {
                     string error = e.Message;
                     Thread.Sleep(5000);
                 }
-            }
+            //}
             return null;
         }
     }
