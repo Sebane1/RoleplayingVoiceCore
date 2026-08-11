@@ -17,8 +17,10 @@ using System.Speech.Synthesis;
 using RoleplayingVoiceCore;
 using NAudio.Wave;
 
-namespace RoleplayingMediaCore {
-    public class RoleplayingMediaManager {
+namespace RoleplayingMediaCore
+{
+    public class RoleplayingMediaManager
+    {
         private static bool _debugMode;
         private string _apiKey;
         private ElevenLabsClient? _api;
@@ -73,26 +75,34 @@ namespace RoleplayingMediaCore {
         private bool _readUnquotedText;
 
         public event EventHandler<string> InitializationCallbacks;
-        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null) {
+        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null)
+        {
             rpVoiceCache = cache;
             _networkedClient = client;
-            if (string.IsNullOrWhiteSpace(apiKey)) {
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
                 apiValid = false;
-            } else {
+            }
+            else
+            {
                 _apiKey = apiKey;
-                if (!string.IsNullOrEmpty(apiKey)) {
+                if (!string.IsNullOrEmpty(apiKey))
+                {
                     apiValid = true;
                 }
                 // Spin a new thread for this
-                Task.Run(() => {
+                Task.Run(() =>
+                {
                     SetAPI(apiKey);
                 });
-                if (characterVoices != null) {
+                if (characterVoices != null)
+                {
                     _characterVoices = characterVoices;
                 }
             }
             InitializationCallbacks += initializationCallbacks;
-            Task.Run(() => {
+            Task.Run(() =>
+            {
                 RefreshElevenlabsSubscriptionInfo();
                 RefreshFishAudioSubscriptionInfo();
                 GetVoiceListElevenlabs();
@@ -104,7 +114,8 @@ namespace RoleplayingMediaCore {
                 File.WriteAllText(pythonBatchFile, batchScript);
             });
         }
-        public void InstallPython() {
+        public void InstallPython()
+        {
             var processStart = new ProcessStartInfo(pythonBatchFile);
             processStart.RedirectStandardOutput = true;
             processStart.RedirectStandardError = true;
@@ -124,15 +135,22 @@ namespace RoleplayingMediaCore {
             process.WaitForExit();
             _pythonAutoInstalled = true;
         }
-        public void InitializeXTTS() {
-            Task.Run(() => {
-                if (!xttsAlreadyEnabled) {
+        public void InitializeXTTS()
+        {
+            Task.Run(() =>
+            {
+                if (!xttsAlreadyEnabled)
+                {
                     xttsAlreadyEnabled = true;
-                    if (!XTTSCommunicator.SetSpeakers(Path.Combine(rpVoiceCache, "speakers"))) {
-                        if (File.Exists(Path.Combine(rpVoiceCache, "xtts_models\\v2.0.2\\model.pth"))) {
+                    if (!XTTSCommunicator.SetSpeakers(Path.Combine(rpVoiceCache, "speakers")))
+                    {
+                        if (File.Exists(Path.Combine(rpVoiceCache, "xtts_models\\v2.0.2\\model.pth")))
+                        {
                             LaunchXTTS(rpVoiceCache);
                         }
-                    } else {
+                    }
+                    else
+                    {
                         InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
                         _xttsReady = true;
                     }
@@ -140,7 +158,8 @@ namespace RoleplayingMediaCore {
             });
         }
 
-        public void InstallXTTS(string cache) {
+        public void InstallXTTS(string cache)
+        {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Attempting to install C++ build tools please accept the UAC prompt that appears, as this dependency is required for XTTS installation to function. If the UAC prompt was rejected, restart Artemis to try again.");
             var processStart = new ProcessStartInfo(installBatchFile);
             // processStart.RedirectStandardOutput = true;
@@ -160,41 +179,56 @@ namespace RoleplayingMediaCore {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependencies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
         }
 
-        private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e) {
-            try {
-                if (e != null) {
+        private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            try
+            {
+                if (e != null)
+                {
                     XTTSStatus?.Invoke(this, e.Data);
-                    if (!string.IsNullOrEmpty(e.Data)) {
-                        if (e.Data.Contains("Uvicorn running on")) {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        if (e.Data.Contains("Uvicorn running on"))
+                        {
                             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Player voices are ready!");
                             _xttsReady = true;
                         }
-                        if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required.")) {
+                        if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required."))
+                        {
                             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] XTTS installation failed. Missing Microsoft C++ 14.0 or greater. Install that, and re-launch Artemis.");
                             _xttsReady = true;
                         }
                     }
                 }
-            } catch {
+            }
+            catch
+            {
 
             }
         }
 
-        private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e) {
-            try {
-                if (XTTSStatus != null) {
+        private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            try
+            {
+                if (XTTSStatus != null)
+                {
                     XTTSStatus?.Invoke(this, e.Data);
                 }
-                if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required.")) {
+                if (e.Data.Contains("error: Microsoft Visual C++ 14.0 or greater is required."))
+                {
                     InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] XTTS installation failed. Missing Microsoft C++ 14.0 or greater. Install that, and re-launch Artemis.");
                     _xttsReady = true;
                 }
-            } catch {
+            }
+            catch
+            {
 
             }
         }
 
-        public void LaunchXTTS(string cache) {
+        public void LaunchXTTS(string cache)
+        {
             UpdateBatch(cache);
             string folder = @"cd /d" + cache + "\r\n" + _batchLaunch;
             string batchFile = Path.Combine(cache, "launchXTTS.bat");
@@ -217,7 +251,8 @@ namespace RoleplayingMediaCore {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Initializing player voices.");
         }
 
-        public void UpdateBatch(string cache) {
+        public void UpdateBatch(string cache)
+        {
             string batch = $"@echo off\r\n\r\nrem This file is UTF-8 encoded, so we need to update the current code page while executing it\r\nfor /f \"tokens=2 delims=:.\" %%a in ('\"%SystemRoot%\\System32\\chcp.com\"') do (\r\n    set _OLD_CODEPAGE=%%a\r\n)\r\nif defined _OLD_CODEPAGE (\r\n    \"%SystemRoot%\\System32\\chcp.com\" 65001 > nul\r\n)\r\n\r\nset VIRTUAL_ENV={Path.Combine(cache, "venv\\")}\r\n\r\nif not defined PROMPT set PROMPT=$P$G\r\n\r\nif defined _OLD_VIRTUAL_PROMPT set PROMPT=%_OLD_VIRTUAL_PROMPT%\r\nif defined _OLD_VIRTUAL_PYTHONHOME set PYTHONHOME=%_OLD_VIRTUAL_PYTHONHOME%\r\n\r\nset _OLD_VIRTUAL_PROMPT=%PROMPT%\r\nset PROMPT=(venv) %PROMPT%\r\n\r\nif defined PYTHONHOME set _OLD_VIRTUAL_PYTHONHOME=%PYTHONHOME%\r\nset PYTHONHOME=\r\n\r\nif defined _OLD_VIRTUAL_PATH set PATH=%_OLD_VIRTUAL_PATH%\r\nif not defined _OLD_VIRTUAL_PATH set _OLD_VIRTUAL_PATH=%PATH%\r\n\r\nset PATH=%VIRTUAL_ENV%\\Scripts;%PATH%\r\nset VIRTUAL_ENV_PROMPT=(venv) \r\n\r\n:END\r\nif defined _OLD_CODEPAGE (\r\n    \"%SystemRoot%\\System32\\chcp.com\" %_OLD_CODEPAGE% > nul\r\n    set _OLD_CODEPAGE=\r\n)\r\n";
             File.WriteAllText(Path.Combine(cache, "venv\\Scripts\\activate.bat"), batch);
         }
@@ -231,71 +266,95 @@ namespace RoleplayingMediaCore {
         public bool ReadUnquotedText { get => _readUnquotedText; set => _readUnquotedText = value; }
         public static bool DebugMode { get => _debugMode; set => _debugMode = value; }
 
-        public async Task<bool> ApiValidation(string key) {
-            if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c))) {
+        public async Task<bool> ApiValidation(string key)
+        {
+            if (!string.IsNullOrWhiteSpace(key) && key.All(c => char.IsAsciiLetterOrDigit(c)))
+            {
                 var api = new ElevenLabsClient(key);
                 apiValid = true;
-                try {
+                try
+                {
                     await api.UserEndpoint.GetUserInfoAsync();
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     var errorMain = e.Message.ToString();
-                    if (errorMain.Contains("invalid_api_key")) {
+                    if (errorMain.Contains("invalid_api_key"))
+                    {
                         apiValid = false;
                     }
                 }
             }
-            if (string.IsNullOrWhiteSpace(key)) {
+            if (string.IsNullOrWhiteSpace(key))
+            {
                 apiValid = false;
             }
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
-            if (apiValid) {
+            if (apiValid)
+            {
                 return true;
             }
             return false;
         }
 
-        public async Task<string[]> GetVoiceListElevenlabs() {
+        public async Task<string[]> GetVoiceListElevenlabs()
+        {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
-            if (_api != null) {
+            if (_api != null)
+            {
                 int failure = 0;
-                while (failure < 10) {
-                    try {
+                while (failure < 10)
+                {
+                    try
+                    {
                         _elevenlabsVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
                         break;
-                    } catch (Exception e) {
+                    }
+                    catch (Exception e)
+                    {
                         var errorVoiceList = e.Message.ToString();
-                        if (errorVoiceList.Contains("invalid_api_key")) {
+                        if (errorVoiceList.Contains("invalid_api_key"))
+                        {
                             apiValid = false;
                             state.ValidationState = 3;
                             OnApiValidationComplete?.Invoke(this, state);
-                        } else {
+                        }
+                        else
+                        {
                             failure++;
                         }
                     }
                 }
             }
             voicesNames.Add("None");
-            if (_elevenlabsVoices != null) {
-                foreach (var voice in _elevenlabsVoices) {
+            if (_elevenlabsVoices != null)
+            {
+                foreach (var voice in _elevenlabsVoices)
+                {
                     voicesNames.Add(voice.Name);
                 }
             }
             return voicesNames.ToArray();
         }
-        public async Task<string[]> GetVoiceListXTTS() {
+        public async Task<string[]> GetVoiceListXTTS()
+        {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             string path = Path.Combine(rpVoiceCache, "speakers");
             Directory.CreateDirectory(path);
-            if (Directory.Exists(path)) {
+            if (Directory.Exists(path))
+            {
                 _xttsVoices = Directory.GetFiles(path);
                 voicesNames.Add("None");
-                if (_xttsVoices != null) {
-                    foreach (var voice in _xttsVoices) {
-                        if (voice.EndsWith(".wav")) {
+                if (_xttsVoices != null)
+                {
+                    foreach (var voice in _xttsVoices)
+                    {
+                        if (voice.EndsWith(".wav"))
+                        {
                             voicesNames.Add(Path.GetFileNameWithoutExtension(voice));
                         }
                     }
@@ -303,51 +362,72 @@ namespace RoleplayingMediaCore {
             }
             return voicesNames.ToArray();
         }
-        public void SetAPI(string apiKey) {
+        public void SetAPI(string apiKey)
+        {
             _api = new ElevenLabsClient(apiKey);
             apiValid = true;
             ValidationResult validationResult = new ValidationResult();
             validationResult.ValidationSuceeded = apiValid;
             OnApiValidationComplete?.Invoke(this, validationResult);
         }
-        public void RefreshFishAudioSubscriptionInfo() {
-            Task.Run(async delegate {
-                if (!string.IsNullOrEmpty(FishAudioApiKey)) {
-                    try {
-                        using (var client = new HttpClient()) {
+        public void RefreshFishAudioSubscriptionInfo()
+        {
+            Task.Run(async delegate
+            {
+                if (!string.IsNullOrEmpty(FishAudioApiKey))
+                {
+                    try
+                    {
+                        using (var client = new HttpClient())
+                        {
                             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", FishAudioApiKey);
                             var response = await client.GetAsync("https://api.fish.audio/wallet/self/api-credit");
-                            if (response.IsSuccessStatusCode) {
+                            if (response.IsSuccessStatusCode)
+                            {
                                 var content = await response.Content.ReadAsStringAsync();
                                 dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(content);
                                 FishAudioCredit = json.credit != null ? json.credit.ToString() : null;
-                            } else {
+                            }
+                            else
+                            {
                                 FishAudioCredit = null;
                             }
                         }
-                    } catch {
+                    }
+                    catch
+                    {
                         FishAudioCredit = null;
                     }
                 }
             });
         }
-        public void RefreshElevenlabsSubscriptionInfo() {
-            Task.Run(async delegate {
+        public void RefreshElevenlabsSubscriptionInfo()
+        {
+            Task.Run(async delegate
+            {
                 ValidationResult state = new ValidationResult();
                 SubscriptionInfo? value = null;
-                if (_api != null) {
+                if (_api != null)
+                {
                     int failure = 0;
-                    while (failure < 10) {
-                        try {
+                    while (failure < 10)
+                    {
+                        try
+                        {
                             value = await _api.UserEndpoint.GetSubscriptionInfoAsync();
                             break;
-                        } catch (Exception e) {
+                        }
+                        catch (Exception e)
+                        {
                             var errorSubInfo = e.Message.ToString();
-                            if (errorSubInfo.Contains("invalid_api_key")) {
+                            if (errorSubInfo.Contains("invalid_api_key"))
+                            {
                                 apiValid = false;
                                 state.ValidationState = 3;
                                 OnApiValidationComplete?.Invoke(this, state);
-                            } else {
+                            }
+                            else
+                            {
                                 failure++;
                             }
                         }
@@ -358,24 +438,34 @@ namespace RoleplayingMediaCore {
             );
         }
 
-        public async void SetVoiceElevenlabs(string voiceType) {
+        public async void SetVoiceElevenlabs(string voiceType)
+        {
             _voiceTypeElevenlabs = voiceType.ToLower();
             ValidationResult state = new ValidationResult();
-            if (_api != null) {
-                try {
+            if (_api != null)
+            {
+                try
+                {
                     _elevenlabsVoices = await _api.VoicesEndpoint.GetAllVoicesAsync();
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     var errorVoiceGen = e.Message.ToString();
-                    if (errorVoiceGen.Contains("invalid_api_key")) {
+                    if (errorVoiceGen.Contains("invalid_api_key"))
+                    {
                         apiValid = false;
                         state.ValidationState = 3;
                         OnApiValidationComplete?.Invoke(this, state);
                     }
                 }
-                if (_elevenlabsVoices != null) {
-                    foreach (var voice in _elevenlabsVoices) {
-                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs)) {
-                            if (voice != null) {
+                if (_elevenlabsVoices != null)
+                {
+                    foreach (var voice in _elevenlabsVoices)
+                    {
+                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs))
+                        {
+                            if (voice != null)
+                            {
                                 _elevenLabsVoice = voice;
                             }
                             break;
@@ -384,20 +474,29 @@ namespace RoleplayingMediaCore {
                 }
             }
         }
-        public async void SetVoiceXTTS(string voiceType) {
+        public async void SetVoiceXTTS(string voiceType)
+        {
             _voiceTypeXTTS = voiceType.ToLower();
             ValidationResult state = new ValidationResult();
-            if (_api != null) {
-                try {
+            if (_api != null)
+            {
+                try
+                {
                     _xttsVoices = await GetVoiceListXTTS();
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     var errorVoiceGen = e.Message.ToString();
                     OnApiValidationComplete?.Invoke(this, state);
                 }
-                if (_xttsVoices != null) {
-                    foreach (var voice in _xttsVoices) {
-                        if (voice.ToLower().Contains(_voiceTypeXTTS)) {
-                            if (voice != null) {
+                if (_xttsVoices != null)
+                {
+                    foreach (var voice in _xttsVoices)
+                    {
+                        if (voice.ToLower().Contains(_voiceTypeXTTS))
+                        {
+                            if (voice != null)
+                            {
                                 _xttsVoice = voice;
                             }
                             break;
@@ -406,20 +505,29 @@ namespace RoleplayingMediaCore {
                 }
             }
         }
-        public async void SetVoiceMicrosoftNarrator(string voiceType) {
+        public async void SetVoiceMicrosoftNarrator(string voiceType)
+        {
             _microsoftNarratorVoiceType = voiceType.ToLower();
             ValidationResult state = new ValidationResult();
-            if (_api != null) {
-                try {
+            if (_api != null)
+            {
+                try
+                {
                     _microsoftNarratorVoices = await GetVoiceListMicrosoftNarrator();
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     var errorVoiceGen = e.Message.ToString();
                     OnApiValidationComplete?.Invoke(this, state);
                 }
-                if (_microsoftNarratorVoices != null) {
-                    foreach (var voice in _microsoftNarratorVoices) {
-                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType)) {
-                            if (voice != null) {
+                if (_microsoftNarratorVoices != null)
+                {
+                    foreach (var voice in _microsoftNarratorVoices)
+                    {
+                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType))
+                        {
+                            if (voice != null)
+                            {
                                 _microsoftNarratorVoice = voice;
                             }
                             break;
@@ -428,27 +536,36 @@ namespace RoleplayingMediaCore {
                 }
             }
         }
-        
-        public void SetVoiceFishAudio(string voiceType) {
+
+        public void SetVoiceFishAudio(string voiceType)
+        {
             _fishAudioVoiceType = voiceType;
         }
 
-        public void SetVoiceCTTS(string voiceType) {
+        public void SetVoiceCTTS(string voiceType)
+        {
             _cttsVoiceType = voiceType;
         }
 
         public async Task<string> DoVoiceElevenlabs(string sender, string text,
-            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+            bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync)
+        {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_elevenLabsVoice == null) {
-                if (_elevenlabsVoices == null) {
+            if (_elevenLabsVoice == null)
+            {
+                if (_elevenlabsVoices == null)
+                {
                     await GetVoiceListElevenlabs();
                 }
-                if (_elevenlabsVoices != null) {
-                    foreach (var voice in _elevenlabsVoices) {
-                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs)) {
-                            if (voice != null) {
+                if (_elevenlabsVoices != null)
+                {
+                    foreach (var voice in _elevenlabsVoices)
+                    {
+                        if (voice.Name.ToLower().Contains(_voiceTypeElevenlabs))
+                        {
+                            if (voice != null)
+                            {
                                 _elevenLabsVoice = voice;
                             }
                             break;
@@ -457,65 +574,91 @@ namespace RoleplayingMediaCore {
                 }
             }
 
-            if (_elevenLabsVoice != null) {
-                try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+            if (_elevenLabsVoice != null)
+            {
+                try
+                {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“"))))
+                    {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _elevenLabsVoice + "-" + hash + ".mp3");
                         Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
-                        if (!File.Exists(stitchedPath)) {
+                        if (!File.Exists(stitchedPath))
+                        {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (var audioClip in audioClips) {
-                                if (audioClip.Item2) {
+                            foreach (var audioClip in audioClips)
+                            {
+                                if (audioClip.Item2)
+                                {
                                     audioPaths.Add(await GetVoicePathElevenlabs(_elevenLabsVoice.Name, audioClip.Item1, _elevenLabsVoice));
-                                } else if (_readUnquotedText) {
+                                }
+                                else if (_readUnquotedText)
+                                {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
-                            try {
-                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                            try
+                            {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath))
+                                {
                                     playbackStream.Position = 0;
                                     playbackStream.CopyTo(stitchedStream);
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e) {
+                            }
+                            catch (Exception e)
+                            {
                                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
-                        if (useSync) {
+                        if (useSync)
+                        {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                         VoicesUpdated?.Invoke(this, EventArgs.Empty);
-                    } else {
+                    }
+                    else
+                    {
                         return "";
                     }
 
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Elevenlabs TTS failed", Exception = e });
                 }
-            } else {
+            }
+            else
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"DoVoiceElevenlabs: _elevenLabsVoice was null. Current _voiceTypeElevenlabs: {_voiceTypeElevenlabs}" });
             }
             return clipPath;
         }
 
         public async Task<string> DoVoiceXTTS(string sender, string text,
-    bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en") {
+    bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en")
+        {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_xttsVoice == null) {
-                if (_xttsVoices == null) {
+            if (_xttsVoice == null)
+            {
+                if (_xttsVoices == null)
+                {
                     await GetVoiceListXTTS();
                 }
-                if (_xttsVoices != null) {
-                    foreach (var voice in _xttsVoices) {
-                        if (voice.ToLower().Contains(_voiceTypeXTTS)) {
-                            if (voice != null) {
+                if (_xttsVoices != null)
+                {
+                    foreach (var voice in _xttsVoices)
+                    {
+                        if (voice.ToLower().Contains(_voiceTypeXTTS))
+                        {
+                            if (voice != null)
+                            {
                                 _xttsVoice = voice;
                             }
                             break;
@@ -524,62 +667,86 @@ namespace RoleplayingMediaCore {
                 }
             }
 
-            if (_xttsVoice != null) {
-                try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+            if (_xttsVoice != null)
+            {
+                try
+                {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“"))))
+                    {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", _xttsVoice + "-" + hash + ".mp3");
                         Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
-                        if (!File.Exists(stitchedPath)) {
+                        if (!File.Exists(stitchedPath))
+                        {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (var audioClip in audioClips) {
-                                if (audioClip.Item2) {
+                            foreach (var audioClip in audioClips)
+                            {
+                                if (audioClip.Item2)
+                                {
                                     audioPaths.Add(await GetVoicePathXTTS(_xttsVoice, audioClip.Item1, language));
-                                } else if (_readUnquotedText) {
+                                }
+                                else if (_readUnquotedText)
+                                {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
-                            try {
-                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                            try
+                            {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath))
+                                {
                                     playbackStream.Position = 0;
                                     playbackStream.CopyTo(stitchedStream);
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e) {
+                            }
+                            catch (Exception e)
+                            {
                                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
-                        if (useSync) {
+                        if (useSync)
+                        {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                         VoicesUpdated?.Invoke(this, EventArgs.Empty);
-                    } else {
+                    }
+                    else
+                    {
                         return "";
                     }
 
-                } catch {
+                }
+                catch
+                {
 
                 }
             }
             return clipPath;
         }
         public async Task<string> DoVoiceMicrosoftNarrator(string sender, string text,
-bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync)
+        {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_microsoftNarratorVoice == null) {
-                if (_microsoftNarratorVoices == null) {
+            if (_microsoftNarratorVoice == null)
+            {
+                if (_microsoftNarratorVoices == null)
+                {
                     await GetVoiceListMicrosoftNarrator();
                 }
-                if (_microsoftNarratorVoices != null) {
-                    foreach (var voice in _microsoftNarratorVoices) {
-                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType)) {
-                            if (voice != null) {
+                if (_microsoftNarratorVoices != null)
+                {
+                    foreach (var voice in _microsoftNarratorVoices)
+                    {
+                        if (voice.ToLower().Contains(_microsoftNarratorVoiceType))
+                        {
+                            if (voice != null)
+                            {
                                 _microsoftNarratorVoice = voice;
                             }
                             break;
@@ -588,72 +755,96 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 }
             }
 
-            if (_microsoftNarratorVoice != null) {
+            if (_microsoftNarratorVoice != null)
+            {
                 string voice = _microsoftNarratorVoice;
-                try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“")))) {
+                try
+                {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"“"))))
+                    {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
                         Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
-                        if (!File.Exists(stitchedPath)) {
+                        if (!File.Exists(stitchedPath))
+                        {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"“"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (var audioClip in audioClips) {
-                                if (audioClip.Item2) {
+                            foreach (var audioClip in audioClips)
+                            {
+                                if (audioClip.Item2)
+                                {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator(voice, audioClip.Item1));
-                                } else if (_readUnquotedText) {
+                                }
+                                else if (_readUnquotedText)
+                                {
                                     audioPaths.Add(await GetVoicePathMicrosoftNarrator("Microsoft David Desktop", audioClip.Item1));
                                 }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
-                            try {
-                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                            try
+                            {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath))
+                                {
                                     playbackStream.Position = 0;
                                     playbackStream.CopyTo(stitchedStream);
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e) {
+                            }
+                            catch (Exception e)
+                            {
                                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
-                        if (useSync) {
+                        if (useSync)
+                        {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                         VoicesUpdated?.Invoke(this, EventArgs.Empty);
-                    } else {
+                    }
+                    else
+                    {
                         return "";
                     }
 
-                } catch {
+                }
+                catch
+                {
 
                 }
             }
             return clipPath;
         }
 
-        public async Task<string[]> GetVoiceListFishAudio() {
+        public async Task<string[]> GetVoiceListFishAudio()
+        {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             voicesNames.Add("None");
-            if (string.IsNullOrEmpty(FishAudioApiKey)) {
+            if (string.IsNullOrEmpty(FishAudioApiKey))
+            {
                 return voicesNames.ToArray();
             }
-            try {
-                using (HttpClient client = new HttpClient()) {
+            try
+            {
+                using (HttpClient client = new HttpClient())
+                {
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
-                    
+
                     // Fetch voices
                     var response = await client.GetAsync("https://api.fish.audio/model?self=true");
-                    if (response.IsSuccessStatusCode) {
+                    if (response.IsSuccessStatusCode)
+                    {
                         string responseBody = await response.Content.ReadAsStringAsync();
                         dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
-                        if (json != null && json.items != null) {
+                        if (json != null && json.items != null)
+                        {
                             _fishAudioVoiceMap.Clear();
-                            foreach (var item in json.items) {
+                            foreach (var item in json.items)
+                            {
                                 string title = item.title;
                                 string id = item._id; // Fish Audio usually uses _id for models in their v1 REST API
                                 voicesNames.Add(title);
@@ -662,7 +853,9 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                         }
                     }
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 var errorVoiceGen = e.Message.ToString();
                 OnApiValidationComplete?.Invoke(this, state);
             }
@@ -670,183 +863,243 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
             return _fishAudioVoices;
         }
 
-        public async Task<string[]> GetVoiceListMicrosoftNarrator() {
+        public async Task<string[]> GetVoiceListMicrosoftNarrator()
+        {
             ValidationResult state = new ValidationResult();
             List<string> voicesNames = new List<string>();
             var items = new SpeechSynthesizer().GetInstalledVoices();
             List<string> narratorVoices = new List<string>();
-            foreach (var item in items) {
+            foreach (var item in items)
+            {
                 narratorVoices.Add(item.VoiceInfo.Name);
             }
             _microsoftNarratorVoices = narratorVoices.ToArray();
             voicesNames.Add("None");
-            if (_microsoftNarratorVoices != null) {
-                foreach (var voice in _microsoftNarratorVoices) {
+            if (_microsoftNarratorVoices != null)
+            {
+                foreach (var voice in _microsoftNarratorVoices)
+                {
                     voicesNames.Add(voice);
                 }
             }
             return voicesNames.ToArray();
         }
-        public async Task<Tuple<string[], string[]>> GetGenderSortedVoiceListsMicrosoftNarrator() {
+        public async Task<Tuple<string[], string[]>> GetGenderSortedVoiceListsMicrosoftNarrator()
+        {
             ValidationResult state = new ValidationResult();
             List<string> voicesNamesMale = new List<string>();
             List<string> voicesNamesFemale = new List<string>();
             var items = new SpeechSynthesizer().GetInstalledVoices();
-            foreach (var item in items) {
-                if (item.VoiceInfo.Gender == VoiceGender.Male) {
+            foreach (var item in items)
+            {
+                if (item.VoiceInfo.Gender == VoiceGender.Male)
+                {
                     voicesNamesMale.Add(item.VoiceInfo.Name);
-                } else {
+                }
+                else
+                {
                     voicesNamesFemale.Add(item.VoiceInfo.Name);
                 }
             }
             return new Tuple<string[], string[]>(voicesNamesMale.ToArray(), voicesNamesFemale.ToArray());
         }
 
-        public async Task<bool> SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position) {
+        public async Task<bool> SendSound(string sender, string identifier, string soundOnDisk, float volume, Vector3 position)
+        {
             string hash = Shai1Hash(sender + identifier);
             bool sendState = false;
             await Task.Run(async () => { sendState = await _networkedClient.SendFile(hash, soundOnDisk); });
             return sendState;
         }
 
-        public async Task<bool> SendZip(string sender, string soundOnDisk) {
+        public async Task<bool> SendZip(string sender, string soundOnDisk)
+        {
             string hash = Shai1Hash(sender);
             bool sendState = false;
             await Task.Run(async () => { sendState = await _networkedClient.SendZip(hash, soundOnDisk); });
             return sendState;
         }
 
-        public async Task<bool> SendShort(string sender, ushort shortvalue) {
+        public async Task<bool> SendShort(string sender, ushort shortvalue)
+        {
             string hash = Shai1Hash(sender);
             bool sendState = false;
             await Task.Run(async () => { sendState = await _networkedClient.SendShort(hash, shortvalue); });
             return sendState;
         }
-        public async Task<ushort> GetShort(string sender) {
-            if (_networkedClient != null) {
+        public async Task<ushort> GetShort(string sender)
+        {
+            if (_networkedClient != null)
+            {
                 string hash = Shai1Hash(sender);
                 return await _networkedClient.GetShort(hash);
             }
             return 0;
         }
 
-        private async Task<string> GetVoicePathElevenlabs(string voiceType, string trimmedText, Voice characterVoice) {
+        private async Task<string> GetVoicePathElevenlabs(string voiceType, string trimmedText, Voice characterVoice)
+        {
             string audioPath = "";
             var defaultVoiceSettings = new VoiceSettings(0.3f, 1);
-            try {
-                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+            try
+            {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType))
+                {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
-                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower()))
+                {
                     audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
-                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                }
+                else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()]))
+                {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                } else {
+                }
+                else
+                {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromElevenLabs(trimmedText, voiceType, defaultVoiceSettings, characterVoice);
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
-        private async Task<string> GetVoicePathXTTS(string voiceType, string trimmedText, string language) {
+        private async Task<string> GetVoicePathXTTS(string voiceType, string trimmedText, string language)
+        {
             string audioPath = "";
-            try {
-                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+            try
+            {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType))
+                {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
-                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower()))
+                {
                     audioPath = await GetVoiceFromXTTS(trimmedText, voiceType, language);
-                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                }
+                else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()]))
+                {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                } else {
+                }
+                else
+                {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromXTTS(trimmedText, voiceType, language);
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
 
-        private async Task<string> GetVoicePathMicrosoftNarrator(string voiceType, string trimmedText) {
+        private async Task<string> GetVoicePathMicrosoftNarrator(string voiceType, string trimmedText)
+        {
             string audioPath = "";
-            try {
-                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+            try
+            {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType))
+                {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
-                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower()))
+                {
                     audioPath = await GetVoiceFromMicrosoftNarrator(trimmedText, voiceType);
-                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                }
+                else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()]))
+                {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                } else {
+                }
+                else
+                {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromMicrosoftNarrator(trimmedText, voiceType);
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
 
         private async Task<string> GetVoiceFromElevenLabs(string trimmedText, string voiceType,
-            VoiceSettings defaultVoiceSettings, Voice characterVoice) {
+            VoiceSettings defaultVoiceSettings, Voice characterVoice)
+        {
             string audioPath = "";
-            try {
+            try
+            {
                 string unquotedText = trimmedText.Replace(@"""", null);
                 string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
                 string finalText = @"""" + numberAdjusted + @"""";
                 bool foundInHistory = false;
-                if (!foundInHistory) {
+                if (!foundInHistory)
+                {
                     audioPath = await _api.TextToSpeechEndpoint
                         .TextToSpeechAsync(finalText, characterVoice,
                         defaultVoiceSettings, new Model("eleven_flash_v2_5"), rpVoiceCache);
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
-            } catch {
+            }
+            catch
+            {
 
             }
             return audioPath;
         }
 
-        private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType, string language) {
+        private async Task<string> GetVoiceFromXTTS(string trimmedText, string voiceType, string language)
+        {
             string audioPath = "";
-            try {
+            try
+            {
                 string unquotedText = trimmedText.Replace(@"""", null);
                 string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
                 string finalText = @"""" + numberAdjusted + @"""";
                 bool foundInHistory = false;
                 byte[] data = null;
-                if (!foundInHistory) {
-                    while (data == null || data.Length == 0) {
+                if (!foundInHistory)
+                {
+                    while (data == null || data.Length == 0)
+                    {
                         LameDLL.LoadNativeDLL(_basePath);
                         string speakerPath = Path.Combine(rpVoiceCache, "speakers");
-                        if (DebugMode) {
+                        if (DebugMode)
+                        {
                             XTTSStatus?.Invoke(this, "Speaker path is " + speakerPath);
                         }
                         data = await XTTSCommunicator.GetVoiceData(voiceType, finalText, speakerPath, language);
                         string directory = Path.Combine(rpVoiceCache, "XTTS\\" + voiceType + "\\");
                         Directory.CreateDirectory(directory);
-                        if (DebugMode) {
+                        if (DebugMode)
+                        {
                             XTTSStatus?.Invoke(this, "Output directory is " + directory);
                         }
                         audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
-                        if (DebugMode) {
+                        if (DebugMode)
+                        {
                             XTTSStatus?.Invoke(this, "Audio file output directory is" + audioPath);
                         }
                         await File.WriteAllBytesAsync(audioPath, data);
                     }
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
-            } catch {
+            }
+            catch
+            {
 
             }
             return audioPath;
         }
-        private async Task<string> GetVoiceFromMicrosoftNarrator(string trimmedText, string voiceType) {
+        private async Task<string> GetVoiceFromMicrosoftNarrator(string trimmedText, string voiceType)
+        {
             string audioPath = "";
-            try {
+            try
+            {
                 string unquotedText = trimmedText.Replace(@"""", null);
                 string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
                 string finalText = @"""" + numberAdjusted + @"""";
@@ -855,8 +1108,10 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 MemoryStream memoryStream = new MemoryStream();
                 speechSynthesizer.SetOutputToWaveStream(memoryStream);
                 byte[] data = null;
-                if (!foundInHistory) {
-                    while (data == null || data.Length == 0) {
+                if (!foundInHistory)
+                {
+                    while (data == null || data.Length == 0)
+                    {
                         LameDLL.LoadNativeDLL(_basePath);
                         speechSynthesizer.SelectVoice(voiceType);
                         speechSynthesizer.Speak(trimmedText);
@@ -869,13 +1124,16 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                     }
                 }
                 CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
-            } catch {
+            }
+            catch
+            {
 
             }
             return audioPath;
         }
 
-        private string TrimText(string text) {
+        private string TrimText(string text)
+        {
             string newText = text;
             var wordReplacements = new Dictionary<string, string>
             {
@@ -893,27 +1151,35 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 {"<3", "love" },
                 {"omg", "oh my gosh" }
             };
-            foreach (var word in wordReplacements) {
+            foreach (var word in wordReplacements)
+            {
                 newText = Regex.Replace(newText, $@"(?<=^|\s){word.Key}(?=\s|$)", word.Value, RegexOptions.IgnoreCase);
             }
-            foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray()) {
+            foreach (char character in @"@#$%^&*()_+{}\/<>|`~".ToCharArray())
+            {
                 newText = newText.Replace(character + "", null);
             }
             return newText;
         }
 
-        public MemoryStream ConcatenateAudio(params string[] mp3filenames) {
+        public MemoryStream ConcatenateAudio(params string[] mp3filenames)
+        {
             MemoryStream output = new MemoryStream();
-            foreach (string file in mp3filenames) {
-                if (File.Exists(file)) {
-                    using (Mp3FileReader reader = new Mp3FileReader(file)) {
-                        if ((output.Position == 0) && (reader.Id3v2Tag != null)) {
+            foreach (string file in mp3filenames)
+            {
+                if (File.Exists(file))
+                {
+                    using (Mp3FileReader reader = new Mp3FileReader(file))
+                    {
+                        if ((output.Position == 0) && (reader.Id3v2Tag != null))
+                        {
                             output.Write(reader.Id3v2Tag.RawData,
                                          0,
                                          reader.Id3v2Tag.RawData.Length);
                         }
                         Mp3Frame frame = null;
-                        while ((frame = reader.ReadNextFrame()) != null) {
+                        while ((frame = reader.ReadNextFrame()) != null)
+                        {
                             output.Write(frame.RawData, 0, frame.RawData.Length);
                         }
                     }
@@ -922,155 +1188,165 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
             return output;
         }
 
-        private string ExtractQuotations(string text) {
+        private string ExtractQuotations(string text)
+        {
             string newText = "";
             string[] strings = null;
-            if (text.Contains(@"""")) {
+            if (text.Contains(@""""))
+            {
                 strings = text.Split('"');
-            } else {
+            }
+            else
+            {
                 strings = text.Split('“');
             }
-            if (strings.Length > 1) {
-                for (int i = 0; i < strings.Length; i++) {
-                    if ((i + 1) % 2 == 0) {
+            if (strings.Length > 1)
+            {
+                for (int i = 0; i < strings.Length; i++)
+                {
+                    if ((i + 1) % 2 == 0)
+                    {
                         newText += strings[i] + (strings.Length % 2 == 0 ? " -- " : "");
                     }
                 }
                 return newText;
-            } else {
+            }
+            else
+            {
                 return text;
             }
         }
 
-        private Tuple<string, bool>[] ExtractQuotationsToList(string text, bool aggressiveSplicing) {
+        private Tuple<string, bool>[] ExtractQuotationsToList(string text, bool aggressiveSplicing)
+        {
             string newText = "";
             string[] strings = null;
             List<Tuple<string, bool>> quotes = new List<Tuple<string, bool>>();
-            if (text.Contains(@"""")) {
+            if (text.Contains(@""""))
+            {
                 strings = text.Split('"');
-            } else {
+            }
+            else
+            {
                 strings = text.Split('“');
             }
-            if (strings.Length > 1) {
-                for (int i = 0; i < strings.Length; i++) {
+            if (strings.Length > 1)
+            {
+                for (int i = 0; i < strings.Length; i++)
+                {
                     bool isQuoted = (i + 1) % 2 == 0;
-                    if (aggressiveSplicing) {
-                        foreach (var item in AggressiveWordSplicing(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "))) {
+                    if (aggressiveSplicing)
+                    {
+                        foreach (var item in AggressiveWordSplicing(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - ")))
+                        {
                             quotes.Add(new Tuple<string, bool>(item.Item1, isQuoted));
                         }
-                    } else {
+                    }
+                    else
+                    {
                         quotes.Add(new Tuple<string, bool>(strings[i].Replace("\"", null).Replace("“", null).Replace(",", " - "), isQuoted));
                     }
                 }
-            } else {
+            }
+            else
+            {
                 quotes.Add(new Tuple<string, bool>(text, true));
             }
             return quotes.ToArray();
         }
 
-        private Tuple<string, bool>[] AggressiveWordSplicing(string text) {
+        private Tuple<string, bool>[] AggressiveWordSplicing(string text)
+        {
             string[] strings = null;
             List<Tuple<string, bool>> quotes = new List<Tuple<string, bool>>();
             strings = text.Split(' ');
             string temp = "";
-            for (int i = 0; i < strings.Length; i++) {
+            for (int i = 0; i < strings.Length; i++)
+            {
                 temp += strings[i] + " ";
                 if (strings[i].Contains(",") || (strings[i].Contains(".") && !strings[i].Contains("..."))
                     || strings[i].Contains("!") || strings[i].Contains("?") || strings[i].Contains(";")
-                    || strings[i].Contains(":") || strings[i].Contains("·")) {
+                    || strings[i].Contains(":") || strings[i].Contains("·"))
+                {
                     quotes.Add(new Tuple<string, bool>(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim(), true));
                     temp = "";
                 }
             }
-            if (!string.IsNullOrEmpty(temp)) {
+            if (!string.IsNullOrEmpty(temp))
+            {
                 quotes.Add(new Tuple<string, bool>(temp.Replace("\"", null).Replace("“", null).Replace(",", "").Trim(), true));
             }
             return quotes.ToArray();
         }
 
-        public static string CreateMD5(string input) {
+        public static string CreateMD5(string input)
+        {
             // Use input string to calculate MD5 hash
-            using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create()) {
+            using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
+            {
                 byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
                 byte[] hashBytes = md5.ComputeHash(inputBytes);
                 return Convert.ToHexString(hashBytes); // .NET 5 +
             }
         }
-        public static string Shai1Hash(string input) {
+        public static string Shai1Hash(string input)
+        {
             using var sha1 = SHA1.Create();
             return Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(input)));
         }
 
         public async Task<string> GetSound(string sender, string identifier, float volume,
-            Vector3 centerPosition, bool isShoutYell, string? subDirectory = null, bool ignoreCache = false) {
+            Vector3 centerPosition, bool isShoutYell, string? subDirectory = null, bool ignoreCache = false)
+        {
             string path = "";
-            if (_networkedClient != null) {
+            if (_networkedClient != null)
+            {
                 KeyValuePair<Vector3, string> data = new KeyValuePair<Vector3, string>();
                 Guid id = Guid.NewGuid();
                 string hash = Shai1Hash(sender + identifier);
                 string localPath = Path.Combine(rpVoiceCache + subDirectory, (!ignoreCache ? hash : id) + ".mp3");
-                if (!File.Exists(localPath) || ignoreCache) {
+                if (!File.Exists(localPath) || ignoreCache)
+                {
                     data = await _networkedClient.GetFile(hash, rpVoiceCache + subDirectory, id.ToString());
                     path = data.Value;
-                } else {
+                }
+                else
+                {
                     path = localPath;
                 }
             }
             return path;
         }
-        public async Task<string> GetZip(string sender, string path) {
-            if (_networkedClient != null) {
+        public async Task<string> GetZip(string sender, string path)
+        {
+            if (_networkedClient != null)
+            {
                 string hash = Shai1Hash(sender);
                 return await _networkedClient.GetZip(hash, path);
             }
             return "";
         }
 
-        private async Task<string> GetVoiceFromFishAudio(string trimmedText, string voiceType) {
+        private async Task<string> GetVoiceFromFishAudio(string trimmedText, string voiceType)
+        {
             string audioPath = "";
-            try {
-                if (string.IsNullOrEmpty(FishAudioApiKey)) return "";
-                string unquotedText = trimmedText.Replace(@"""", null);
-                string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
-                
-                // Retrieve the actual ID from the map if it exists
-                string referenceId = voiceType;
-                if (_fishAudioVoiceMap.ContainsKey(voiceType)) {
+            string unquotedText = trimmedText.Replace(@"""", null);
+            string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
+            if (string.IsNullOrEmpty(FishAudioApiKey)) return "";
+            // Retrieve the actual ID from the map if it exists
+            string referenceId = voiceType;
+            try
+            {
+                if (_fishAudioVoiceMap.ContainsKey(voiceType))
+                {
                     referenceId = _fishAudioVoiceMap[voiceType];
                 }
 
-                using (HttpClient client = new HttpClient()) {
-                    client.Timeout = TimeSpan.FromMinutes(2);
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
-                    client.DefaultRequestHeaders.Add("model", "s2.1-pro-free");
-                    
-                    var payload = new {
-                        text = numberAdjusted,
-                        reference_id = referenceId,
-                        format = "mp3"
-                    };
-                    
-                    var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), System.Text.Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("https://api.fish.audio/v1/tts", content);
-                    
-                    if (response.IsSuccessStatusCode) {
-                        byte[] data = await response.Content.ReadAsByteArrayAsync();
-                        string directory = Path.Combine(rpVoiceCache, "FishAudio\\" + voiceType + "\\");
-                        Directory.CreateDirectory(directory);
-                        audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
-                        await File.WriteAllBytesAsync(audioPath, data);
-                        CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
-                    } else {
-                        string errorResponse = await response.Content.ReadAsStringAsync();
-                        OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"Fish Audio API Error: {response.StatusCode} - {errorResponse}" });
-                    }
-                }
-            } catch (Exception e) {
                 using (HttpClient client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
-                    client.DefaultRequestHeaders.Add("model", "s2.1-pro");
+                    client.DefaultRequestHeaders.Add("model", "s2.1-pro-free");
 
                     var payload = new
                     {
@@ -1100,183 +1376,278 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
             }
             catch (Exception e)
             {
-                OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Fish Audio exception", Exception = e });
+                try
+                {
+                    using (HttpClient client = new HttpClient())
+                    {
+                        client.Timeout = TimeSpan.FromMinutes(2);
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                        client.DefaultRequestHeaders.Add("model", "s2.1-pro");
+
+                        var payload = new
+                        {
+                            text = numberAdjusted,
+                            reference_id = referenceId,
+                            format = "mp3"
+                        };
+
+                        var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), System.Text.Encoding.UTF8, "application/json");
+                        var response = await client.PostAsync("https://api.fish.audio/v1/tts", content);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            byte[] data = await response.Content.ReadAsByteArrayAsync();
+                            string directory = Path.Combine(rpVoiceCache, "FishAudio\\" + voiceType + "\\");
+                            Directory.CreateDirectory(directory);
+                            audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
+                            await File.WriteAllBytesAsync(audioPath, data);
+                            CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
+                        }
+                        else
+                        {
+                            string errorResponse = await response.Content.ReadAsStringAsync();
+                            OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = $"Fish Audio API Error: {response.StatusCode} - {errorResponse}" });
+                        }
+                    }
+                }
+                catch (Exception e2)
+                {
+                    OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Fish Audio exception", Exception = e2 });
+                }
             }
-        }
             return audioPath;
         }
 
-        private async Task<string> GetVoiceFromCTTS(string trimmedText, string voiceType, string language) {
+        private async Task<string> GetVoiceFromCTTS(string trimmedText, string voiceType, string language)
+        {
             string audioPath = "";
-            try {
+            try
+            {
                 string unquotedText = trimmedText.Replace(@"""", null);
                 string numberAdjusted = char.IsDigit(unquotedText.Last()) ? unquotedText + "." : unquotedText;
-                
+
                 string speakerPath = "";
-                if (voiceType.Contains(".wav")) {
+                if (voiceType.Contains(".wav"))
+                {
                     speakerPath = voiceType;
-                } else {
+                }
+                else
+                {
                     speakerPath = Path.Combine(rpVoiceCache, "speakers\\" + voiceType + ".wav");
                 }
                 if (!File.Exists(speakerPath)) return "";
-                
+
                 string cttsAddr = string.IsNullOrEmpty(CTTSAddress) ? "http://localhost:8308" : CTTSAddress;
-                
+
                 byte[] data = await AIDataProxy.CTTS.CTTSCommunicator.GetVoiceData(numberAdjusted, speakerPath, language, cttsAddr);
-                if (data != null && data.Length > 0) {
+                if (data != null && data.Length > 0)
+                {
                     string directory = Path.Combine(rpVoiceCache, "CTTS\\" + voiceType + "\\");
                     Directory.CreateDirectory(directory);
                     audioPath = Path.Combine(directory, Guid.NewGuid() + ".mp3");
                     await File.WriteAllBytesAsync(audioPath, data);
                     CharacterVoices.VoiceCatalogue[(voiceType)].Add(trimmedText.ToLower(), audioPath);
                 }
-            } catch { }
+            }
+            catch { }
             return audioPath;
         }
 
         public async Task<string> DoVoiceFishAudio(string sender, string text,
-bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync) {
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync)
+        {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_fishAudioVoiceType != null) {
+            if (_fishAudioVoiceType != null)
+            {
                 string voice = _fishAudioVoiceType;
-                try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
+                try
+                {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o"))))
+                    {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
                         Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
-                        if (!File.Exists(stitchedPath)) {
+                        if (!File.Exists(stitchedPath))
+                        {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (var audioClip in audioClips) {
-                                if (audioClip.Item2) {
+                            foreach (var audioClip in audioClips)
+                            {
+                                if (audioClip.Item2)
+                                {
                                     audioPaths.Add(await GetVoicePathFishAudio(voice, audioClip.Item1));
-                                } else if (_readUnquotedText) {
+                                }
+                                else if (_readUnquotedText)
+                                {
                                     audioPaths.Add(await GetVoicePathFishAudio(voice, audioClip.Item1));
                                 }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
-                            try {
-                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                            try
+                            {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath))
+                                {
                                     playbackStream.Position = 0;
                                     playbackStream.CopyTo(stitchedStream);
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e) {
+                            }
+                            catch (Exception e)
+                            {
                                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
-                        if (useSync) {
+                        if (useSync)
+                        {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                         VoicesUpdated?.Invoke(this, EventArgs.Empty);
                     }
-                } catch { }
+                }
+                catch { }
             }
             return clipPath;
         }
 
         public async Task<string> DoVoiceCTTS(string sender, string text,
-bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en") {
+bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync, string language = "en")
+        {
             string clipPath = "";
             string hash = Shai1Hash(sender + text);
-            if (_cttsVoiceType != null) {
+            if (_cttsVoiceType != null)
+            {
                 string voice = _cttsVoiceType;
-                try {
-                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o")))) {
+                try
+                {
+                    if (!text.StartsWith("(") && !text.EndsWith(")") && !(isEmote && (!text.Contains(@"""") || text.Contains(@"?o"))))
+                    {
                         string stitchedPath = Path.Combine(rpVoiceCache + @"\Outgoing", voice + "-" + hash + ".mp3");
                         Directory.CreateDirectory(Path.GetDirectoryName(stitchedPath));
-                        if (!File.Exists(stitchedPath)) {
+                        if (!File.Exists(stitchedPath))
+                        {
                             string trimmedText = TrimText(text);
                             Tuple<string, bool>[] audioClips = (trimmedText.Contains(@"""") || trimmedText.Contains(@"?o"))
                                 ? ExtractQuotationsToList(trimmedText, aggressiveSplicing) : (aggressiveSplicing ? AggressiveWordSplicing(trimmedText) : new Tuple<string, bool>[] { new Tuple<string, bool>(trimmedText, true) });
                             List<string> audioPaths = new List<string>();
-                            foreach (var audioClip in audioClips) {
-                                if (audioClip.Item2) {
+                            foreach (var audioClip in audioClips)
+                            {
+                                if (audioClip.Item2)
+                                {
                                     audioPaths.Add(await GetVoicePathCTTS(voice, audioClip.Item1, language));
-                                } else if (_readUnquotedText) {
+                                }
+                                else if (_readUnquotedText)
+                                {
                                     audioPaths.Add(await GetVoicePathCTTS(voice, audioClip.Item1, language));
                                 }
                             }
                             MemoryStream playbackStream = ConcatenateAudio(audioPaths.ToArray());
-                            try {
-                                using (Stream stitchedStream = File.OpenWrite(stitchedPath)) {
+                            try
+                            {
+                                using (Stream stitchedStream = File.OpenWrite(stitchedPath))
+                                {
                                     playbackStream.Position = 0;
                                     playbackStream.CopyTo(stitchedStream);
                                     stitchedStream.Flush();
                                     stitchedStream.Close();
                                 }
-                            } catch (Exception e) {
+                            }
+                            catch (Exception e)
+                            {
                                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
                             }
                         }
-                        if (useSync) {
+                        if (useSync)
+                        {
                             Task.Run(() => _networkedClient.SendFile(hash, stitchedPath));
                         }
                         clipPath = stitchedPath;
                         VoicesUpdated?.Invoke(this, EventArgs.Empty);
                     }
-                } catch { }
+                }
+                catch { }
             }
             return clipPath;
         }
 
-        private async Task<string> GetVoicePathFishAudio(string voiceType, string trimmedText) {
+        private async Task<string> GetVoicePathFishAudio(string voiceType, string trimmedText)
+        {
             string audioPath = "";
-            try {
-                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+            try
+            {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType))
+                {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
-                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower()))
+                {
                     audioPath = await GetVoiceFromFishAudio(trimmedText, voiceType);
-                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                }
+                else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()]))
+                {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                } else {
+                }
+                else
+                {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromFishAudio(trimmedText, voiceType);
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
 
-        private async Task<string> GetVoicePathCTTS(string voiceType, string trimmedText, string language) {
+        private async Task<string> GetVoicePathCTTS(string voiceType, string trimmedText, string language)
+        {
             string audioPath = "";
-            try {
-                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType)) {
+            try
+            {
+                if (!CharacterVoices.VoiceCatalogue.ContainsKey(voiceType))
+                {
                     CharacterVoices.VoiceCatalogue[voiceType] = new Dictionary<string, string>();
                 }
-                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower())) {
+                if (!CharacterVoices.VoiceCatalogue[(voiceType)].ContainsKey(trimmedText.ToLower()))
+                {
                     audioPath = await GetVoiceFromCTTS(trimmedText, voiceType, language);
-                } else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()])) {
+                }
+                else if (File.Exists(CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()]))
+                {
                     audioPath = CharacterVoices.VoiceCatalogue[(voiceType)][trimmedText.ToLower()];
-                } else {
+                }
+                else
+                {
                     CharacterVoices.VoiceCatalogue[(voiceType)].Remove(trimmedText.ToLower());
                     audioPath = await GetVoiceFromCTTS(trimmedText, voiceType, language);
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 OnVoiceFailed?.Invoke(this, new VoiceFailure() { FailureMessage = "Failed", Exception = e });
             }
             return audioPath;
         }
     }
+}
 
-    public class ValidationResult : EventArgs {
-        public bool ValidationSuceeded { get; set; }
-        // ValidationState 3 is meant for api calls failed when they shouldn't have
-        // Meaning somehow an invalid key slipped by the validation, or it got invalidated by outside sources
-        // Right now the plugin isn't set up to actually make use of it, and this needs to be thought through
-        public int ValidationState { get; set; }
-    }
-    public class VoiceFailure : EventArgs {
-        string _failureMessage;
-        Exception _exception;
+public class ValidationResult : EventArgs
+{
+    public bool ValidationSuceeded { get; set; }
+    // ValidationState 3 is meant for api calls failed when they shouldn't have
+    // Meaning somehow an invalid key slipped by the validation, or it got invalidated by outside sources
+    // Right now the plugin isn't set up to actually make use of it, and this needs to be thought through
+    public int ValidationState { get; set; }
+}
+public class VoiceFailure : EventArgs
+{
+    string _failureMessage;
+    Exception _exception;
 
-        public string FailureMessage { get => _failureMessage; set => _failureMessage = value; }
-        public Exception Exception { get => _exception; set => _exception = value; }
-    }
+    public string FailureMessage { get => _failureMessage; set => _failureMessage = value; }
+    public Exception Exception { get => _exception; set => _exception = value; }
 }
