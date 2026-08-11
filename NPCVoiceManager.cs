@@ -25,7 +25,6 @@ namespace RoleplayingVoiceCore
         {
             try { File.AppendAllText(_debugLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n"); } catch { }
         }
-        private bool _useCustomRelayServer = false;
         private Dictionary<string, string> _characterToVoicePairing = new Dictionary<string, string>();
         private Dictionary<string, VoiceLinePriority> _characterToCacheType = new Dictionary<string, VoiceLinePriority>();
         private string _cacheLocation;
@@ -36,14 +35,13 @@ namespace RoleplayingVoiceCore
         private string _editorCacheLocation = "";
         private string _versionIdentifier;
         private string _customRelayServer;
-        private string _port = "5670";
+        private string _port = "5671";
         private string _closestServerAlias;
         private string _currentServerAlias;
         Stopwatch cacheTimer = new Stopwatch();
         Stopwatch cacheSaveTimer = new Stopwatch();
         private bool _cacheLoaded;
         private bool alreadySaving;
-        private bool useClosestRelay;
         private DateTime _closestRelayBlockedUntilUtc = DateTime.MinValue;
         private bool _closestRelayRefreshInProgress;
         private readonly object _relayCircuitLock = new object();
@@ -52,13 +50,11 @@ namespace RoleplayingVoiceCore
         private bool _isServer = false;
 
         public event EventHandler OnMasterListAcquired;
-        public bool UseCustomRelayServer { get => _useCustomRelayServer; set => _useCustomRelayServer = value; }
         public string CustomRelayServer { get => _customRelayServer; set => _customRelayServer = value; }
         public string Port { get => _port; set => _port = value; }
         public string CurrentServerAlias { get => _currentServerAlias; set => _currentServerAlias = value; }
         public CharacterVoices CharacterVoices { get => _characterVoices; }
         public CharacterVoices CharacterVoicesMasterList { get => _characterVoicesMasterList; set => _characterVoicesMasterList = value; }
-        public bool UseClosestRelay { get => useClosestRelay; set => useClosestRelay = value; }
 
         public NPCVoiceManager(Dictionary<string, string> characterToVoicePairing, Dictionary<string, VoiceLinePriority> characterToCacheType,
             string cacheLocation, string version, bool isAServer)
@@ -112,7 +108,6 @@ namespace RoleplayingVoiceCore
                     {
                         string value = await post.Content.ReadAsStringAsync();
                         ServerRegistrationRequest response = JsonConvert.DeserializeObject<ServerRegistrationRequest>(value);
-                        _useCustomRelayServer = true;
                         _customRelayServer = response.PublicHostAddress;
                         _port = response.Port;
                         _closestServerAlias = response.Alias;
@@ -129,13 +124,14 @@ namespace RoleplayingVoiceCore
         {
             return _isServer || Environment.MachineName == "ARTEMISDIALOGUE" ? ArtemisRelayServer : PrimaryRelayServer;
         }
-        private bool ShouldUseClosestRelay()
-        {
-            // Keep the closest-relay preference enabled, but skip it while a recent request failure is cooling down.
-            return _useCustomRelayServer
-                && useClosestRelay
-                && DateTime.UtcNow >= _closestRelayBlockedUntilUtc;
-        }
+        //private bool ShouldUseClosestRelay()
+        //{
+        //    // Keep the closest-relay preference enabled, but skip it while a recent request failure is cooling down.
+        //    return _useCustomRelayServer
+        //        && useClosestRelay
+        //        && DateTime.UtcNow >= _closestRelayBlockedUntilUtc;
+        //}
+
         private void MarkClosestRelayUnavailable(string reason)
         {
             // Keep the user's "closest relay" preference, but avoid hammering a relay that just timed out.
@@ -434,16 +430,16 @@ namespace RoleplayingVoiceCore
             bool recoverLineType = false;
             bool isServerRequest = resp != null;
             string characterGendered = character + (gender ? "_0" : "_1");
-            if (ShouldUseClosestRelay())
-            {
-                currentRelayServer = "http://" + _customRelayServer + ":" + _port;
-                _currentServerAlias = _closestServerAlias;
-                usingClosestRelay = true;
-            }
-            else
-            {
+            //if (ShouldUseClosestRelay())
+            //{
+            //    currentRelayServer = "http://" + _customRelayServer + ":" + _port;
+            //    _currentServerAlias = _closestServerAlias;
+            //    usingClosestRelay = true;
+            //}
+            //else
+            //{
                 _currentServerAlias = PrimaryRelayAlias;
-            }
+            //}
             string voiceEngine = "";
             bool succeeded = false;
             DebugLog($"[GetCharacterAudio] START char='{character}' gendered='{characterGendered}' cacheLoaded={_cacheLoaded} cachePath='{_cachePath}' server='{currentRelayServer}'");
