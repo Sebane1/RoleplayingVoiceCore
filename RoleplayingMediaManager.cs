@@ -71,70 +71,44 @@ namespace RoleplayingMediaCore
         private Dictionary<string, string> _fishAudioVoiceMap = new Dictionary<string, string>();
         private string _cttsVoiceType;
         public string FishAudioApiKey { get; set; }
+        public string ElevenLabsApiKey { get; set; }
         public string CTTSAddress { get; set; }
         private bool _readUnquotedText;
 
         public event EventHandler<string> InitializationCallbacks;
-        public RoleplayingMediaManager(string apiKey, string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null)
+        public RoleplayingMediaManager(string cache, NetworkedClient client, CharacterVoices? characterVoices = null, EventHandler<string> initializationCallbacks = null)
         {
             rpVoiceCache = cache;
             _networkedClient = client;
-            if (string.IsNullOrWhiteSpace(apiKey))
+            _characterVoices = characterVoices;
+            InitializationCallbacks += initializationCallbacks;
+        }
+
+        public void InitializeElevenlabs()
+        {
+            if (string.IsNullOrWhiteSpace(ElevenLabsApiKey))
             {
                 apiValid = false;
             }
             else
             {
-                _apiKey = apiKey;
-                if (!string.IsNullOrEmpty(apiKey))
+                if (!string.IsNullOrEmpty(ElevenLabsApiKey))
                 {
                     apiValid = true;
                 }
                 // Spin a new thread for this
                 Task.Run(() =>
                 {
-                    SetAPI(apiKey);
+                    SetAPI(ElevenLabsApiKey);
                 });
-                if (characterVoices != null)
-                {
-                    _characterVoices = characterVoices;
-                }
             }
-            InitializationCallbacks += initializationCallbacks;
             Task.Run(() =>
             {
                 RefreshElevenlabsSubscriptionInfo();
-                RefreshFishAudioSubscriptionInfo();
                 GetVoiceListElevenlabs();
-                string batchScript = @"cd /d" + cache + "\r\n" + _batchInstall;
-                installBatchFile = Path.Combine(cache, "install.bat");
-                File.WriteAllText(installBatchFile, batchScript);
-                batchScript = @"cd /d" + cache + "\r\n" + _installPythonBatch;
-                pythonBatchFile = Path.Combine(cache, "pythonInstall.bat");
-                File.WriteAllText(pythonBatchFile, batchScript);
             });
         }
-        public void InstallPython()
-        {
-            var processStart = new ProcessStartInfo(pythonBatchFile);
-            processStart.RedirectStandardOutput = true;
-            processStart.RedirectStandardError = true;
-            processStart.WindowStyle = ProcessWindowStyle.Hidden;
-            processStart.UseShellExecute = false;
-            processStart.RedirectStandardInput = true;
-            processStart.CreateNoWindow = true;
-            Process process = new Process();
-            process.StartInfo = processStart;
-            process.OutputDataReceived += Process_OutputDataReceived;
-            process.ErrorDataReceived += Process_ErrorDataReceived;
-            process.EnableRaisingEvents = true;
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Python not detected, attempting to auto install.");
-            process.WaitForExit();
-            _pythonAutoInstalled = true;
-        }
+
         public void InitializeXTTS()
         {
             Task.Run(() =>
@@ -162,20 +136,10 @@ namespace RoleplayingMediaCore
         {
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Attempting to install C++ build tools please accept the UAC prompt that appears, as this dependency is required for XTTS installation to function. If the UAC prompt was rejected, restart Artemis to try again.");
             var processStart = new ProcessStartInfo(installBatchFile);
-            // processStart.RedirectStandardOutput = true;
-            // processStart.RedirectStandardError = true;
-            //processStart.WindowStyle = ProcessWindowStyle.Hidden;
             processStart.UseShellExecute = false;
-            // processStart.RedirectStandardInput = true;
-            // processStart.CreateNoWindow = true;
             Process process = new Process();
             process.StartInfo = processStart;
-            // process.OutputDataReceived += Process_OutputDataReceived;
-            //process.ErrorDataReceived += Process_ErrorDataReceived;
-            //process.EnableRaisingEvents = true;
             process.Start();
-            //process.BeginOutputReadLine();
-            //process.BeginErrorReadLine();
             InitializationCallbacks?.Invoke(this, "[Roleplaying Voice Core] Installing dependencies, this may take a while. You can keep playing while you wait (we'll let you know when its done)");
         }
 
@@ -262,9 +226,11 @@ namespace RoleplayingMediaCore
         public string FishAudioCredit { get => _fishAudioCredit; set => _fishAudioCredit = value; }
         public NetworkedClient NetworkedClient { get => _networkedClient; set => _networkedClient = value; }
         public bool XttsReady { get => _xttsReady; set => _xttsReady = value; }
-        public string BasePath {
+        public string BasePath
+        {
             get => _basePath;
-            set {
+            set
+            {
                 _basePath = value;
                 AudioConversionHelper.NativeLibrarySearchPath = value;
             }
@@ -553,6 +519,23 @@ namespace RoleplayingMediaCore
             _cttsVoiceType = voiceType;
         }
 
+        public Task<string> DoVoiceFishAudioWithSpecificVoice(string sender, string text, bool isEmote, float volume, Vector3 position, bool aggressiveSplicing)
+        {
+            SetVoiceFishAudio(sender);
+            return DoVoiceFishAudio(sender, text, isEmote, volume, position, aggressiveSplicing, false);
+        }
+
+        public Task<string> DoVoiceMicrosoftNarratorWithSpecificVoice(string sender, string text, bool isEmote, float volume, Vector3 position, bool aggressiveSplicing)
+        {
+            SetVoiceMicrosoftNarrator(sender);
+            return DoVoiceMicrosoftNarrator(sender, text, isEmote, volume, position, aggressiveSplicing, false);
+        }
+
+        public Task<string> DoCTTSWithSpecificVoice(string sender, string text, bool isEmote, float volume, Vector3 position, bool aggressiveSplicing)
+        {
+            SetVoiceCTTS(sender);
+            return DoVoiceCTTS(sender, text, isEmote, volume, position, aggressiveSplicing, false);
+        }
         public async Task<string> DoVoiceElevenlabs(string sender, string text,
             bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useSync)
         {

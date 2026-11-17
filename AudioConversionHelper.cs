@@ -1,4 +1,4 @@
-﻿using NAudio.Lame;
+using NAudio.Lame;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
@@ -25,6 +25,20 @@ namespace RoleplayingVoiceCore {
             if (!string.IsNullOrEmpty(baseDirectory)) {
                 searchPaths.Add(baseDirectory);
             }
+
+            try {
+                var asmDir = Path.GetDirectoryName(typeof(AudioConversionHelper).Assembly.Location);
+                if (!string.IsNullOrEmpty(asmDir)) {
+                    searchPaths.Add(asmDir);
+                }
+            } catch { }
+
+            try {
+                var entryDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location);
+                if (!string.IsNullOrEmpty(entryDir)) {
+                    searchPaths.Add(entryDir);
+                }
+            } catch { }
 
             LameDLL.LoadNativeDLL(searchPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
         }
