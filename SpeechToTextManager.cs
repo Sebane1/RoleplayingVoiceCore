@@ -29,6 +29,7 @@ namespace RoleplayingVoiceCore {
         public bool RpMode { get => _rpMode; set => _rpMode = value; }
         public SpeechToTextBackend Backend { get; set; } = SpeechToTextBackend.Whisper;
         public string FishAudioApiKey { get; set; } = "";
+        public byte[] LastRecordedAudio { get; private set; } = Array.Empty<byte>();
 
         public SpeechToTextManager(string path) {
             _basePath = path;
@@ -106,6 +107,12 @@ namespace RoleplayingVoiceCore {
             _waveWriter.Flush();
             _waveSource.DataAvailable -= DataAvailable;
             _waveSource.RecordingStopped -= RecordingStopped;
+
+            try {
+                LastRecordedAudio = _recordedAudioStream?.ToArray() ?? Array.Empty<byte>();
+            } catch {
+                LastRecordedAudio = Array.Empty<byte>();
+            }
 
             if (Backend == SpeechToTextBackend.FishAudio && !string.IsNullOrWhiteSpace(FishAudioApiKey)) {
                 try {
