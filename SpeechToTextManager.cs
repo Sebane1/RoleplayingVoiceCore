@@ -1,10 +1,17 @@
-﻿using NAudio.Wave;
+using NAudio.Wave;
+using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Timers;
 using Whisper.net;
 using Whisper.net.Ggml;
 
 namespace RoleplayingVoiceCore {
+    public enum SpeechToTextBackend {
+        Whisper,
+        FishAudio
+    }
+
     public class SpeechToTextManager {
         private Stopwatch _timer = new Stopwatch();
         private WaveInEvent _waveSource;
@@ -20,6 +27,8 @@ namespace RoleplayingVoiceCore {
         public string FinalText { get => _finalText; set => _finalText = value; }
         public bool IsRecording { get => _isRecording; set => _isRecording = value; }
         public bool RpMode { get => _rpMode; set => _rpMode = value; }
+        public SpeechToTextBackend Backend { get; set; } = SpeechToTextBackend.Whisper;
+        public string FishAudioApiKey { get; set; } = "";
 
         public SpeechToTextManager(string path) {
             _basePath = path;
@@ -64,13 +73,22 @@ namespace RoleplayingVoiceCore {
         private void DataAvailable(object sender, WaveInEventArgs e) {
             if (_waveWriter != null) {
                 _waveWriter.Write(e.Buffer, 0, e.BytesRecorded);
+
+                // Calculate max peak amplitude across the buffer
+                short maxPeak = 0;
+                for (int index = 0; index < e.BytesRecorded - 1; index += 2) {
+                    short sample = Math.Abs(BitConverter.ToInt16(e.Buffer, index));
+                    if (sample > maxPeak) {
+                        maxPeak = sample;
+                    }
+                }
+
                 int threshold = 500;
-                int value = Math.Abs(BitConverter.ToInt16(e.Buffer, (e.BytesRecorded - 2)));
-                if (value < threshold) {
+                if (maxPeak < threshold) {
                     if (!_timer.IsRunning) {
                         _timer.Start();
                     }
-                    if (_timer.ElapsedMilliseconds > 1000) {
+                    if (_timer.ElapsedMilliseconds > 2000) {
                         StopRecording();
                     }
                 } else {
@@ -88,36 +106,94 @@ namespace RoleplayingVoiceCore {
             _waveWriter.Flush();
             _waveSource.DataAvailable -= DataAvailable;
             _waveSource.RecordingStopped -= RecordingStopped;
-            /*Stop the audio recording*/
-            if (File.Exists(_modelName)) {
+
+            if (Backend == SpeechToTextBackend.FishAudio && !string.IsNullOrWhiteSpace(FishAudioApiKey)) {
                 try {
-
-                    using var whisperFactory = WhisperFactory.FromPath(_modelName, false, _basePath + @"\runtimes\win-x64\whisper.dll");
-
-                    using var processor = whisperFactory.CreateBuilder()
-                        .WithLanguage("en")
-                        .Build();
-
-                    _finalText = "";
                     _recordedAudioStream.Position = 0;
-                    await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
-                        Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
-                        _finalText += result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0];
-                        break;
+                    string transcribedText = await TranscribeWithFishAudioAsync(_recordedAudioStream, FishAudioApiKey);
+                    if (!string.IsNullOrWhiteSpace(transcribedText)) {
+                        _finalText = transcribedText.Trim();
+                        RecordingFinished?.Invoke(this, _finalText);
+                    } else if (File.Exists(_modelName)) {
+                        await TranscribeWithWhisperAsync();
                     }
-                    _finalText = FinalText.Trim();
-                    /*Send notification that the recording is complete*/
-                    RecordingFinished?.Invoke(this, _finalText);
                 } catch {
-
+                    if (File.Exists(_modelName)) {
+                        await TranscribeWithWhisperAsync();
+                    }
                 }
+            } else if (File.Exists(_modelName)) {
+                await TranscribeWithWhisperAsync();
             }
+
             try {
                 _waveSource?.Dispose();
                 _waveWriter?.Dispose();
             } catch { }
             _timer.Reset();
             _isRecording = false;
+        }
+
+        private async Task TranscribeWithWhisperAsync() {
+            try {
+                using var whisperFactory = WhisperFactory.FromPath(_modelName, false, _basePath + @"\runtimes\win-x64\whisper.dll");
+
+                using var processor = whisperFactory.CreateBuilder()
+                    .WithLanguage("en")
+                    .Build();
+
+                _finalText = "";
+                _recordedAudioStream.Position = 0;
+                await foreach (var result in processor.ProcessAsync(_recordedAudioStream)) {
+                    Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
+                    string cleanSegment = result.Text.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0].Trim();
+                    if (!string.IsNullOrEmpty(cleanSegment)) {
+                        _finalText += " " + cleanSegment;
+                    }
+                }
+                _finalText = FinalText.Trim();
+                RecordingFinished?.Invoke(this, _finalText);
+            } catch {
+
+            }
+        }
+
+        public async Task<string> TranscribeWithFishAudioAsync(Stream audioStream, string apiKey) {
+            try {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                httpClient.DefaultRequestHeaders.Add("model", "transcribe-1");
+
+                using var formContent = new MultipartFormDataContent();
+                byte[] audioData;
+                if (audioStream is MemoryStream memStream) {
+                    audioData = memStream.ToArray();
+                } else {
+                    using var ms = new MemoryStream();
+                    audioStream.Position = 0;
+                    await audioStream.CopyToAsync(ms);
+                    audioData = ms.ToArray();
+                }
+
+                var byteArrayContent = new ByteArrayContent(audioData);
+                byteArrayContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+                formContent.Add(byteArrayContent, "audio", "audio.wav");
+
+                var response = await httpClient.PostAsync("https://api.fish.audio/v1/asr", formContent);
+                if (response.IsSuccessStatusCode) {
+                    string responseBody = await response.Content.ReadAsStringAsync();
+                    var jObj = JObject.Parse(responseBody);
+                    string rawText = jObj["text"]?.ToString() ?? "";
+
+                    // Clean tags or speaker markers if present (e.g. <|speaker:0|>, [laughter])
+                    string cleanText = rawText.Replace("]", "[").Replace("(", "[").Replace(")", "[").Replace("*", "[").Split("[")[0].Trim();
+                    return !string.IsNullOrWhiteSpace(cleanText) ? cleanText : rawText.Trim();
+                }
+            } catch (Exception ex) {
+                Debug.WriteLine($"[SpeechToTextManager] Fish Audio transcription failed: {ex.Message}");
+            }
+            return "";
         }
         /// <summary>
         /// Callback executed when the recording is stopped
