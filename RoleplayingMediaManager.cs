@@ -16,6 +16,7 @@ using System.Text.RegularExpressions;
 using System.Speech.Synthesis;
 using RoleplayingVoiceCore;
 using NAudio.Wave;
+using Newtonsoft.Json;
 
 namespace RoleplayingMediaCore
 {
@@ -69,6 +70,7 @@ namespace RoleplayingMediaCore
         private string _fishAudioVoiceType;
         private string[] _fishAudioVoices;
         private Dictionary<string, string> _fishAudioVoiceMap = new Dictionary<string, string>();
+        public Dictionary<string, string> FishAudioVoiceMap => _fishAudioVoiceMap;
         private string _cttsVoiceType;
         public string FishAudioApiKey { get; set; }
         public string ElevenLabsApiKey { get; set; }
@@ -822,32 +824,76 @@ bool isEmote, float volume, Vector3 position, bool aggressiveSplicing, bool useS
                 {
                     client.Timeout = TimeSpan.FromMinutes(2);
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", FishAudioApiKey);
+                    _fishAudioVoiceMap.Clear();
 
-                    // Fetch voices
-                    var response = await client.GetAsync("https://api.fish.audio/model?self=true");
-                    if (response.IsSuccessStatusCode)
+                    try
                     {
-                        string responseBody = await response.Content.ReadAsStringAsync();
-                        dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
-                        if (json != null && json.items != null)
+                        var response = await client.GetAsync("https://api.fish.audio/model?self=true&page_size=100");
+                        if (response.IsSuccessStatusCode)
                         {
-                            _fishAudioVoiceMap.Clear();
-                            foreach (var item in json.items)
+                            string responseBody = await response.Content.ReadAsStringAsync();
+                            dynamic json = JsonConvert.DeserializeObject(responseBody);
+                            if (json != null && json.items != null)
                             {
-                                string title = item.title;
-                                string id = item._id; // Fish Audio usually uses _id for models in their v1 REST API
-                                voicesNames.Add(title);
-                                _fishAudioVoiceMap[title] = id;
+                                foreach (var item in json.items)
+                                {
+                                    string title = (string)item.title;
+                                    string id = (string)item._id;
+                                    if (!string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(id))
+                                    {
+                                        if (!_fishAudioVoiceMap.ContainsKey(title))
+                                        {
+                                            voicesNames.Add(title);
+                                            _fishAudioVoiceMap[title] = id;
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
+                    catch { }
+
+                    for (int page = 1; page <= 5; page++)
+                    {
+                        try
+                        {
+                            var response = await client.GetAsync($"https://api.fish.audio/model?page_size=100&page_number={page}&sort_by=task_count");
+                            if (response.IsSuccessStatusCode)
+                            {
+                                string responseBody = await response.Content.ReadAsStringAsync();
+                                dynamic json = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
+                                if (json != null && json.items != null)
+                                {
+                                    int countAdded = 0;
+                                    foreach (var item in json.items)
+                                    {
+                                        string title = (string)item.title;
+                                        string id = (string)item._id;
+                                        if (!string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(id))
+                                        {
+                                            if (!_fishAudioVoiceMap.ContainsKey(title))
+                                            {
+                                                voicesNames.Add(title);
+                                                _fishAudioVoiceMap[title] = id;
+                                                countAdded++;
+                                            }
+                                        }
+                                    }
+                                    if (countAdded == 0) break;
+                                }
+                                else break;
+                            }
+                            else break;
+                        }
+                        catch { break; }
                     }
                 }
             }
             catch (Exception e)
             {
                 var errorVoiceGen = e.Message.ToString();
-                OnApiValidationComplete?.Invoke(this, state);
             }
+            OnApiValidationComplete?.Invoke(this, state);
             _fishAudioVoices = voicesNames.ToArray();
             return _fishAudioVoices;
         }
